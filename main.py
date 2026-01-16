@@ -2,6 +2,7 @@ import os
 import logging
 import asyncio
 import random
+import html
 import google.generativeai as genai
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
@@ -121,6 +122,14 @@ def calculate_typing_delay(text: str) -> float:
     else:
         delay = random.uniform(5.0, 7.0)
     return delay
+
+def markdown_to_html(text: str) -> str:
+    escaped = html.escape(text)
+    escaped = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', escaped)
+    escaped = re.sub(r'\*([^*]+?)\*', r'<i>\1</i>', escaped)
+    escaped = re.sub(r'__(.+?)__', r'<u>\1</u>', escaped)
+    escaped = re.sub(r'_([^_]+?)_', r'<i>\1</i>', escaped)
+    return escaped
 
 async def check_subscription(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
     if not FORCE_SUB_CHANNEL:
@@ -371,12 +380,15 @@ Previous conversation:
         
         save_message(user.id, 'assistant', ai_response)
         
+        formatted_response = markdown_to_html(ai_response)
+        
         try:
             await update.message.reply_text(
-                ai_response,
+                formatted_response,
                 parse_mode=ParseMode.HTML
             )
-        except Exception:
+        except Exception as format_error:
+            logger.warning(f"HTML formatting failed: {format_error}")
             await update.message.reply_text(ai_response)
         
     except Exception as e:
