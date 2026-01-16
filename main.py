@@ -1,5 +1,7 @@
 import os
 import logging
+import asyncio
+import random
 import google.generativeai as genai
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
@@ -91,6 +93,18 @@ def get_model():
             'max_output_tokens': 1024,
         }
     )
+
+def calculate_typing_delay(text: str) -> float:
+    length = len(text)
+    if length < 50:
+        delay = random.uniform(1.0, 2.0)
+    elif length < 150:
+        delay = random.uniform(2.0, 4.0)
+    elif length < 300:
+        delay = random.uniform(3.5, 5.5)
+    else:
+        delay = random.uniform(5.0, 7.0)
+    return delay
 
 async def check_subscription(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
     if not FORCE_SUB_CHANNEL:
@@ -308,6 +322,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     save_message(user.id, 'user', message_text)
     
+    logger.info(f"[USER {user.id}] {preferred_name}: {message_text}")
+    
     try:
         model = get_model()
         
@@ -329,6 +345,14 @@ Previous conversation:
         response = model.generate_content(context_prompt)
         ai_response = response.text.strip()
         
+        logger.info(f"[KEERTHANA -> {user.id}] {ai_response}")
+        
+        typing_delay = calculate_typing_delay(ai_response)
+        logger.info(f"[DELAY] Waiting {typing_delay:.1f}s before sending response")
+        
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+        await asyncio.sleep(typing_delay)
+        
         save_message(user.id, 'assistant', ai_response)
         
         try:
@@ -346,7 +370,6 @@ Previous conversation:
             f"Sorry sweetheart, I was daydreaming about us! 🥰 Tell me again, dear!",
             f"Oops! Got lost in your love for a second there, {preferred_name}! 💋 Say that again?"
         ]
-        import random
         await update.message.reply_text(random.choice(fallback_responses))
 
 def main():
