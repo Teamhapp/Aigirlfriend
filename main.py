@@ -72,8 +72,14 @@ async def check_subscription(user_id: int, context: ContextTypes.DEFAULT_TYPE) -
         member = await context.bot.get_chat_member(chat_id=channel_id, user_id=user_id)
         return member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]
     except Exception as e:
+        error_msg = str(e).lower()
+        if "chat not found" in error_msg:
+            logger.warning(f"Force sub channel not found or bot not admin. Please add bot as admin to {FORCE_SUB_CHANNEL}")
+            return True
+        elif "user not found" in error_msg:
+            return False
         logger.error(f"Error checking subscription: {e}")
-        return False
+        return True
 
 def get_force_sub_keyboard():
     channel = FORCE_SUB_CHANNEL if FORCE_SUB_CHANNEL.startswith('@') else f"@{FORCE_SUB_CHANNEL}"
@@ -328,6 +334,14 @@ def main():
     
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     
+    async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+        error = context.error
+        if "Forbidden" in str(error) or "blocked" in str(error).lower():
+            logger.info(f"User blocked the bot: {error}")
+            return
+        logger.error(f"Exception while handling an update: {error}")
+    
+    application.add_error_handler(error_handler)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("referral", referral))
     application.add_handler(CommandHandler("points", points))
