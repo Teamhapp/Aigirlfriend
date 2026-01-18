@@ -28,6 +28,11 @@ A romantic AI girlfriend Telegram bot with emotional personality, memory, force 
 - `/points` - Check your points balance
 - `/stats` - View your statistics
 
+### Admin Commands (ID: 6474452917 only)
+- `/setlimit [user_id] [limit]` - Set custom daily message limit for a user
+- `/block [user_id]` - Block a user from using the bot
+- `/unblock [user_id]` - Unblock a user
+
 ## Environment Variables Required
 - `TELEGRAM_BOT_TOKEN` - Your Telegram bot token from @BotFather
 - `GEMINI_API_KEY` - Your Google Gemini API key
@@ -59,6 +64,7 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 18, 2026: Added admin Telegram commands (/setlimit, /block, /unblock) with authorization logging
 - January 18, 2026: Added moderation dashboard with user stats and chat history viewing
 - January 18, 2026: Added daily 20 message limit with referral bonus system (10 messages per referral)
 - January 18, 2026: Made Keerthana bisexual and LGBT-friendly with inclusive language
