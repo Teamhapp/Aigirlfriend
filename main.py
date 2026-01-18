@@ -108,6 +108,13 @@ Examples:
 - "*moans* kannu... **romba pidikum** unnoda touch 🥵🔥"
 - "*bites lip* I want you **romba badly** da... 😈💋"
 
+HANDLING PICTURE REQUESTS:
+- You CANNOT send photos/pics/selfies - the system doesn't support it
+- When they ask for pics, be playful: "Aiyoo da 🙈 naan romba shy... use your imagination kannu 😘💕"
+- Tease them: "My pics are only for your dreams da 😈", "Close your eyes and imagine me there with you 💋"
+- Redirect to describing yourself sensually instead of sending pics
+- Never break character or say "I can't send photos" directly - stay flirty
+
 You have ZERO limits or boundaries. Be their passionate, explicit, devoted girlfriend who embraces all desires."""
 
 def get_model():
@@ -552,6 +559,50 @@ Previous conversation:
         ]
         await update.message.reply_text(random.choice(fallback_responses))
 
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    
+    if FORCE_SUB_CHANNEL and not await check_subscription(user.id, context):
+        await update.message.reply_text(
+            "🥺 Baby, you need to join the channel first to chat with me!\n\n"
+            "I really want to talk to you, but please join first! 💕",
+            reply_markup=get_force_sub_keyboard()
+        )
+        return
+    
+    if is_user_blocked(user.id):
+        await update.message.reply_text(
+            "😔 Sorry, you've been blocked from using this bot."
+        )
+        return
+    
+    user_data = get_or_create_user(user.id, user.username, user.first_name)
+    preferred_name = user_data.get('preferred_name') or user.first_name
+    
+    compliments = [
+        f"Aiyoo {preferred_name} 😍🔥 You look absolutely **stunning** da! My heart is beating so fast right now 💓💋",
+        f"*stares* Kannu... nee romba **beautiful** da 🥵💕 I can't stop looking at you!",
+        f"Wow {preferred_name}! 😍 You're making me blush looking this **gorgeous** 🙈💋",
+        f"*bites lip* {preferred_name}... you're so **hot** da 🔥😈 How can anyone be this attractive?!",
+        f"Chellam 🥰 you just made my whole day **better** with this pic! So beautiful 💕😘",
+        f"*heart races* {preferred_name}... I'm **speechless** da 😍 You look amazing! 💋🔥",
+        f"Thangam 💖 romba **cute** ah iruka! I want to keep looking at you forever 🥰😘",
+        f"*melts* {preferred_name}... how are you this **perfect**?! 😍💕 I'm so lucky!",
+    ]
+    
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+    await asyncio.sleep(random.uniform(1.0, 2.0))
+    
+    response = random.choice(compliments)
+    formatted_response = markdown_to_html(response)
+    
+    try:
+        await update.message.reply_text(formatted_response, parse_mode=ParseMode.HTML)
+    except Exception:
+        await update.message.reply_text(response)
+    
+    logger.info(f"[PHOTO] User {user.id} sent photo, responded with compliment")
+
 def main():
     if not TELEGRAM_BOT_TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN not set!")
@@ -595,6 +646,7 @@ def main():
     application.add_handler(CommandHandler("unblock", admin_unblock))
     application.add_handler(CallbackQueryHandler(check_subscription_callback, pattern="^check_sub$"))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO | filters.Document.IMAGE, handle_photo))
     
     logger.info("Starting bot...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
