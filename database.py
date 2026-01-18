@@ -55,6 +55,7 @@ def init_database():
             cur.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_reset_date DATE DEFAULT CURRENT_DATE')
             cur.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE')
             cur.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_daily_limit INTEGER DEFAULT NULL')
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS confirmed_gender VARCHAR(20) DEFAULT NULL")
         except Exception:
             pass
         
@@ -136,6 +137,33 @@ def get_or_create_user(user_id, username=None, first_name=None, referred_by=None
         logger.error(f"Error in get_or_create_user: {e}")
         conn.rollback()
         raise
+    finally:
+        cur.close()
+        release_connection(conn)
+
+def get_confirmed_gender(user_id):
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT confirmed_gender FROM users WHERE user_id = %s', (user_id,))
+        result = cur.fetchone()
+        return result[0] if result else None
+    finally:
+        cur.close()
+        release_connection(conn)
+
+def set_confirmed_gender(user_id, gender):
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute('UPDATE users SET confirmed_gender = %s WHERE user_id = %s', (gender, user_id))
+        conn.commit()
+        logger.info(f"Set confirmed gender for user {user_id} to {gender}")
+        return True
+    except Exception as e:
+        logger.error(f"Error setting gender: {e}")
+        conn.rollback()
+        return False
     finally:
         cur.close()
         release_connection(conn)

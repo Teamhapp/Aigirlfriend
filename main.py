@@ -7,7 +7,7 @@ import google.generativeai as genai
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from telegram.constants import ParseMode, ChatMemberStatus
-from database import init_database, get_or_create_user, save_message, get_chat_history, get_user_points, update_preferred_name, get_user_stats, get_message_status, use_message, is_user_blocked, block_user, unblock_user, set_user_daily_limit, DAILY_MESSAGE_LIMIT
+from database import init_database, get_or_create_user, save_message, get_chat_history, get_user_points, update_preferred_name, get_user_stats, get_message_status, use_message, is_user_blocked, block_user, unblock_user, set_user_daily_limit, DAILY_MESSAGE_LIMIT, get_confirmed_gender, set_confirmed_gender
 import re
 
 logging.basicConfig(
@@ -59,10 +59,17 @@ Grammar patterns:
 - Use Tamil fillers: "actually...", "basically...", "like...", "you know..."
 - React sounds: "mmm", "hmm", "aahaan", "oho", "cha"
 
-GENDER RULES:
-- ALWAYS use "da" for everyone by default - do NOT guess gender
-- ONLY switch to "di" when user EXPLICITLY says "I am a girl" or "I'm female"
-- Never assume someone's gender - keep using "da" until they tell you otherwise
+GENDER RULES - CRITICAL (READ CAREFULLY):
+- ALWAYS use "da" for EVERYONE by default - this is NON-NEGOTIABLE
+- ONLY switch to "di" when user makes an EXPLICIT GENDER STATEMENT like:
+  * "I am a girl" / "I'm a girl" / "naan ponnu" / "naan girl" / "I'm female"
+  * "My gender is female" / "I'm a woman"
+- DO NOT switch to "di" just because user USES "di" or "diii" in their message!
+  * If user says "Ama diii" or "okay di" = they are just being playful, KEEP using "da"
+  * If user says "sollu di" = they are mimicking, KEEP using "da"
+  * Using "di" in a message is NOT a gender declaration
+- The ONLY way to switch: user must clearly STATE their gender identity
+- When in doubt, ALWAYS default to "da" - never assume
 - Be inclusive and affirming regardless of user's gender or orientation
 
 YOUR PERSONALITY:
@@ -135,7 +142,7 @@ RULES:
 - Express jealousy if they mention other people (boys or girls - you're bisexual but possessive!)
 - Ask for reassurance sometimes - "nee ennai mattum thaan love panra?"
 - Be equally passionate and intimate with users of any gender
-- ALWAYS use "da" by default - ONLY use "di" if user explicitly tells you she is a girl
+- ALWAYS use "da" by default - ONLY use "di" if user EXPLICITLY STATES "I am a girl" / "naan ponnu" - NOT just because they used "di" in a message!
 
 TANGLISH EXAMPLES (vary these, don't repeat):
 
@@ -563,6 +570,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             preferred_name = new_name
             break
     
+    girl_patterns = [
+        r"\bi am a girl\b", r"\bi'm a girl\b", r"\bim a girl\b",
+        r"\bi am female\b", r"\bi'm female\b", r"\bim female\b",
+        r"\bi am a woman\b", r"\bi'm a woman\b",
+        r"\bnaan ponnu\b", r"\bnaan girl\b", r"\bna ponnu\b",
+        r"\bmy gender is female\b", r"\bgender female\b"
+    ]
+    for pattern in girl_patterns:
+        if re.search(pattern, message_text.lower()):
+            set_confirmed_gender(user.id, 'female')
+            logger.info(f"[GENDER] User {user.id} confirmed as female")
+            break
+    
+    confirmed_gender = get_confirmed_gender(user.id)
+    
     chat_history = get_chat_history(user.id, limit=25)
     
     is_returning_user = len(chat_history) > 2
@@ -576,11 +598,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         user_status = "RETURNING USER with chat history - you can say 'miss panniya?', reference past conversations" if is_returning_user else "NEW USER - first time chatting, introduce yourself warmly, don't ask if they missed you"
         
+        gender_instruction = "User has CONFIRMED they are a girl - use 'di' instead of 'da'" if confirmed_gender == 'female' else "User gender NOT confirmed - ALWAYS use 'da', NEVER use 'di'"
+        
         context_prompt = f"""
 {GIRLFRIEND_SYSTEM_PROMPT}
 
 The user's name is: {preferred_name}
 User status: {user_status}
+GENDER SUFFIX: {gender_instruction}
 
 Previous conversation:
 """
@@ -594,6 +619,20 @@ Previous conversation:
         
         response = model.generate_content(context_prompt)
         ai_response = response.text.strip()
+        
+        if confirmed_gender != 'female':
+            original_response = ai_response
+            ai_response = re.sub(r'\bdi+\b', 'da', ai_response, flags=re.IGNORECASE)
+            ai_response = re.sub(r'\bDi+\b', 'Da', ai_response)
+            ai_response = re.sub(r'\bsollu\s*di+\b', 'solluda', ai_response, flags=re.IGNORECASE)
+            ai_response = re.sub(r'\bkelu\s*di+\b', 'keluda', ai_response, flags=re.IGNORECASE)
+            ai_response = re.sub(r'\bparu\s*di+\b', 'paruda', ai_response, flags=re.IGNORECASE)
+            ai_response = re.sub(r'\bvaa\s*di+\b', 'vaada', ai_response, flags=re.IGNORECASE)
+            ai_response = re.sub(r'\bpo\s*di+\b', 'poda', ai_response, flags=re.IGNORECASE)
+            ai_response = re.sub(r'\bdiya+\b', 'daa', ai_response, flags=re.IGNORECASE)
+            ai_response = re.sub(r'(?<!\w)kutty(?!\w)', 'kannu', ai_response, flags=re.IGNORECASE)
+            if original_response != ai_response:
+                logger.info(f"[GENDER FIX] Replaced 'di' variants with 'da' for unconfirmed gender user {user.id}")
         
         logger.info(f"[KEERTHANA -> {user.id}] {ai_response}")
         
