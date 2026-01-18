@@ -20,7 +20,8 @@ A romantic AI girlfriend Telegram bot with emotional personality, memory, force 
 - **Message Limits**: 20 free messages daily, resets at midnight
 - **Referral System**: Users earn 10 bonus messages for each friend who joins
 - **Rich Formatting**: Bold, italic, emojis for expressive messages
-- **Tanglish Support**: Natural Tamil + English conversation style (uses "da" default, "di" for girls)
+- **Tanglish Support**: Natural Tamil + English conversation style (uses "da" default, "di" only for confirmed girls)
+- **Gender Detection**: Server-side tracking - only switches to "di" when user explicitly states "I am a girl" / "naan ponnu"
 
 ## Commands
 - `/start` - Start the bot and register
@@ -64,6 +65,8 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 18, 2026: Fixed "di" bug - bot now ONLY uses "di" when user explicitly confirms gender (e.g., "I am a girl"), not when playfully saying "diii"
+- January 18, 2026: Added server-side gender detection with database tracking and post-processing to enforce "da" default
 - January 18, 2026: Fixed repetitive questioning - Keerthana now takes initiative with actions instead of always asking "sollu da"
 - January 18, 2026: Enhanced Tanglish vocabulary, grammar patterns, and expanded chat history to 25 messages for better memory
 - January 18, 2026: Added photo handling - compliments when users send pics, playful decline when asked for pics
