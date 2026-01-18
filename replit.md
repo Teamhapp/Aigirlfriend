@@ -52,8 +52,11 @@ A romantic AI girlfriend Telegram bot with emotional personality, memory, force 
 Access the dashboard at the webview URL (port 5000). Features:
 - Password-protected login (uses DASHBOARD_PASSWORD)
 - Stats overview: total users, messages, active today
-- User table: names, message counts, credits, referrals
+- User table: names, message counts, status, custom limits, referrals
 - View chat history for any user with timestamps
+- Block/Unblock users - blocked users cannot use the bot
+- Set custom daily message limits for individual users
+- Admin ID: 6474452917
 
 ## Recent Changes
 - January 18, 2026: Added moderation dashboard with user stats and chat history viewing
