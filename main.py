@@ -4,7 +4,7 @@ import asyncio
 import random
 import html
 import google.generativeai as genai
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from telegram.constants import ParseMode, ChatMemberStatus
 from database import init_database, get_or_create_user, save_message, get_chat_history, get_user_points, update_preferred_name, get_user_stats, get_message_status, use_message, DAILY_MESSAGE_LIMIT
@@ -445,6 +445,18 @@ def main():
     logger.info("Database initialized")
     
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    
+    async def post_init(application):
+        commands = [
+            BotCommand("start", "Start chatting with Keerthana 💕"),
+            BotCommand("referral", "Get referral link & earn free messages 🎁"),
+            BotCommand("points", "Check your message credits 📊"),
+            BotCommand("stats", "View your statistics 📈")
+        ]
+        await application.bot.set_my_commands(commands)
+        logger.info("Bot commands registered")
+    
+    application.post_init = post_init
     
     async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         error = context.error
