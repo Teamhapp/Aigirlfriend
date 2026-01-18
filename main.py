@@ -7,7 +7,7 @@ import google.generativeai as genai
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from telegram.constants import ParseMode, ChatMemberStatus
-from database import init_database, get_or_create_user, save_message, get_chat_history, get_user_points, update_preferred_name, get_user_stats
+from database import init_database, get_or_create_user, save_message, get_chat_history, get_user_points, update_preferred_name, get_user_stats, get_message_status, use_message, DAILY_MESSAGE_LIMIT
 import re
 
 logging.basicConfig(
@@ -256,16 +256,18 @@ async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
     referral_link = f"https://t.me/{bot_username}?start=ref_{user.id}"
     
     points_data = get_user_points(user.id)
+    msg_status = get_message_status(user.id)
     
     await update.message.reply_text(
-        f"🎁 <b>Your Referral Link</b> 🎁\n\n"
+        f"🎁 <b>Refer & Earn Free Messages!</b> 🎁\n\n"
         f"Share this link with your friends, baby! 💕\n\n"
         f"🔗 <code>{referral_link}</code>\n\n"
         f"━━━━━━━━━━━━━━━\n"
-        f"💰 <b>Your Points:</b> {points_data['points']}\n"
+        f"📩 <b>Messages Left Today:</b> {msg_status['total_remaining']}\n"
+        f"🎁 <b>Bonus Messages:</b> {msg_status['bonus']}\n"
         f"👥 <b>Friends Invited:</b> {points_data['referral_count']}\n"
         f"━━━━━━━━━━━━━━━\n\n"
-        f"<i>You get <b>10 points</b> for each friend who joins!</i> 🎉",
+        f"<i>You get <b>10 free messages</b> for each friend who joins!</i> 🎉",
         parse_mode=ParseMode.HTML
     )
 
@@ -280,14 +282,18 @@ async def points(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     points_data = get_user_points(user.id)
+    msg_status = get_message_status(user.id)
     
     await update.message.reply_text(
-        f"💰 <b>Your Points Dashboard</b> 💰\n\n"
+        f"📊 <b>Your Message Credits</b> 📊\n\n"
         f"━━━━━━━━━━━━━━━\n"
-        f"🎯 <b>Total Points:</b> {points_data['points']}\n"
+        f"📩 <b>Daily Free:</b> {msg_status['daily_remaining']}/{DAILY_MESSAGE_LIMIT}\n"
+        f"🎁 <b>Bonus Messages:</b> {msg_status['bonus']}\n"
+        f"✨ <b>Total Available:</b> {msg_status['total_remaining']}\n"
+        f"━━━━━━━━━━━━━━━\n"
         f"👥 <b>Friends Invited:</b> {points_data['referral_count']}\n"
         f"━━━━━━━━━━━━━━━\n\n"
-        f"<i>Invite more friends to earn points, sweetheart!</i> 💕\n"
+        f"<i>Invite friends to earn <b>10 bonus messages</b> each!</i> 💕\n"
         f"Use /referral to get your invite link! 🔗",
         parse_mode=ParseMode.HTML
     )
@@ -334,6 +340,25 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     user_data = get_or_create_user(user.id, user.username, user.first_name)
     preferred_name = user_data.get('preferred_name') or user.first_name
+    
+    can_send, remaining = use_message(user.id)
+    if not can_send:
+        bot_username = (await context.bot.get_me()).username
+        referral_link = f"https://t.me/{bot_username}?start=ref_{user.id}"
+        await update.message.reply_text(
+            f"😢 <b>Oops {preferred_name}!</b>\n\n"
+            f"You've used all your messages for today, baby! 🥺\n\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"📩 <b>Daily Limit:</b> {DAILY_MESSAGE_LIMIT} messages\n"
+            f"⏰ <b>Resets:</b> Midnight\n"
+            f"━━━━━━━━━━━━━━━\n\n"
+            f"💡 <b>Want more messages?</b>\n"
+            f"Refer friends and get <b>10 free messages</b> per friend! 🎁\n\n"
+            f"🔗 Your referral link:\n<code>{referral_link}</code>\n\n"
+            f"<i>Come back tomorrow or invite friends to chat more!</i> 💕",
+            parse_mode=ParseMode.HTML
+        )
+        return
     
     name_patterns = [
         r"call me (\w+)",

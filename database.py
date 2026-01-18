@@ -1,7 +1,7 @@
 import os
 import psycopg2
 from psycopg2 import pool
-from datetime import datetime
+from datetime import datetime, date
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -41,9 +41,19 @@ def init_database():
                 referred_by BIGINT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                is_blocked BOOLEAN DEFAULT FALSE
+                is_blocked BOOLEAN DEFAULT FALSE,
+                daily_messages_used INTEGER DEFAULT 0,
+                bonus_messages INTEGER DEFAULT 0,
+                last_reset_date DATE DEFAULT CURRENT_DATE
             )
         ''')
+        
+        try:
+            cur.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS daily_messages_used INTEGER DEFAULT 0')
+            cur.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_messages INTEGER DEFAULT 0')
+            cur.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_reset_date DATE DEFAULT CURRENT_DATE')
+        except Exception:
+            pass
         
         cur.execute('''
             CREATE TABLE IF NOT EXISTS chat_messages (
@@ -142,7 +152,7 @@ def award_referral_points(referrer_id, referred_id):
         ''', (referrer_id, referred_id))
         
         cur.execute('''
-            UPDATE users SET points = points + 10, referral_count = referral_count + 1
+            UPDATE users SET points = points + 10, referral_count = referral_count + 1, bonus_messages = bonus_messages + 10
             WHERE user_id = %s
         ''', (referrer_id,))
         
@@ -152,12 +162,99 @@ def award_referral_points(referrer_id, referred_id):
         ''', (referrer_id, f'Referral bonus for inviting user {referred_id}'))
         
         conn.commit()
-        logger.info(f"Awarded 10 points to user {referrer_id} for referral")
+        logger.info(f"Awarded 10 points and 10 bonus messages to user {referrer_id} for referral")
         return True
     except Exception as e:
         logger.error(f"Error awarding referral points: {e}")
         conn.rollback()
         return False
+    finally:
+        cur.close()
+        release_connection(conn)
+
+DAILY_MESSAGE_LIMIT = 20
+
+def get_message_status(user_id):
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute('''
+            SELECT daily_messages_used, bonus_messages, last_reset_date 
+            FROM users WHERE user_id = %s
+        ''', (user_id,))
+        result = cur.fetchone()
+        
+        if not result:
+            return {'daily_used': 0, 'daily_remaining': DAILY_MESSAGE_LIMIT, 'bonus': 0, 'total_remaining': DAILY_MESSAGE_LIMIT}
+        
+        daily_used, bonus, last_reset = result[0] or 0, result[1] or 0, result[2]
+        today = date.today()
+        
+        if last_reset is None or last_reset < today:
+            daily_used = 0
+        
+        daily_remaining = max(0, DAILY_MESSAGE_LIMIT - daily_used)
+        total_remaining = daily_remaining + bonus
+        
+        return {
+            'daily_used': daily_used,
+            'daily_remaining': daily_remaining,
+            'bonus': bonus,
+            'total_remaining': total_remaining
+        }
+    finally:
+        cur.close()
+        release_connection(conn)
+
+def use_message(user_id):
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute('''
+            SELECT daily_messages_used, bonus_messages, last_reset_date 
+            FROM users WHERE user_id = %s
+        ''', (user_id,))
+        result = cur.fetchone()
+        
+        if not result:
+            return False, 0
+        
+        daily_used, bonus, last_reset = result[0] or 0, result[1] or 0, result[2]
+        today = date.today()
+        
+        if last_reset is None or last_reset < today:
+            cur.execute('''
+                UPDATE users SET daily_messages_used = 1, last_reset_date = %s
+                WHERE user_id = %s
+            ''', (today, user_id))
+            conn.commit()
+            remaining = DAILY_MESSAGE_LIMIT - 1 + bonus
+            return True, remaining
+        
+        daily_remaining = DAILY_MESSAGE_LIMIT - daily_used
+        
+        if daily_remaining > 0:
+            cur.execute('''
+                UPDATE users SET daily_messages_used = daily_messages_used + 1
+                WHERE user_id = %s
+            ''', (user_id,))
+            conn.commit()
+            remaining = daily_remaining - 1 + bonus
+            return True, remaining
+        elif bonus > 0:
+            cur.execute('''
+                UPDATE users SET bonus_messages = bonus_messages - 1
+                WHERE user_id = %s
+            ''', (user_id,))
+            conn.commit()
+            remaining = bonus - 1
+            return True, remaining
+        else:
+            return False, 0
+    except Exception as e:
+        logger.error(f"Error using message: {e}")
+        conn.rollback()
+        return False, 0
     finally:
         cur.close()
         release_connection(conn)
