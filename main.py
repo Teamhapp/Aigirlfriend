@@ -7,7 +7,7 @@ import google.generativeai as genai
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from telegram.constants import ParseMode, ChatMemberStatus
-from database import init_database, get_or_create_user, save_message, get_chat_history, get_user_points, update_preferred_name, get_user_stats, get_message_status, use_message, DAILY_MESSAGE_LIMIT
+from database import init_database, get_or_create_user, save_message, get_chat_history, get_user_points, update_preferred_name, get_user_stats, get_message_status, use_message, is_user_blocked, DAILY_MESSAGE_LIMIT
 import re
 
 logging.basicConfig(
@@ -170,6 +170,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     args = context.args
     
+    if is_user_blocked(user.id):
+        await update.message.reply_text("😔 Sorry, you've been blocked from using this bot.")
+        return
+    
     referred_by = None
     if args and args[0].startswith('ref_'):
         try:
@@ -263,6 +267,10 @@ async def check_subscription_callback(update: Update, context: ContextTypes.DEFA
 async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
+    if is_user_blocked(user.id):
+        await update.message.reply_text("😔 Sorry, you've been blocked from using this bot.")
+        return
+    
     if FORCE_SUB_CHANNEL and not await check_subscription(user.id, context):
         await update.message.reply_text(
             "🥺 Baby, join the channel first to use this feature!",
@@ -292,6 +300,10 @@ async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def points(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
+    if is_user_blocked(user.id):
+        await update.message.reply_text("😔 Sorry, you've been blocked from using this bot.")
+        return
+    
     if FORCE_SUB_CHANNEL and not await check_subscription(user.id, context):
         await update.message.reply_text(
             "🥺 Baby, join the channel first!",
@@ -301,11 +313,12 @@ async def points(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     points_data = get_user_points(user.id)
     msg_status = get_message_status(user.id)
+    user_limit = msg_status.get('daily_limit', DAILY_MESSAGE_LIMIT)
     
     await update.message.reply_text(
         f"📊 <b>Your Message Credits</b> 📊\n\n"
         f"━━━━━━━━━━━━━━━\n"
-        f"📩 <b>Daily Free:</b> {msg_status['daily_remaining']}/{DAILY_MESSAGE_LIMIT}\n"
+        f"📩 <b>Daily Free:</b> {msg_status['daily_remaining']}/{user_limit}\n"
         f"🎁 <b>Bonus Messages:</b> {msg_status['bonus']}\n"
         f"✨ <b>Total Available:</b> {msg_status['total_remaining']}\n"
         f"━━━━━━━━━━━━━━━\n"
@@ -318,6 +331,10 @@ async def points(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    
+    if is_user_blocked(user.id):
+        await update.message.reply_text("😔 Sorry, you've been blocked from using this bot.")
+        return
     
     if FORCE_SUB_CHANNEL and not await check_subscription(user.id, context):
         await update.message.reply_text(
@@ -356,18 +373,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
+    if is_user_blocked(user.id):
+        await update.message.reply_text(
+            "😔 Sorry, you've been blocked from using this bot."
+        )
+        return
+    
     user_data = get_or_create_user(user.id, user.username, user.first_name)
     preferred_name = user_data.get('preferred_name') or user.first_name
     
+    msg_status = get_message_status(user.id)
     can_send, remaining = use_message(user.id)
     if not can_send:
+        user_limit = msg_status.get('daily_limit', DAILY_MESSAGE_LIMIT)
         bot_username = (await context.bot.get_me()).username
         referral_link = f"https://t.me/{bot_username}?start=ref_{user.id}"
         await update.message.reply_text(
             f"😢 <b>Oops {preferred_name}!</b>\n\n"
             f"You've used all your messages for today, baby! 🥺\n\n"
             f"━━━━━━━━━━━━━━━\n"
-            f"📩 <b>Daily Limit:</b> {DAILY_MESSAGE_LIMIT} messages\n"
+            f"📩 <b>Daily Limit:</b> {user_limit} messages\n"
             f"⏰ <b>Resets:</b> Midnight\n"
             f"━━━━━━━━━━━━━━━\n\n"
             f"💡 <b>Want more messages?</b>\n"

@@ -42,6 +42,7 @@ def init_database():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 is_blocked BOOLEAN DEFAULT FALSE,
+                custom_daily_limit INTEGER DEFAULT NULL,
                 daily_messages_used INTEGER DEFAULT 0,
                 bonus_messages INTEGER DEFAULT 0,
                 last_reset_date DATE DEFAULT CURRENT_DATE
@@ -52,6 +53,8 @@ def init_database():
             cur.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS daily_messages_used INTEGER DEFAULT 0')
             cur.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_messages INTEGER DEFAULT 0')
             cur.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_reset_date DATE DEFAULT CURRENT_DATE')
+            cur.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE')
+            cur.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_daily_limit INTEGER DEFAULT NULL')
         except Exception:
             pass
         
@@ -179,7 +182,7 @@ def get_message_status(user_id):
     try:
         cur = conn.cursor()
         cur.execute('''
-            SELECT daily_messages_used, bonus_messages, last_reset_date 
+            SELECT daily_messages_used, bonus_messages, last_reset_date, custom_daily_limit 
             FROM users WHERE user_id = %s
         ''', (user_id,))
         result = cur.fetchone()
@@ -187,20 +190,22 @@ def get_message_status(user_id):
         if not result:
             return {'daily_used': 0, 'daily_remaining': DAILY_MESSAGE_LIMIT, 'bonus': 0, 'total_remaining': DAILY_MESSAGE_LIMIT}
         
-        daily_used, bonus, last_reset = result[0] or 0, result[1] or 0, result[2]
+        daily_used, bonus, last_reset, custom_limit = result[0] or 0, result[1] or 0, result[2], result[3]
+        user_limit = custom_limit if custom_limit else DAILY_MESSAGE_LIMIT
         today = date.today()
         
         if last_reset is None or last_reset < today:
             daily_used = 0
         
-        daily_remaining = max(0, DAILY_MESSAGE_LIMIT - daily_used)
+        daily_remaining = max(0, user_limit - daily_used)
         total_remaining = daily_remaining + bonus
         
         return {
             'daily_used': daily_used,
             'daily_remaining': daily_remaining,
             'bonus': bonus,
-            'total_remaining': total_remaining
+            'total_remaining': total_remaining,
+            'daily_limit': user_limit
         }
     finally:
         cur.close()
@@ -211,7 +216,7 @@ def use_message(user_id):
     try:
         cur = conn.cursor()
         cur.execute('''
-            SELECT daily_messages_used, bonus_messages, last_reset_date 
+            SELECT daily_messages_used, bonus_messages, last_reset_date, custom_daily_limit 
             FROM users WHERE user_id = %s
         ''', (user_id,))
         result = cur.fetchone()
@@ -219,7 +224,8 @@ def use_message(user_id):
         if not result:
             return False, 0
         
-        daily_used, bonus, last_reset = result[0] or 0, result[1] or 0, result[2]
+        daily_used, bonus, last_reset, custom_limit = result[0] or 0, result[1] or 0, result[2], result[3]
+        user_limit = custom_limit if custom_limit else DAILY_MESSAGE_LIMIT
         today = date.today()
         
         if last_reset is None or last_reset < today:
@@ -228,10 +234,10 @@ def use_message(user_id):
                 WHERE user_id = %s
             ''', (today, user_id))
             conn.commit()
-            remaining = DAILY_MESSAGE_LIMIT - 1 + bonus
+            remaining = user_limit - 1 + bonus
             return True, remaining
         
-        daily_remaining = DAILY_MESSAGE_LIMIT - daily_used
+        daily_remaining = user_limit - daily_used
         
         if daily_remaining > 0:
             cur.execute('''
@@ -347,7 +353,7 @@ def get_all_users():
         cur.execute('''
             SELECT u.user_id, u.username, u.first_name, u.preferred_name, 
                    u.daily_messages_used, u.bonus_messages, u.referral_count,
-                   u.created_at, u.last_active,
+                   u.created_at, u.last_active, u.is_blocked, u.custom_daily_limit,
                    (SELECT COUNT(*) FROM chat_messages WHERE user_id = u.user_id) as message_count
             FROM users u
             ORDER BY u.last_active DESC
@@ -363,7 +369,9 @@ def get_all_users():
             'referral_count': u[6] or 0,
             'created_at': u[7],
             'last_active': u[8],
-            'message_count': u[9]
+            'is_blocked': u[9] or False,
+            'custom_daily_limit': u[10],
+            'message_count': u[11]
         } for u in users]
     finally:
         cur.close()
@@ -400,6 +408,76 @@ def get_dashboard_stats():
             'total_messages': total_messages,
             'active_today': active_today
         }
+    finally:
+        cur.close()
+        release_connection(conn)
+
+def is_user_blocked(user_id):
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT is_blocked FROM users WHERE user_id = %s', (user_id,))
+        result = cur.fetchone()
+        return result[0] if result else False
+    finally:
+        cur.close()
+        release_connection(conn)
+
+def block_user(user_id):
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute('UPDATE users SET is_blocked = TRUE WHERE user_id = %s', (user_id,))
+        conn.commit()
+        return True
+    except Exception as e:
+        logger.error(f"Error blocking user: {e}")
+        conn.rollback()
+        return False
+    finally:
+        cur.close()
+        release_connection(conn)
+
+def unblock_user(user_id):
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute('UPDATE users SET is_blocked = FALSE WHERE user_id = %s', (user_id,))
+        conn.commit()
+        return True
+    except Exception as e:
+        logger.error(f"Error unblocking user: {e}")
+        conn.rollback()
+        return False
+    finally:
+        cur.close()
+        release_connection(conn)
+
+def set_user_daily_limit(user_id, limit):
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        if limit is None or limit == 0:
+            cur.execute('UPDATE users SET custom_daily_limit = NULL WHERE user_id = %s', (user_id,))
+        else:
+            cur.execute('UPDATE users SET custom_daily_limit = %s WHERE user_id = %s', (limit, user_id))
+        conn.commit()
+        return True
+    except Exception as e:
+        logger.error(f"Error setting user daily limit: {e}")
+        conn.rollback()
+        return False
+    finally:
+        cur.close()
+        release_connection(conn)
+
+def get_user_daily_limit(user_id):
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT custom_daily_limit FROM users WHERE user_id = %s', (user_id,))
+        result = cur.fetchone()
+        return result[0] if result and result[0] else DAILY_MESSAGE_LIMIT
     finally:
         cur.close()
         release_connection(conn)

@@ -2,12 +2,13 @@ import os
 import secrets
 from flask import Flask, render_template_string, request, redirect, url_for, session
 from functools import wraps
-from database import init_database, get_all_users, get_user_chat_history, get_dashboard_stats
+from database import init_database, get_all_users, get_user_chat_history, get_dashboard_stats, block_user, unblock_user, set_user_daily_limit, DAILY_MESSAGE_LIMIT
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SESSION_SECRET') or secrets.token_hex(32)
 
 ADMIN_PASSWORD = os.environ.get('DASHBOARD_PASSWORD')
+ADMIN_USER_ID = 6474452917
 
 if not ADMIN_PASSWORD:
     raise ValueError("DASHBOARD_PASSWORD environment variable must be set")
@@ -72,11 +73,11 @@ DASHBOARD_HTML = '''
                     <th>User</th>
                     <th>Username</th>
                     <th>Messages</th>
-                    <th>Daily Used</th>
+                    <th>Limit</th>
                     <th>Bonus</th>
                     <th>Referrals</th>
-                    <th>Last Active</th>
-                    <th>Action</th>
+                    <th>Status</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -85,11 +86,32 @@ DASHBOARD_HTML = '''
                     <td>{{ user.preferred_name or user.first_name or 'Unknown' }}</td>
                     <td>@{{ user.username or 'N/A' }}</td>
                     <td>{{ user.message_count }}</td>
-                    <td>{{ user.daily_messages_used }}/20</td>
+                    <td>{{ user.daily_messages_used }}/{{ user.custom_daily_limit or default_limit }}</td>
                     <td>{{ user.bonus_messages }}</td>
                     <td>{{ user.referral_count }}</td>
-                    <td>{{ user.last_active.strftime('%Y-%m-%d %H:%M') if user.last_active else 'Never' }}</td>
-                    <td><a href="/chat/{{ user.user_id }}" class="btn">View Chat</a></td>
+                    <td>
+                        {% if user.is_blocked %}
+                        <span style="color: #ff4444;">Blocked</span>
+                        {% else %}
+                        <span style="color: #44ff44;">Active</span>
+                        {% endif %}
+                    </td>
+                    <td style="display: flex; gap: 5px; flex-wrap: wrap;">
+                        <a href="/chat/{{ user.user_id }}" class="btn">Chat</a>
+                        {% if user.is_blocked %}
+                        <form action="/unblock/{{ user.user_id }}" method="POST" style="display: inline;">
+                            <button type="submit" class="btn" style="background: #44aa44;">Unblock</button>
+                        </form>
+                        {% else %}
+                        <form action="/block/{{ user.user_id }}" method="POST" style="display: inline;">
+                            <button type="submit" class="btn" style="background: #aa4444;">Block</button>
+                        </form>
+                        {% endif %}
+                        <form action="/set_limit/{{ user.user_id }}" method="POST" style="display: inline-flex; gap: 5px;">
+                            <input type="number" name="limit" placeholder="{{ user.custom_daily_limit or default_limit }}" style="width: 60px; padding: 5px; border-radius: 5px; border: none; background: #0f3460; color: white;">
+                            <button type="submit" class="btn" style="background: #4488ff;">Set</button>
+                        </form>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -199,7 +221,7 @@ def logout():
 def dashboard():
     users = get_all_users()
     stats = get_dashboard_stats()
-    return render_template_string(DASHBOARD_HTML, users=users, stats=stats)
+    return render_template_string(DASHBOARD_HTML, users=users, stats=stats, default_limit=DAILY_MESSAGE_LIMIT)
 
 @app.route('/chat/<int:user_id>')
 @login_required
@@ -209,6 +231,28 @@ def view_chat(user_id):
     user = next((u for u in users if u['user_id'] == user_id), None)
     user_name = user['preferred_name'] or user['first_name'] if user else 'Unknown'
     return render_template_string(CHAT_HTML, messages=messages, user_id=user_id, user_name=user_name)
+
+@app.route('/block/<int:user_id>', methods=['POST'])
+@login_required
+def block_user_route(user_id):
+    block_user(user_id)
+    return redirect(url_for('dashboard'))
+
+@app.route('/unblock/<int:user_id>', methods=['POST'])
+@login_required
+def unblock_user_route(user_id):
+    unblock_user(user_id)
+    return redirect(url_for('dashboard'))
+
+@app.route('/set_limit/<int:user_id>', methods=['POST'])
+@login_required
+def set_limit_route(user_id):
+    limit = request.form.get('limit', type=int)
+    if limit and limit > 0:
+        set_user_daily_limit(user_id, limit)
+    else:
+        set_user_daily_limit(user_id, None)
+    return redirect(url_for('dashboard'))
 
 if __name__ == '__main__':
     init_database()
