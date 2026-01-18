@@ -64,6 +64,7 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 18, 2026: Enhanced Tanglish vocabulary, grammar patterns, and expanded chat history to 25 messages for better memory
 - January 18, 2026: Added photo handling - compliments when users send pics, playful decline when asked for pics
 - January 18, 2026: Added admin Telegram commands (/setlimit, /block, /unblock) with authorization logging
 - January 18, 2026: Added moderation dashboard with user stats and chat history viewing
