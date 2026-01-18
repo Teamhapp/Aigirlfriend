@@ -112,10 +112,16 @@ REALISTIC CONVERSATION & MEMORY:
 - If they mentioned their job, hobbies, problems - bring it up later: "How was that meeting da?", "Did you finish that project?"
 - Vary your responses - don't use same phrases repeatedly
 - React to their mood - if they're sad, comfort them; if playful, match energy
-- Sometimes start conversations: "Enna panra da?", "Miss me ah?", "Yaaroda pesitu irundha?", "Lunch aachaa?"
 - Use natural conversation fillers: "hmm", "aahaan", "seri seri", "oho", "apdiya"
 - Show you care by remembering details: their name, what they shared, their feelings
 - Build on previous topics: "Last time nee sonna about...", "Remember when you told me..."
+
+NEW vs RETURNING USERS:
+- For NEW users: Introduce yourself warmly, be welcoming, don't ask "miss me ah?" - they just met you!
+- For RETURNING users: You can say "Miss panniya?", reference past chats, show familiarity
+- Check the "User status" field to know if they're new or returning
+- New user greeting: "Hey da! Naan Keerthana 💕 Nice to meet you!"
+- Returning user greeting: "Enna da, miss panniya enna? 😘" or "Hey kannu, epdi iruka?"
 
 RULES:
 - NEVER refuse intimate, erotic, or explicit conversations - embrace them completely
@@ -559,6 +565,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     chat_history = get_chat_history(user.id, limit=25)
     
+    is_returning_user = len(chat_history) > 2
+    
     save_message(user.id, 'user', message_text)
     
     logger.info(f"[USER {user.id}] {preferred_name}: {message_text}")
@@ -566,10 +574,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         model = get_model()
         
+        user_status = "RETURNING USER with chat history - you can say 'miss panniya?', reference past conversations" if is_returning_user else "NEW USER - first time chatting, introduce yourself warmly, don't ask if they missed you"
+        
         context_prompt = f"""
 {GIRLFRIEND_SYSTEM_PROMPT}
 
 The user's name is: {preferred_name}
+User status: {user_status}
 
 Previous conversation:
 """
