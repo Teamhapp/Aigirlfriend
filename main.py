@@ -7,7 +7,7 @@ import google.generativeai as genai
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from telegram.constants import ParseMode, ChatMemberStatus
-from database import init_database, get_or_create_user, save_message, get_chat_history, get_user_points, update_preferred_name, get_user_stats, get_message_status, use_message, is_user_blocked, DAILY_MESSAGE_LIMIT
+from database import init_database, get_or_create_user, save_message, get_chat_history, get_user_points, update_preferred_name, get_user_stats, get_message_status, use_message, is_user_blocked, block_user, unblock_user, set_user_daily_limit, DAILY_MESSAGE_LIMIT
 import re
 
 logging.basicConfig(
@@ -20,6 +20,7 @@ TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 FORCE_SUB_CHANNEL = os.environ.get('FORCE_SUB_CHANNEL', '')
 BOT_USERNAME = os.environ.get('BOT_USERNAME', 'your_bot')
+ADMIN_USER_ID = 6474452917
 
 genai.configure(api_key=GEMINI_API_KEY)
 
@@ -361,6 +362,82 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode=ParseMode.HTML
         )
 
+async def admin_setlimit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        logger.warning(f"Unauthorized /setlimit attempt by user {user.id}")
+        return
+    
+    args = context.args
+    if len(args) < 2:
+        await update.message.reply_text(
+            "Usage: /setlimit [user_id] [limit]\n"
+            "Example: /setlimit 123456789 50",
+            parse_mode=ParseMode.HTML
+        )
+        return
+    
+    try:
+        target_user_id = int(args[0])
+        limit = int(args[1])
+        
+        if limit <= 0:
+            set_user_daily_limit(target_user_id, None)
+            await update.message.reply_text(
+                f"Reset user {target_user_id} to default limit ({DAILY_MESSAGE_LIMIT} messages/day)"
+            )
+        else:
+            set_user_daily_limit(target_user_id, limit)
+            await update.message.reply_text(
+                f"Set user {target_user_id} daily limit to {limit} messages"
+            )
+    except ValueError:
+        await update.message.reply_text("Invalid user ID or limit. Both must be numbers.")
+
+async def admin_block(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        logger.warning(f"Unauthorized /block attempt by user {user.id}")
+        return
+    
+    args = context.args
+    if len(args) < 1:
+        await update.message.reply_text(
+            "Usage: /block [user_id]\n"
+            "Example: /block 123456789",
+            parse_mode=ParseMode.HTML
+        )
+        return
+    
+    try:
+        target_user_id = int(args[0])
+        block_user(target_user_id)
+        await update.message.reply_text(f"Blocked user {target_user_id}")
+    except ValueError:
+        await update.message.reply_text("Invalid user ID. Must be a number.")
+
+async def admin_unblock(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        logger.warning(f"Unauthorized /unblock attempt by user {user.id}")
+        return
+    
+    args = context.args
+    if len(args) < 1:
+        await update.message.reply_text(
+            "Usage: /unblock [user_id]\n"
+            "Example: /unblock 123456789",
+            parse_mode=ParseMode.HTML
+        )
+        return
+    
+    try:
+        target_user_id = int(args[0])
+        unblock_user(target_user_id)
+        await update.message.reply_text(f"Unblocked user {target_user_id}")
+    except ValueError:
+        await update.message.reply_text("Invalid user ID. Must be a number.")
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     message_text = update.message.text
@@ -513,6 +590,9 @@ def main():
     application.add_handler(CommandHandler("referral", referral))
     application.add_handler(CommandHandler("points", points))
     application.add_handler(CommandHandler("stats", stats))
+    application.add_handler(CommandHandler("setlimit", admin_setlimit))
+    application.add_handler(CommandHandler("block", admin_block))
+    application.add_handler(CommandHandler("unblock", admin_unblock))
     application.add_handler(CallbackQueryHandler(check_subscription_callback, pattern="^check_sub$"))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
