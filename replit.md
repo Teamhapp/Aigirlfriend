@@ -12,13 +12,14 @@ A romantic AI girlfriend Telegram bot with emotional personality, memory, force 
 ```
 
 ## Features
-- **AI Girlfriend Personality**: Romantic, emotional conversations using Gemini AI
-- **Force Subscription**: Users must join specified channel before using bot
+- **AI Girlfriend Personality**: Romantic, emotional conversations using Gemini AI (bisexual, LGBT-friendly)
+- **Force Subscription**: Users must join @keerthanalovesu channel before using bot
 - **Chat Memory**: Stores conversation history in PostgreSQL
 - **Personalization**: Remembers user's preferred name and conversation style
-- **Referral System**: Users earn 10 points for each friend who joins
+- **Message Limits**: 20 free messages daily, resets at midnight
+- **Referral System**: Users earn 10 bonus messages for each friend who joins
 - **Rich Formatting**: Bold, italic, emojis for expressive messages
-- **Tanglish Support**: Natural Tamil + English conversation style
+- **Tanglish Support**: Natural Tamil + English conversation style (uses "da" default, "di" for girls)
 
 ## Commands
 - `/start` - Start the bot and register
@@ -45,4 +46,6 @@ A romantic AI girlfriend Telegram bot with emotional personality, memory, force 
 - PostgreSQL (psycopg2)
 
 ## Recent Changes
+- January 18, 2026: Added daily 20 message limit with referral bonus system (10 messages per referral)
+- January 18, 2026: Made Keerthana bisexual and LGBT-friendly with inclusive language
 - January 16, 2026: Initial project setup with all core features
