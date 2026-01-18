@@ -6,6 +6,7 @@ A romantic AI girlfriend Telegram bot with emotional personality, memory, force 
 ## Project Structure
 ```
 ├── main.py              # Main Telegram bot application
+├── dashboard.py         # Flask moderation dashboard
 ├── database.py          # PostgreSQL database operations
 ├── .gitignore          # Git ignore file
 └── replit.md           # Project documentation

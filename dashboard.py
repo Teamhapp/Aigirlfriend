@@ -1,10 +1,11 @@
 import os
+import secrets
 from flask import Flask, render_template_string, request, redirect, url_for, session
 from functools import wraps
 from database import init_database, get_all_users, get_user_chat_history, get_dashboard_stats
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SESSION_SECRET')
+app.secret_key = os.environ.get('SESSION_SECRET') or secrets.token_hex(32)
 
 ADMIN_PASSWORD = os.environ.get('DASHBOARD_PASSWORD')
 
