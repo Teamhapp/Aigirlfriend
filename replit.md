@@ -33,6 +33,8 @@ A romantic AI girlfriend Telegram bot with emotional personality, memory, force 
 - `GEMINI_API_KEY` - Your Google Gemini API key
 - `FORCE_SUB_CHANNEL` - Channel username for mandatory subscription (e.g., @yourchannel)
 - `DATABASE_URL` - PostgreSQL connection string (auto-configured)
+- `DASHBOARD_PASSWORD` - Password to access the moderation dashboard (required)
+- `SESSION_SECRET` - Secret key for Flask sessions (optional, auto-generated if not set)
 
 ## Database Tables
 - `users` - User profiles, points, referral counts
@@ -46,7 +48,15 @@ A romantic AI girlfriend Telegram bot with emotional personality, memory, force 
 - google-generativeai (Gemini API)
 - PostgreSQL (psycopg2)
 
+## Moderation Dashboard
+Access the dashboard at the webview URL (port 5000). Features:
+- Password-protected login (uses DASHBOARD_PASSWORD)
+- Stats overview: total users, messages, active today
+- User table: names, message counts, credits, referrals
+- View chat history for any user with timestamps
+
 ## Recent Changes
+- January 18, 2026: Added moderation dashboard with user stats and chat history viewing
 - January 18, 2026: Added daily 20 message limit with referral bonus system (10 messages per referral)
 - January 18, 2026: Made Keerthana bisexual and LGBT-friendly with inclusive language
 - January 16, 2026: Initial project setup with all core features
