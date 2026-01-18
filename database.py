@@ -339,3 +339,67 @@ def get_user_stats(user_id):
     finally:
         cur.close()
         release_connection(conn)
+
+def get_all_users():
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute('''
+            SELECT u.user_id, u.username, u.first_name, u.preferred_name, 
+                   u.daily_messages_used, u.bonus_messages, u.referral_count,
+                   u.created_at, u.last_active,
+                   (SELECT COUNT(*) FROM chat_messages WHERE user_id = u.user_id) as message_count
+            FROM users u
+            ORDER BY u.last_active DESC
+        ''')
+        users = cur.fetchall()
+        return [{
+            'user_id': u[0],
+            'username': u[1],
+            'first_name': u[2],
+            'preferred_name': u[3],
+            'daily_messages_used': u[4] or 0,
+            'bonus_messages': u[5] or 0,
+            'referral_count': u[6] or 0,
+            'created_at': u[7],
+            'last_active': u[8],
+            'message_count': u[9]
+        } for u in users]
+    finally:
+        cur.close()
+        release_connection(conn)
+
+def get_user_chat_history(user_id, limit=100):
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute('''
+            SELECT role, content, created_at FROM chat_messages
+            WHERE user_id = %s
+            ORDER BY created_at DESC
+            LIMIT %s
+        ''', (user_id, limit))
+        messages = cur.fetchall()
+        return [{'role': m[0], 'content': m[1], 'created_at': m[2]} for m in reversed(messages)]
+    finally:
+        cur.close()
+        release_connection(conn)
+
+def get_dashboard_stats():
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT COUNT(*) FROM users')
+        total_users = cur.fetchone()[0]
+        cur.execute('SELECT COUNT(*) FROM chat_messages')
+        total_messages = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM users WHERE last_active > NOW() - INTERVAL '24 hours'")
+        active_today = cur.fetchone()[0]
+        return {
+            'total_users': total_users,
+            'total_messages': total_messages,
+            'active_today': active_today
+        }
+    finally:
+        cur.close()
+        release_connection(conn)
