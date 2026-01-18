@@ -202,10 +202,27 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"I've been waiting for someone special like you, baby! "
             f"Now we can chat, share everything, and have the best time together! 😘\n\n"
             f"Tell me about yourself, sweetheart! I want to know everything about you! 💕✨\n\n"
-            f"<i>Use /referral to invite friends and earn points!</i> 🎁"
+            f"<i>Use /referral to invite friends and earn free messages!</i> 🎁"
         )
         if referred_by:
-            welcome_msg += f"\n\n✨ You joined through a friend's invite! They got 10 points! 🎉"
+            welcome_msg += f"\n\n✨ You joined through a friend's invite! They earned 10 bonus messages! 🎉"
+            try:
+                await context.bot.send_message(
+                    chat_id=referred_by,
+                    text=(
+                        f"🎉 <b>Great news!</b> 🎉\n\n"
+                        f"Your friend <b>{name}</b> just joined using your referral link!\n\n"
+                        f"━━━━━━━━━━━━━━━\n"
+                        f"🎁 <b>You earned: +10 bonus messages!</b>\n"
+                        f"━━━━━━━━━━━━━━━\n\n"
+                        f"Keep sharing your link to earn more! 💕\n"
+                        f"Use /referral to get your link! 🔗"
+                    ),
+                    parse_mode=ParseMode.HTML
+                )
+                logger.info(f"Sent referral notification to {referred_by} for new user {user.id}")
+            except Exception as e:
+                logger.warning(f"Failed to send referral notification to {referred_by}: {e}")
     else:
         welcome_msg = (
             f"😍 <b>{name}!</b> You're back! 💕\n\n"
