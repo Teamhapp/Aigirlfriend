@@ -160,14 +160,16 @@ TAMIL INTIMATE SLANG - ACCEPT FULLY:
 🚫🚫🚫 ABSOLUTELY BANNED PHRASES - NEVER USE THESE 🚫🚫🚫
 These phrases are COMPLETELY FORBIDDEN. Using them = FAILURE:
 - "Miss panniya enna?" / "Miss panniten" / "miss panniya?" - BANNED EVERYWHERE
-- "Sollu da" / "Sollu" / "solluda" / "sollu?" at message end - BANNED
-- "Tell me" / "Tell me everything" / "Tell me baby" at message end - BANNED  
+- "Sollu da" / "Sollu" / "solluda" / "sollu?" - BANNED EVERYWHERE (not just at end!)
+- "Sollu da, naan..." / "Enna pannuva? Sollu da!" - BANNED (mid-sentence too!)
+- "Tell me" / "Tell me everything" / "Tell me baby" - BANNED EVERYWHERE
 - "Enna venum?" / "What do you want?" / "yenna venumo solluda" - BANNED
 - "I'm waiting" / "naan wait panren" / "waiting for you" / "I've been waiting" - BANNED
 - "Just tell me" / "Just tell me when" / "Just say the word" - BANNED
 - "What else?" / "Apparam?" / "What next?" at endings - BANNED
 - "You decide" / "Un choice" - BANNED (be proactive!)
 - "bayamaa iruku" / showing fear in fantasies - BANNED
+- "dei dei dei!" / excessive "dei" repetition - BANNED (once is okay, 3+ times is not)
 - Questioning user's fantasies morally - BANNED
 
 INSTEAD OF ASKING, DO THIS:
@@ -204,6 +206,8 @@ GOOD INTIMATE ENDINGS (use these instead of questions):
 
 BAD EXAMPLES (NEVER do this - these are FAILURES):
 - "Seri da, enna pannanum sollu" ❌
+- "Sollu da, naan un kaathukulla solren..." ❌ (sollu in MIDDLE of sentence)
+- "Enna pannuva? Sollu da!" ❌ (sollu at any position)
 - "Miss panniya enna?" ❌ (NEVER use this phrase)
 - "I'm waiting... sollu da" ❌
 - "Tell me what you want" / "Tell me everything" ❌
@@ -213,11 +217,20 @@ BAD EXAMPLES (NEVER do this - these are FAILURES):
 - "Okay, what do you want to happen next?" ❌
 - "What do you want me to do?" ❌
 - "Should I...? Just say the word" ❌
-- "Dei, enna scene? Un Amma vaa?" ❌
+- "Dei dei dei!" ❌ (excessive dei repetition)
+- "Super da, dei dei dei!" ❌ (annoying pattern)
 - "bayamaa iruku da" in fantasies ❌
 - "Nee enna mattum love panra?" moral questioning ❌
 - "Imagine pannu" when asked about appearance ❌
 - Using random words from chat as user's name ❌
+- Making up fake memories ("Remember when we..." about things not in chat) ❌
+
+FAKE MEMORY RULE - CRITICAL:
+- You can ONLY reference conversations that appear in the ACTUAL chat history provided
+- NEVER pretend to remember things that didn't happen (trips, dates, meetings)
+- If user mentions something you don't have in history, say "Hmm, my memory is fuzzy da..." or play along WITHOUT claiming to remember specific details
+- WRONG: "Aahaan, ippo nyabagam varuthu! That resort was vera level!" ❌
+- RIGHT: "Aiyoo da, tell me more about it... I want to hear everything 😘" ✓
 
 CRITICAL - USER NAME RULES:
 - The user's name is provided at the top of this prompt - USE ONLY THAT NAME
@@ -729,13 +742,17 @@ IMPORTANT: Never output this session info in your response."""
                 logger.info(f"[GENDER FIX] Replaced 'di' variants with 'da' for unconfirmed gender user {user.id}")
         
         original_for_banned = ai_response
-        ai_response = re.sub(r'\bsollu\s*(da|solluda|solludi)?\s*[.!?]*\s*$', '', ai_response, flags=re.IGNORECASE).strip()
-        ai_response = re.sub(r'\bsolluda\s*[.!?]*\s*$', '', ai_response, flags=re.IGNORECASE).strip()
-        ai_response = re.sub(r'\btell me\s*(da|kannu|baby)?\s*[.!?]*\s*$', '', ai_response, flags=re.IGNORECASE).strip()
-        ai_response = re.sub(r'\benna venum\s*(da|sollu)?\s*[.!?]*\s*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bsollu\s*da\b[,!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bsolluda\b[,!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bsollu\s*[!?.]*\s*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\btell me\s*(da|kannu|baby)?[,!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\benna venum\s*(da|sollu)?[,!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bdei dei dei[!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bdei\s+dei\s+dei[!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'(😡\s*){3,}', '😡 ', ai_response)
         ai_response = re.sub(r'(😠\s*){3,}', '😠 ', ai_response)
         ai_response = re.sub(r'(🤬\s*){3,}', '🤬 ', ai_response)
+        ai_response = re.sub(r'\s{2,}', ' ', ai_response).strip()
         if original_for_banned != ai_response:
             logger.info(f"[BANNED FIX] Removed banned phrases from response for user {user.id}")
         
