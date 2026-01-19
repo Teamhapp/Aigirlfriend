@@ -7,7 +7,6 @@ integrations = ["python_gemini:1.0.0", "python_database:1.0.0"]
 channel = "stable-25_05"
 
 [workflows]
-runButton = "Project"
 
 [[workflows.workflow]]
 name = "Project"
