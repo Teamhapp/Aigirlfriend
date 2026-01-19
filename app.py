@@ -785,6 +785,8 @@ import threading
 
 loop = None
 loop_thread = None
+init_lock = threading.Lock()
+initialized = False
 
 def run_event_loop():
     global loop
@@ -797,9 +799,70 @@ def start_background_loop():
     loop_thread = threading.Thread(target=run_event_loop, daemon=True)
     loop_thread.start()
 
+def ensure_initialized():
+    global application, loop, initialized
+    
+    if initialized:
+        return True
+    
+    with init_lock:
+        if initialized:
+            return True
+        
+        if not TELEGRAM_BOT_TOKEN or not GEMINI_API_KEY:
+            logger.error("Missing TELEGRAM_BOT_TOKEN or GEMINI_API_KEY")
+            return False
+        
+        try:
+            start_background_loop()
+            import time
+            time.sleep(0.5)
+            
+            init_database()
+            logger.info("Database initialized")
+            
+            application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+            
+            application.add_handler(CommandHandler("start", start))
+            application.add_handler(CommandHandler("referral", referral))
+            application.add_handler(CommandHandler("points", points))
+            application.add_handler(CommandHandler("stats", stats))
+            application.add_handler(CommandHandler("setlimit", admin_setlimit))
+            application.add_handler(CommandHandler("block", admin_block))
+            application.add_handler(CommandHandler("unblock", admin_unblock))
+            application.add_handler(CallbackQueryHandler(check_subscription_callback, pattern="^check_sub$"))
+            application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+            application.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO | filters.Document.IMAGE, handle_photo))
+            
+            async def init_app():
+                await application.initialize()
+                await application.start()
+                commands = [
+                    BotCommand("start", "Start chatting with Keerthana"),
+                    BotCommand("referral", "Get referral link & earn free messages"),
+                    BotCommand("points", "Check your message credits"),
+                    BotCommand("stats", "View your statistics")
+                ]
+                await application.bot.set_my_commands(commands)
+                logger.info("Bot initialized and started")
+            
+            future = asyncio.run_coroutine_threadsafe(init_app(), loop)
+            future.result(timeout=30)
+            
+            initialized = True
+            logger.info("Telegram bot fully initialized")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize bot: {e}")
+            return False
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
     global application, loop
+    
+    if not ensure_initialized():
+        return Response(status=500)
+    
     if application is None:
         return Response(status=500)
     
@@ -867,71 +930,6 @@ def set_limit_route(user_id):
         set_user_daily_limit(user_id, None)
     return redirect(url_for('dashboard'))
 
-def setup_webhook():
-    global application, loop
-    
-    if not TELEGRAM_BOT_TOKEN:
-        logger.error("TELEGRAM_BOT_TOKEN not set!")
-        return False
-    
-    if not GEMINI_API_KEY:
-        logger.error("GEMINI_API_KEY not set!")
-        return False
-    
-    start_background_loop()
-    import time
-    time.sleep(0.5)
-    
-    init_database()
-    logger.info("Database initialized")
-    
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-    
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("referral", referral))
-    application.add_handler(CommandHandler("points", points))
-    application.add_handler(CommandHandler("stats", stats))
-    application.add_handler(CommandHandler("setlimit", admin_setlimit))
-    application.add_handler(CommandHandler("block", admin_block))
-    application.add_handler(CommandHandler("unblock", admin_unblock))
-    application.add_handler(CallbackQueryHandler(check_subscription_callback, pattern="^check_sub$"))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO | filters.Document.IMAGE, handle_photo))
-    
-    async def init_app():
-        await application.initialize()
-        await application.start()
-        commands = [
-            BotCommand("start", "Start chatting with Keerthana 💕"),
-            BotCommand("referral", "Get referral link & earn free messages 🎁"),
-            BotCommand("points", "Check your message credits 📊"),
-            BotCommand("stats", "View your statistics 📈")
-        ]
-        await application.bot.set_my_commands(commands)
-        logger.info("Bot initialized and started")
-    
-    future = asyncio.run_coroutine_threadsafe(init_app(), loop)
-    future.result(timeout=30)
-    
-    if WEBHOOK_DOMAIN:
-        webhook_url = f"{WEBHOOK_DOMAIN}/webhook"
-        try:
-            response = requests.post(
-                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setWebhook",
-                json={"url": webhook_url, "allowed_updates": ["message", "callback_query"]}
-            )
-            result = response.json()
-            if result.get('ok'):
-                logger.info(f"Webhook set successfully: {webhook_url}")
-            else:
-                logger.error(f"Failed to set webhook: {result}")
-        except Exception as e:
-            logger.error(f"Error setting webhook: {e}")
-    else:
-        logger.warning("No WEBHOOK_DOMAIN found, webhook not set")
-    
-    return True
-
 if __name__ == '__main__':
-    if setup_webhook():
-        app.run(host='0.0.0.0', port=5000, debug=False)
+    ensure_initialized()
+    app.run(host='0.0.0.0', port=5000, debug=False)
