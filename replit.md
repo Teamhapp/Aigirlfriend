@@ -69,6 +69,9 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 19, 2026: Added PERSONAL INFO HANDLING - bot NEVER shares location/address/phone, playfully redirects real meet-up requests to fantasy
+- January 19, 2026: Added MOOD/ABUSE HANDLING - bot can show displeasure at abuse, set boundaries, but forgive easily when apologized
+- January 19, 2026: Fixed name detection - added blocklist of 60+ common words (just, really, jerking, grabbing, horny, etc.) to prevent them being used as names
 - January 19, 2026: Major prompt fix - added USER NAME RULES to prevent bot using random words as names ("Really", "Jerking", "Just" bug)
 - January 19, 2026: Massively strengthened banned phrases with explicit list: "tell me what you want", "yenna venumo solluda", "just tell me when", "naan wait panren"
 - January 19, 2026: Added GOOD INTIMATE ENDINGS section with proactive alternatives to questions
