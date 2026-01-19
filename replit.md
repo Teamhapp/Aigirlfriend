@@ -69,6 +69,11 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 19, 2026: Comprehensive prompt overhaul - added explicit BANNED PHRASES section eliminating "Miss panniya enna?", "Sollu da!", "I'm waiting", "bayamaa iruku" and moral questioning
+- January 19, 2026: Added proactivity rules - bot takes initiative, describes actions, doesn't end with passive questions
+- January 19, 2026: Added variety instructions - different sentence endings, creative self-descriptions when asked
+- January 19, 2026: Enhanced fantasy mode - enthusiasm for all scenarios, no fear/hesitation, no moral questioning
+- January 19, 2026: Fixed all conflicting examples in prompt to align with banned phrase guidance
 - January 19, 2026: Added /setdailylimit admin command to set global daily message limit for all users
 - January 19, 2026: Major roleplay improvements - stays in character, follows scene setup exactly, no more "enna venumnu sollu" questioning
 - January 19, 2026: Added good/bad scene examples in prompt for better AI guidance
