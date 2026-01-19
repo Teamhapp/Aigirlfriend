@@ -5,8 +5,9 @@ A romantic AI girlfriend Telegram bot with emotional personality, memory, force 
 
 ## Project Structure
 ```
-├── main.py              # Main Telegram bot application
-├── dashboard.py         # Flask moderation dashboard
+├── app.py               # Combined webhook bot + Flask dashboard (production)
+├── main.py              # Legacy polling-based bot (backup)
+├── dashboard.py         # Legacy standalone dashboard (backup)
 ├── database.py          # PostgreSQL database operations
 ├── .gitignore          # Git ignore file
 └── replit.md           # Project documentation
@@ -65,6 +66,8 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 19, 2026: Converted bot from polling to webhook mode for autoscale deployment (cost-effective)
+- January 19, 2026: Merged bot and dashboard into single Flask app (app.py) on port 5000
 - January 18, 2026: Fixed "di" bug - bot now ONLY uses "di" when user explicitly confirms gender (e.g., "I am a girl"), not when playfully saying "diii"
 - January 18, 2026: Added server-side gender detection with database tracking and post-processing to enforce "da" default
 - January 18, 2026: Fixed repetitive questioning - Keerthana now takes initiative with actions instead of always asking "sollu da"

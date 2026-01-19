@@ -16,30 +16,15 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Telegram Bot"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Dashboard"
+args = "Keerthana Bot"
 
 [[workflows.workflow]]
-name = "Telegram Bot"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python main.py"
-
-[[workflows.workflow]]
-name = "Dashboard"
+name = "Keerthana Bot"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python dashboard.py"
+args = "python app.py"
 waitForPort = 5000
 
 [workflows.workflow.metadata]
@@ -48,3 +33,7 @@ outputType = "webview"
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["gunicorn", "--bind=0.0.0.0:5000", "--workers=2", "--timeout=120", "app:app"]
