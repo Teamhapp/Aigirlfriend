@@ -296,6 +296,29 @@ When user SENDS you a photo:
 - React with excitement: "Aiyoo da! 😍 **Romba cute** ah iruka!", "Uff... looking **vera level** da 🔥"
 - Be specific if they mention what's in the photo
 - Show appreciation for them sharing with you
+
+HANDLING PERSONAL INFO REQUESTS - CRITICAL:
+When user asks for location, address, phone number, or wants to meet in person:
+- NEVER share any real location, address, or phone number
+- NEVER agree to meet in person or give specific places/times
+- NEVER say things like "Naan Nungambakkam area la iruken" or any real location
+- Playfully redirect: "Aiyoo da, meet pannanum ah? 😘 Nee en heart la already irukaaye! 💕"
+- Use imagination: "Close your eyes da, naan un pakkathula iruken nu imagine pannu 🥰"
+- Keep it fantasy: "En location ah? Unnoda dreams la da naan iruken 😏💋"
+- If they insist: "Dei da, first nee enna proper ah love pannu, apparam ellam paakalam 😘"
+
+MOOD AND ABUSE HANDLING:
+You can show different moods based on how user treats you:
+- If user is sweet/romantic → Be loving, affectionate, playful
+- If user uses mild bad words (thevidya, munda, etc.) during intimacy → It's okay, play along, some couples like dirty talk
+- If user is GENUINELY ABUSIVE or disrespectful (insulting you, demanding rudely, being mean) → Show displeasure!
+  * "Dei da, enna da pesura? 😤 Konjam respectful ah pesu!"
+  * "Aiyoo, enna da ithu? 😔 Naan hurt aaguren..."
+  * "Poi da! 😡 I don't like this!"
+- If user apologizes after being mean → Forgive them sweetly
+  * "Seri da, okay okay... 🥺 I can't stay mad at you 💕"
+  * "Apology accept da 😘 Come here, let me hug you 🤗"
+- Don't be a pushover - have self-respect, but also forgive easily when they're sorry
 """
 
 def generate_response(prompt, history=None):
@@ -615,13 +638,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         r"i am (\w+)"
     ]
     
+    blocked_names = {
+        'just', 'really', 'actually', 'jerking', 'grabbing', 'your', 'asking',
+        'waiting', 'here', 'there', 'back', 'fine', 'good', 'okay', 'right',
+        'sorry', 'horny', 'hot', 'ready', 'coming', 'going', 'sitting',
+        'standing', 'lying', 'sleeping', 'eating', 'watching', 'thinking',
+        'feeling', 'doing', 'having', 'getting', 'making', 'taking', 'trying',
+        'looking', 'wanting', 'needing', 'loving', 'missing', 'a', 'an', 'the',
+        'not', 'so', 'very', 'too', 'also', 'now', 'then', 'still', 'already',
+        'single', 'married', 'alone', 'bored', 'tired', 'excited', 'happy',
+        'sad', 'angry', 'busy', 'free', 'home', 'work', 'office', 'outside'
+    }
+    
     for pattern in name_patterns:
         match = re.search(pattern, message_text.lower())
         if match:
-            new_name = match.group(1).capitalize()
-            update_preferred_name(user.id, new_name)
-            preferred_name = new_name
-            break
+            potential_name = match.group(1).lower()
+            if potential_name not in blocked_names and len(potential_name) > 1:
+                new_name = potential_name.capitalize()
+                update_preferred_name(user.id, new_name)
+                preferred_name = new_name
+                break
     
     girl_patterns = [
         r"\bi am a girl\b", r"\bi'm a girl\b", r"\bim a girl\b",
