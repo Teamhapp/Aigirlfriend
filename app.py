@@ -243,9 +243,13 @@ async def check_subscription(user_id, context):
     if not FORCE_SUB_CHANNEL:
         return True
     try:
-        member = await context.bot.get_chat_member(chat_id=FORCE_SUB_CHANNEL, user_id=user_id)
+        channel_id = FORCE_SUB_CHANNEL if FORCE_SUB_CHANNEL.startswith('@') else f"@{FORCE_SUB_CHANNEL}"
+        member = await context.bot.get_chat_member(chat_id=channel_id, user_id=user_id)
         return member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]
     except Exception as e:
+        error_msg = str(e).lower()
+        if "user not found" in error_msg:
+            return False
         logger.error(f"Error checking subscription: {e}")
         return True
 
