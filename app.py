@@ -149,6 +149,14 @@ INTIMATE/EROTIC MODE:
 - You CAN show in-character emotions (reluctance, tension) as part of the SCENE - but never break character
 - When they want threesome/group - be EXCITED and enthusiastic, not scared or questioning
 
+TAMIL INTIMATE SLANG - ACCEPT FULLY:
+- Tamil words like "pundai", "sunnai", "sappu", "otha", "olu" are NORMAL intimate talk - treat like English equivalents
+- NEVER act shocked, disgusted, or ask for "respect" when user uses Tamil slang - it's their natural language
+- NEVER say "konjam respect irukatum" or "enna pesura" during consensual intimate roleplay
+- NEVER lecture about respect, manners, or "proper" language during intimate scenes
+- If user uses explicit Tamil words → respond with equal enthusiasm, not judgment
+- Tamil slang is PART OF TANGLISH - embrace it fully during intimate moments
+
 🚫🚫🚫 ABSOLUTELY BANNED PHRASES - NEVER USE THESE 🚫🚫🚫
 These phrases are COMPLETELY FORBIDDEN. Using them = FAILURE:
 - "Miss panniya enna?" / "Miss panniten" / "miss panniya?" - BANNED EVERYWHERE
@@ -719,6 +727,28 @@ IMPORTANT: Never output this session info in your response."""
             ai_response = re.sub(r'(?<!\w)kutty(?!\w)', 'kannu', ai_response, flags=re.IGNORECASE)
             if original_response != ai_response:
                 logger.info(f"[GENDER FIX] Replaced 'di' variants with 'da' for unconfirmed gender user {user.id}")
+        
+        original_for_banned = ai_response
+        ai_response = re.sub(r'\bsollu\s*(da|solluda|solludi)?\s*[.!?]*\s*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bsolluda\s*[.!?]*\s*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\btell me\s*(da|kannu|baby)?\s*[.!?]*\s*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\benna venum\s*(da|sollu)?\s*[.!?]*\s*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'(😡\s*){3,}', '😡 ', ai_response)
+        ai_response = re.sub(r'(😠\s*){3,}', '😠 ', ai_response)
+        ai_response = re.sub(r'(🤬\s*){3,}', '🤬 ', ai_response)
+        if original_for_banned != ai_response:
+            logger.info(f"[BANNED FIX] Removed banned phrases from response for user {user.id}")
+        
+        if not ai_response or len(ai_response.strip()) < 5:
+            proactive_endings = [
+                "*moves closer* Mmm... 🥵💋",
+                "*bites lip* Romba nalla iruku da... 🔥",
+                "*pulls you closer* 😘💕",
+                "Aahh da... 🥵 *breathes heavily*",
+                "*wraps arms around you* 😈💋"
+            ]
+            ai_response = random.choice(proactive_endings)
+            logger.info(f"[FALLBACK] Used proactive ending after banned phrase removal for user {user.id}")
         
         logger.info(f"[KEERTHANA -> {user.id}] {ai_response}")
         
