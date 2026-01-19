@@ -32,7 +32,18 @@ FORCE_SUB_CHANNEL = os.environ.get('FORCE_SUB_CHANNEL', '')
 ADMIN_USER_ID = 6474452917
 ADMIN_PASSWORD = os.environ.get('DASHBOARD_PASSWORD')
 
-WEBHOOK_DOMAIN = os.environ.get('REPLIT_DOMAINS', '').split(',')[0] if os.environ.get('REPLIT_DOMAINS') else os.environ.get('REPLIT_DEV_DOMAIN', '')
+def get_webhook_domain():
+    if os.environ.get('WEBHOOK_URL'):
+        return os.environ.get('WEBHOOK_URL').rstrip('/')
+    domains = os.environ.get('REPLIT_DOMAINS', '').split(',')
+    if domains and domains[0]:
+        return f"https://{domains[0]}"
+    dev_domain = os.environ.get('REPLIT_DEV_DOMAIN', '')
+    if dev_domain:
+        return f"https://{dev_domain}"
+    return None
+
+WEBHOOK_DOMAIN = get_webhook_domain()
 
 genai.configure(api_key=GEMINI_API_KEY)
 
@@ -903,7 +914,7 @@ def setup_webhook():
     future.result(timeout=30)
     
     if WEBHOOK_DOMAIN:
-        webhook_url = f"https://{WEBHOOK_DOMAIN}/webhook"
+        webhook_url = f"{WEBHOOK_DOMAIN}/webhook"
         try:
             response = requests.post(
                 f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setWebhook",

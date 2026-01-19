@@ -42,6 +42,7 @@ A romantic AI girlfriend Telegram bot with emotional personality, memory, force 
 - `DATABASE_URL` - PostgreSQL connection string (auto-configured)
 - `DASHBOARD_PASSWORD` - Password to access the moderation dashboard (required)
 - `SESSION_SECRET` - Secret key for Flask sessions (optional, auto-generated if not set)
+- `WEBHOOK_URL` - Production deployment URL for Telegram webhook (set in production environment only)
 
 ## Database Tables
 - `users` - User profiles, points, referral counts
@@ -66,6 +67,7 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 19, 2026: Fixed production webhook - bot now correctly registers webhook with production deployment URL
 - January 19, 2026: Converted bot from polling to webhook mode for autoscale deployment (cost-effective)
 - January 19, 2026: Merged bot and dashboard into single Flask app (app.py) on port 5000
 - January 18, 2026: Fixed "di" bug - bot now ONLY uses "di" when user explicitly confirms gender (e.g., "I am a girl"), not when playfully saying "diii"
