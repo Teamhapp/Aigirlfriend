@@ -15,7 +15,7 @@ from database import (
     get_user_points, update_preferred_name, get_user_stats, get_message_status, 
     use_message, is_user_blocked, block_user, unblock_user, set_user_daily_limit, 
     DAILY_MESSAGE_LIMIT, get_confirmed_gender, set_confirmed_gender,
-    get_all_users, get_user_chat_history, get_dashboard_stats
+    get_all_users, get_user_chat_history, get_dashboard_stats, award_referral_points
 )
 import re
 import requests
@@ -269,6 +269,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     user_data = get_or_create_user(user.id, user.username, user.first_name, referred_by=referrer_id)
     preferred_name = user_data.get('preferred_name') or user.first_name
+    
+    if user_data.get('is_new') and user_data.get('referred_by'):
+        award_referral_points(user_data['referred_by'], user.id)
     
     if FORCE_SUB_CHANNEL and not await check_subscription(user.id, context):
         await update.message.reply_text(
