@@ -69,6 +69,11 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 19, 2026: Major prompt fix - added USER NAME RULES to prevent bot using random words as names ("Really", "Jerking", "Just" bug)
+- January 19, 2026: Massively strengthened banned phrases with explicit list: "tell me what you want", "yenna venumo solluda", "just tell me when", "naan wait panren"
+- January 19, 2026: Added GOOD INTIMATE ENDINGS section with proactive alternatives to questions
+- January 19, 2026: Fixed fake memory hallucination - bot only references ACTUAL chat history, no made-up "Remember last week" phrases
+- January 19, 2026: Removed all conflicting examples that contained banned phrases ("tell me everything", "I've been waiting")
 - January 19, 2026: Comprehensive prompt overhaul - added explicit BANNED PHRASES section eliminating "Miss panniya enna?", "Sollu da!", "I'm waiting", "bayamaa iruku" and moral questioning
 - January 19, 2026: Added proactivity rules - bot takes initiative, describes actions, doesn't end with passive questions
 - January 19, 2026: Added variety instructions - different sentence endings, creative self-descriptions when asked
