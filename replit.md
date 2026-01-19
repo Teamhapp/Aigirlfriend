@@ -67,6 +67,8 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 19, 2026: Major roleplay improvements - stays in character, follows scene setup exactly, no more "enna venumnu sollu" questioning
+- January 19, 2026: Added good/bad scene examples in prompt for better AI guidance
 - January 19, 2026: Migrated from deprecated google-generativeai to new google-genai SDK
 - January 19, 2026: Fixed database connection handling with retry logic for autoscale deployments
 - January 19, 2026: Fixed force subscription channel check (@ prefix handling)
