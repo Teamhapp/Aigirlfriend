@@ -69,6 +69,10 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 19, 2026: Added TAMIL INTIMATE SLANG section - bot now accepts Tamil words (pundai, sunnai, etc.) without moralizing
+- January 19, 2026: Added post-processing to strip banned phrases (sollu, solluda, tell me) from message endings
+- January 19, 2026: Added fallback proactive responses when post-processing leaves response too short
+- January 19, 2026: Fixed bot lecturing about "respect" during consensual roleplay - no more moralizing
 - January 19, 2026: CRITICAL BUG FIX - Fixed system prompt leaking into responses (user was seeing "The user's name is: X User status: RETURNING USER..." text)
 - January 19, 2026: CRITICAL BUG FIX - Fixed angry emoji spam loop (😡😡😡😡😡... was appearing) by adding rules against repeating emojis
 - January 19, 2026: CRITICAL BUG FIX - Fixed "I'm a boy" setting name to "A" by adding boy/girl/man/woman to blocklist
