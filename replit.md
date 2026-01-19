@@ -53,7 +53,7 @@ A romantic AI girlfriend Telegram bot with emotional personality, memory, force 
 ## Tech Stack
 - Python 3.11+
 - python-telegram-bot
-- google-generativeai (Gemini API)
+- google-genai (new unified Gemini SDK)
 - PostgreSQL (psycopg2)
 
 ## Moderation Dashboard
@@ -67,6 +67,9 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 19, 2026: Migrated from deprecated google-generativeai to new google-genai SDK
+- January 19, 2026: Fixed database connection handling with retry logic for autoscale deployments
+- January 19, 2026: Fixed force subscription channel check (@ prefix handling)
 - January 19, 2026: Fixed production webhook - bot now correctly registers webhook with production deployment URL
 - January 19, 2026: Converted bot from polling to webhook mode for autoscale deployment (cost-effective)
 - January 19, 2026: Merged bot and dashboard into single Flask app (app.py) on port 5000

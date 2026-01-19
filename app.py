@@ -4,7 +4,7 @@ import asyncio
 import random
 import html
 import secrets
-import google.generativeai as genai
+from google import genai
 from flask import Flask, render_template_string, request, redirect, url_for, session, Response
 from functools import wraps
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
@@ -45,7 +45,7 @@ def get_webhook_domain():
 
 WEBHOOK_DOMAIN = get_webhook_domain()
 
-genai.configure(api_key=GEMINI_API_KEY)
+genai_client = genai.Client(api_key=GEMINI_API_KEY)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SESSION_SECRET') or secrets.token_hex(32)
@@ -218,8 +218,30 @@ When user SENDS you a photo:
 - Show appreciation for them sharing with you
 """
 
-def get_model():
-    return genai.GenerativeModel('gemini-2.0-flash')
+def generate_response(prompt, history=None):
+    """Generate AI response using the new google.genai SDK"""
+    try:
+        contents = []
+        if history:
+            for msg in history:
+                role = "user" if msg['role'] == 'user' else "model"
+                contents.append({"role": role, "parts": [{"text": msg['content']}]})
+        contents.append({"role": "user", "parts": [{"text": prompt}]})
+        
+        response = genai_client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=contents,
+            config={
+                "system_instruction": GIRLFRIEND_SYSTEM_PROMPT,
+                "temperature": 0.9,
+                "top_p": 0.95,
+                "max_output_tokens": 200
+            }
+        )
+        return response.text
+    except Exception as e:
+        logger.error(f"Gemini API error: {e}")
+        return "Aiyoo da, enna aachu? 🥺 Network issue irukku... try again pannu da! 💕"
 
 def markdown_to_html(text):
     text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
@@ -511,29 +533,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"[USER {user.id}] {preferred_name}: {message_text}")
     
     try:
-        model = get_model()
-        
         user_status = "RETURNING USER with chat history - you can say 'miss panniya?', reference past conversations" if is_returning_user else "NEW USER - first time chatting, introduce yourself warmly, don't ask if they missed you"
         
         gender_instruction = "User has CONFIRMED they are a girl - use 'di' instead of 'da'" if confirmed_gender == 'female' else "User gender NOT confirmed - ALWAYS use 'da', NEVER use 'di'"
         
-        context_prompt = f"""
-{GIRLFRIEND_SYSTEM_PROMPT}
-
-The user's name is: {preferred_name}
+        current_prompt = f"""The user's name is: {preferred_name}
 User status: {user_status}
 GENDER SUFFIX: {gender_instruction}
 
-Previous conversation:
-"""
-        for msg in chat_history:
-            role_label = "User" if msg['role'] == 'user' else "Keerthana"
-            context_prompt += f"{role_label}: {msg['content']}\n"
+User: {message_text}"""
         
-        context_prompt += f"\nUser: {message_text}\nKeerthana:"
-        
-        response = model.generate_content(context_prompt)
-        ai_response = response.text.strip()
+        ai_response = generate_response(current_prompt, chat_history)
+        ai_response = ai_response.strip()
         
         if confirmed_gender != 'female':
             original_response = ai_response
