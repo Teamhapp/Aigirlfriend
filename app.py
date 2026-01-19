@@ -15,7 +15,8 @@ from database import (
     get_user_points, update_preferred_name, get_user_stats, get_message_status, 
     use_message, is_user_blocked, block_user, unblock_user, set_user_daily_limit, 
     DAILY_MESSAGE_LIMIT, get_confirmed_gender, set_confirmed_gender,
-    get_all_users, get_user_chat_history, get_dashboard_stats, award_referral_points
+    get_all_users, get_user_chat_history, get_dashboard_stats, award_referral_points,
+    set_global_daily_limit, get_global_daily_limit
 )
 import re
 import requests
@@ -474,6 +475,40 @@ async def admin_unblock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("Invalid user ID. Must be a number.")
 
+async def admin_setdailylimit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        logger.warning(f"[ADMIN] Unauthorized /setdailylimit attempt by user {user.id} ({user.username})")
+        return
+    
+    if len(context.args) < 1:
+        current_limit = get_global_daily_limit()
+        await update.message.reply_text(
+            f"📊 Current global daily limit: {current_limit} messages\n\n"
+            f"Usage: /setdailylimit [limit]\n"
+            f"Example: /setdailylimit 30\n\n"
+            f"This sets the default daily message limit for ALL users."
+        )
+        return
+    
+    try:
+        new_limit = int(context.args[0])
+        if new_limit < 1:
+            await update.message.reply_text("❌ Limit must be at least 1")
+            return
+        if new_limit > 1000:
+            await update.message.reply_text("❌ Limit cannot exceed 1000")
+            return
+        
+        set_global_daily_limit(new_limit)
+        logger.info(f"[ADMIN] User {user.id} set global daily limit to {new_limit}")
+        await update.message.reply_text(
+            f"✅ Global daily limit set to {new_limit} messages!\n\n"
+            f"All users without custom limits will now have {new_limit} messages per day."
+        )
+    except ValueError:
+        await update.message.reply_text("❌ Invalid number. Please provide a valid limit.")
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     message_text = update.message.text
@@ -871,6 +906,7 @@ def ensure_initialized():
             application.add_handler(CommandHandler("points", points))
             application.add_handler(CommandHandler("stats", stats))
             application.add_handler(CommandHandler("setlimit", admin_setlimit))
+            application.add_handler(CommandHandler("setdailylimit", admin_setdailylimit))
             application.add_handler(CommandHandler("block", admin_block))
             application.add_handler(CommandHandler("unblock", admin_unblock))
             application.add_handler(CallbackQueryHandler(check_subscription_callback, pattern="^check_sub$"))

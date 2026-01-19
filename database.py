@@ -117,6 +117,20 @@ def init_database():
         cur.execute('CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created_at)')
         cur.execute('CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_id)')
         
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS bot_settings (
+                key VARCHAR(100) PRIMARY KEY,
+                value TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cur.execute('''
+            INSERT INTO bot_settings (key, value) 
+            VALUES ('global_daily_limit', '20')
+            ON CONFLICT (key) DO NOTHING
+        ''')
+        
         conn.commit()
         logger.info("Database initialized successfully")
     except Exception as e:
@@ -215,10 +229,63 @@ def award_referral_points(conn, referrer_id, referred_id):
         conn.rollback()
         return False
 
-DAILY_MESSAGE_LIMIT = 20
+DEFAULT_DAILY_MESSAGE_LIMIT = 20
+
+def get_global_daily_limit():
+    """Get the global daily message limit from settings"""
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT value FROM bot_settings WHERE key = 'global_daily_limit'")
+        result = cur.fetchone()
+        cur.close()
+        if result:
+            return int(result[0])
+        return DEFAULT_DAILY_MESSAGE_LIMIT
+    except Exception as e:
+        logger.warning(f"Error getting global daily limit: {e}")
+        return DEFAULT_DAILY_MESSAGE_LIMIT
+    finally:
+        if conn:
+            release_connection(conn)
+
+DAILY_MESSAGE_LIMIT = get_global_daily_limit()
+
+@with_db_retry()
+def set_global_daily_limit(conn, new_limit):
+    """Set the global daily message limit for all users"""
+    try:
+        cur = conn.cursor()
+        cur.execute('''
+            INSERT INTO bot_settings (key, value, updated_at) 
+            VALUES ('global_daily_limit', %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (key) DO UPDATE SET value = %s, updated_at = CURRENT_TIMESTAMP
+        ''', (str(new_limit), str(new_limit)))
+        conn.commit()
+        cur.close()
+        return True
+    except Exception as e:
+        logger.error(f"Error setting global daily limit: {e}")
+        conn.rollback()
+        return False
+
+def _get_global_limit_from_conn(conn):
+    """Get global daily limit using existing connection"""
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT value FROM bot_settings WHERE key = 'global_daily_limit'")
+        result = cur.fetchone()
+        cur.close()
+        if result:
+            return int(result[0])
+    except Exception:
+        pass
+    return DEFAULT_DAILY_MESSAGE_LIMIT
 
 @with_db_retry()
 def get_message_status(conn, user_id):
+    global_limit = _get_global_limit_from_conn(conn)
     cur = conn.cursor()
     cur.execute('''
         SELECT daily_messages_used, bonus_messages, last_reset_date, custom_daily_limit 
@@ -228,10 +295,10 @@ def get_message_status(conn, user_id):
     cur.close()
     
     if not result:
-        return {'daily_used': 0, 'daily_remaining': DAILY_MESSAGE_LIMIT, 'bonus': 0, 'total_remaining': DAILY_MESSAGE_LIMIT}
+        return {'daily_used': 0, 'daily_remaining': global_limit, 'bonus': 0, 'total_remaining': global_limit}
     
     daily_used, bonus, last_reset, custom_limit = result[0] or 0, result[1] or 0, result[2], result[3]
-    user_limit = custom_limit if custom_limit else DAILY_MESSAGE_LIMIT
+    user_limit = custom_limit if custom_limit else global_limit
     today = date.today()
     
     if last_reset is None or last_reset < today:
@@ -263,7 +330,8 @@ def use_message(conn, user_id):
             return False, 0
         
         daily_used, bonus, last_reset, custom_limit = result[0] or 0, result[1] or 0, result[2], result[3]
-        user_limit = custom_limit if custom_limit else DAILY_MESSAGE_LIMIT
+        global_limit = _get_global_limit_from_conn(conn)
+        user_limit = custom_limit if custom_limit else global_limit
         today = date.today()
         
         if last_reset is None or last_reset < today:
@@ -485,4 +553,6 @@ def get_user_daily_limit(conn, user_id):
     cur.execute('SELECT custom_daily_limit FROM users WHERE user_id = %s', (user_id,))
     result = cur.fetchone()
     cur.close()
-    return result[0] if result and result[0] else DAILY_MESSAGE_LIMIT
+    if result and result[0]:
+        return result[0]
+    return _get_global_limit_from_conn(conn)

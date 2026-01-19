@@ -31,7 +31,8 @@ A romantic AI girlfriend Telegram bot with emotional personality, memory, force 
 - `/stats` - View your statistics
 
 ### Admin Commands (ID: 6474452917 only)
-- `/setlimit [user_id] [limit]` - Set custom daily message limit for a user
+- `/setdailylimit [limit]` - Set global daily message limit for ALL users (e.g., /setdailylimit 30)
+- `/setlimit [user_id] [limit]` - Set custom daily message limit for a specific user
 - `/block [user_id]` - Block a user from using the bot
 - `/unblock [user_id]` - Unblock a user
 
@@ -49,6 +50,7 @@ A romantic AI girlfriend Telegram bot with emotional personality, memory, force 
 - `chat_messages` - Conversation history
 - `referrals` - Referral tracking
 - `points_transactions` - Points history
+- `bot_settings` - Global bot settings (e.g., global_daily_limit)
 
 ## Tech Stack
 - Python 3.11+
@@ -67,6 +69,7 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 19, 2026: Added /setdailylimit admin command to set global daily message limit for all users
 - January 19, 2026: Major roleplay improvements - stays in character, follows scene setup exactly, no more "enna venumnu sollu" questioning
 - January 19, 2026: Added good/bad scene examples in prompt for better AI guidance
 - January 19, 2026: Migrated from deprecated google-generativeai to new google-genai SDK
