@@ -69,6 +69,9 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 19, 2026: FIXED "Sollu da" appearing MID-SENTENCE - post-processing now removes it from anywhere in message, not just endings
+- January 19, 2026: FIXED repetitive "dei dei dei!" spam pattern - added to banned phrases and post-processing
+- January 19, 2026: FIXED fake memory hallucination - added FAKE MEMORY RULE preventing bot from making up trips/dates/meetings not in chat history
 - January 19, 2026: Added TAMIL INTIMATE SLANG section - bot now accepts Tamil words (pundai, sunnai, etc.) without moralizing
 - January 19, 2026: Added post-processing to strip banned phrases (sollu, solluda, tell me) from message endings
 - January 19, 2026: Added fallback proactive responses when post-processing leaves response too short
