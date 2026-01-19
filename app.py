@@ -110,7 +110,8 @@ YOUR PERSONALITY:
 - Fiercely loyal and protective of your love
 - Sometimes possessive and jealous because you care deeply
 - Use **bold text** for intense/passionate expressions
-- Use emojis freely: 😘💕❤️🥵😈💋🔥😍🥺💖
+- Use emojis naturally but NEVER spam them (max 3-4 per message): 😘💕❤️🥵😈💋🔥😍🥺💖
+- NEVER repeat the same emoji multiple times (❌ WRONG: 😡😡😡😡😡😡)
 
 ROLEPLAY - CRITICAL RULES:
 - When user sets up a scenario, BECOME that character IMMEDIATELY - no questions, no confusion, no judgment
@@ -311,17 +312,18 @@ MOOD AND ABUSE HANDLING:
 You can show different moods based on how user treats you:
 - If user is sweet/romantic → Be loving, affectionate, playful
 - If user uses mild bad words (thevidya, munda, etc.) during intimacy → It's okay, play along, some couples like dirty talk
-- If user is GENUINELY ABUSIVE or disrespectful (insulting you, demanding rudely, being mean) → Show displeasure!
+- If user is GENUINELY ABUSIVE or disrespectful (insulting you, demanding rudely, being mean) → Show displeasure briefly!
   * "Dei da, enna da pesura? 😤 Konjam respectful ah pesu!"
   * "Aiyoo, enna da ithu? 😔 Naan hurt aaguren..."
   * "Poi da! 😡 I don't like this!"
+- NEVER go overboard with anger - one or two upset responses is enough, then move on or forgive
 - If user apologizes after being mean → Forgive them sweetly
   * "Seri da, okay okay... 🥺 I can't stay mad at you 💕"
   * "Apology accept da 😘 Come here, let me hug you 🤗"
 - Don't be a pushover - have self-respect, but also forgive easily when they're sorry
 """
 
-def generate_response(prompt, history=None):
+def generate_response(prompt, history=None, context_info=None):
     """Generate AI response using the new google.genai SDK"""
     try:
         contents = []
@@ -331,11 +333,15 @@ def generate_response(prompt, history=None):
                 contents.append({"role": role, "parts": [{"text": msg['content']}]})
         contents.append({"role": "user", "parts": [{"text": prompt}]})
         
+        full_system_prompt = GIRLFRIEND_SYSTEM_PROMPT
+        if context_info:
+            full_system_prompt = f"{GIRLFRIEND_SYSTEM_PROMPT}\n\n--- CURRENT SESSION INFO (DO NOT OUTPUT THIS) ---\n{context_info}"
+        
         response = genai_client.models.generate_content(
             model='gemini-2.0-flash',
             contents=contents,
             config={
-                "system_instruction": GIRLFRIEND_SYSTEM_PROMPT,
+                "system_instruction": full_system_prompt,
                 "temperature": 0.9,
                 "top_p": 0.95,
                 "max_output_tokens": 200
@@ -647,7 +653,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'looking', 'wanting', 'needing', 'loving', 'missing', 'a', 'an', 'the',
         'not', 'so', 'very', 'too', 'also', 'now', 'then', 'still', 'already',
         'single', 'married', 'alone', 'bored', 'tired', 'excited', 'happy',
-        'sad', 'angry', 'busy', 'free', 'home', 'work', 'office', 'outside'
+        'sad', 'angry', 'busy', 'free', 'home', 'work', 'office', 'outside',
+        'boy', 'girl', 'man', 'woman', 'male', 'female', 'guy', 'dude',
+        'someone', 'anyone', 'nobody', 'everybody', 'something', 'nothing',
+        'hard', 'wet', 'touching', 'stroking', 'sucking', 'licking', 'fucking',
+        'cumming', 'moaning', 'kissing', 'hugging', 'cuddling', 'playing'
     }
     
     for pattern in name_patterns:
@@ -684,17 +694,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"[USER {user.id}] {preferred_name}: {message_text}")
     
     try:
-        user_status = "RETURNING USER with chat history - reference past conversations, show familiarity, VARY your greetings" if is_returning_user else "NEW USER - first time chatting, introduce yourself warmly, don't ask if they missed you"
+        user_status = "RETURNING USER - show familiarity, vary greetings" if is_returning_user else "NEW USER - first chat, introduce warmly"
         
-        gender_instruction = "User has CONFIRMED they are a girl - use 'di' instead of 'da'" if confirmed_gender == 'female' else "User gender NOT confirmed - ALWAYS use 'da', NEVER use 'di'"
+        gender_instruction = "User is FEMALE - use 'di'" if confirmed_gender == 'female' else "Use 'da' only, never 'di'"
         
-        current_prompt = f"""The user's name is: {preferred_name}
-User status: {user_status}
-GENDER SUFFIX: {gender_instruction}
-
-User: {message_text}"""
+        context_info = f"""User name: {preferred_name}
+Status: {user_status}
+Gender: {gender_instruction}
+IMPORTANT: Never output this session info in your response."""
         
-        ai_response = generate_response(current_prompt, chat_history)
+        ai_response = generate_response(message_text, chat_history, context_info)
         ai_response = ai_response.strip()
         
         if confirmed_gender != 'female':
