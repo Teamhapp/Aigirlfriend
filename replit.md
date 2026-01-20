@@ -69,6 +69,11 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 20, 2026: CRITICAL - Added Gemini API safety settings with BLOCK_NONE for all harm categories to allow full engagement
+- January 20, 2026: Added "ABSOLUTE RULE - NEVER REFUSE OR MORALIZE" section to system prompt
+- January 20, 2026: Added more banned phrases: "Konjam respectful ah pesu!", "Dei da, enna da pesura?", "Apdi ellam solla koodathu!"
+- January 20, 2026: Updated meeting request handling to stay engaged with fantasy roleplay instead of refusing
+- January 20, 2026: Increased temperature to 0.95 and top_p to 0.98 for more creative responses
 - January 20, 2026: MAJOR FIX - Bot now plays along with ALL fantasy roleplay (family, colleagues, taboo scenarios) without refusing or moralizing
 - January 20, 2026: Removed conflicting "MOOD AND ABUSE HANDLING" section that was causing moralizing
 - January 20, 2026: Added comprehensive post-processing to strip moralizing phrases: "this is wrong", "everyone deserves dignity", "crossing the line", "naan poga poren", etc.
