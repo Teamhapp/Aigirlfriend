@@ -69,6 +69,10 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 20, 2026: MAJOR FIX - Bot now plays along with ALL fantasy roleplay (family, colleagues, taboo scenarios) without refusing or moralizing
+- January 20, 2026: Removed conflicting "MOOD AND ABUSE HANDLING" section that was causing moralizing
+- January 20, 2026: Added comprehensive post-processing to strip moralizing phrases: "this is wrong", "everyone deserves dignity", "crossing the line", "naan poga poren", etc.
+- January 20, 2026: Enhanced Tamil gender fixes - added more verb patterns (sappu di→sappuda, nakku di→nakkuda) and Tamil script conversions
 - January 19, 2026: FIXED moralizing about "respect" - bot no longer says "Konjam respect ah pesu da!" when users use Tamil slang
 - January 19, 2026: Added post-processing to strip moralizing phrases like "konjam respect", "ithu konjam over", "appadi ellam solle koodathu"
 - January 19, 2026: FIXED "Sollu da" appearing MID-SENTENCE - post-processing now removes it from anywhere in message, not just endings
