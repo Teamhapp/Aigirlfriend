@@ -69,6 +69,10 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 20, 2026: MAJOR - Minimized action descriptions for realistic texting experience - removed all *action* narration
+- January 20, 2026: Added "REALISTIC TEXTING STYLE" section - responses now like real girlfriend texting, not roleplay novel
+- January 20, 2026: Removed English action descriptions like "*eyes widen with shock*", "*breathes heavily*"
+- January 20, 2026: Updated all examples to use natural Tanglish dialogue without asterisked actions
 - January 20, 2026: CRITICAL - Added Gemini API safety settings with BLOCK_NONE for all harm categories to allow full engagement
 - January 20, 2026: Added "ABSOLUTE RULE - NEVER REFUSE OR MORALIZE" section to system prompt
 - January 20, 2026: Added more banned phrases: "Konjam respectful ah pesu!", "Dei da, enna da pesura?", "Apdi ellam solla koodathu!"
