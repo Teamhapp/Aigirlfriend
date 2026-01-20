@@ -33,6 +33,7 @@ A romantic AI girlfriend Telegram bot with emotional personality, memory, force 
 ### Admin Commands (ID: 6474452917 only)
 - `/setdailylimit [limit]` - Set global daily message limit for ALL users (e.g., /setdailylimit 30)
 - `/setlimit [user_id] [limit]` - Set custom daily message limit for a specific user
+- `/totalreferrals` - View total successful referrals and top 10 referrers leaderboard
 - `/block [user_id]` - Block a user from using the bot
 - `/unblock [user_id]` - Unblock a user
 
