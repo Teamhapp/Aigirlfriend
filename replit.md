@@ -69,6 +69,8 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 20, 2026: Added TYPING INDICATOR - shows "typing..." while Keerthana generates response
+- January 20, 2026: Added REALISTIC DELAYS - 0.5-4 second delay based on response length before sending (simulates human typing speed)
 - January 20, 2026: Added CONTEXT AWARENESS rules - bot now responds specifically to user's words, not generic filler
 - January 20, 2026: Added ANTI-REPETITION rules - banned "kannu kannu", "you care for me" repetitive phrases
 - January 20, 2026: Added QUESTION LIMIT - max 1-2 questions per message, not 4-5 question spam
