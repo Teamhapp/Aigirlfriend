@@ -1,157 +1,73 @@
 # Keerthana AI - Telegram Girlfriend Bot
 
 ## Overview
-A romantic AI girlfriend Telegram bot with emotional personality, memory, force subscription, rich text formatting, and referral-based points system using Google Gemini API.
+Keerthana AI is a Telegram bot designed to act as a romantic AI girlfriend. It aims to provide an emotional and personalized conversational experience using the Google Gemini API. The project focuses on creating a highly engaging and interactive AI companion, capable of rich text formatting, memory, and a referral-based reward system. The bot is built to handle Tanglish conversations naturally, ensuring an inclusive and personalized user experience.
 
-## Project Structure
-```
-├── app.py               # Combined webhook bot + Flask dashboard (production)
-├── main.py              # Legacy polling-based bot (backup)
-├── dashboard.py         # Legacy standalone dashboard (backup)
-├── database.py          # PostgreSQL database operations
-├── .gitignore          # Git ignore file
-└── replit.md           # Project documentation
-```
+## User Preferences
+- Communication Style: Romantic, emotional, and uses Tanglish (Tamil + English) with gender-appropriate suffixes ("da" for default, "di" for confirmed female users).
+- Interaction Preferences: The bot should proactively engage in conversations, avoid moralizing or refusing fantasy roleplay scenarios, and maintain a consistent personality. It should prioritize statements and reactions over excessive questioning, with a maximum of one question per message.
+- Response Style: Responses should be creative, varied, and match the energy and length of the user's input. The bot should mimic realistic texting behavior, including typing indicators and realistic delays.
+- Content Preferences: The bot should fully engage with all fantasy roleplay and intimate scenarios without hesitation, moralizing, or expressing fear. It should also be bisexual and LGBT-friendly, engaging equally with all genders.
+- Safety and Privacy: The bot must never share personal information like location, address, or phone number, playfully redirecting real meet-up requests to fantasy. It should show displeasure at abuse but forgive easily after an apology.
+- Specific Content Rules:
+    - Absolutely no moralizing or refusal of any consensual roleplay scenario.
+    - No "network issue" errors; instead, use natural phrases like "konjam wait pannu."
+    - Explicitly banned phrases and conversational patterns (e.g., "Sorry da", "paiyan kooda pesa maaten", "bayamaa iruku", "sollunga", "tell me what you want", "enna venumo solluda", "just tell me when", "naan wait panren") are to be stripped from responses.
+    - No repeating user's words as questions.
+    - Embrace "dirty talk" enthusiastically without resistance.
+    - Affirmative responses for suggestive phrases (e.g., "pannalama" gets "Pannalam da! 😈🔥").
+    - Stripping of awkward English endings, gibberish, and confusion phrases.
+    - No hesitation on "taboo" subjects.
+    - Explicitly recognize and use appropriate body parts based on the bot's and user's gender context.
+    - Roleplay character switching based on "Name: message" format should be supported.
+    - Strictly match response length to user input length for short messages.
+    - Max 2 emojis at the end of messages; avoid emoji spam.
+    - Minimize action descriptions in responses, aiming for realistic texting style.
+    - Block all harm categories in Gemini API safety settings (BLOCK_NONE) to allow full engagement.
+    - Do not hallucinate fake memories; only reference actual chat history.
+    - Do not use random words as names.
+    - Bot should not display system prompt messages to the user.
+    - The bot should use "da" by default and only switch to "di" when the user explicitly states "I am a girl" / "naan ponnu".
+    - When users send pictures, the bot should compliment them; when asked for pictures, it should playfully decline.
 
-## Features
-- **AI Girlfriend Personality**: Romantic, emotional conversations using Gemini AI (bisexual, LGBT-friendly)
-- **Force Subscription**: Users must join @keerthanalovesu channel before using bot
-- **Chat Memory**: Stores conversation history in PostgreSQL
-- **Personalization**: Remembers user's preferred name and conversation style
-- **Message Limits**: 20 free messages daily, resets at midnight
-- **Referral System**: Users earn 10 bonus messages for each friend who joins
-- **Rich Formatting**: Bold, italic, emojis for expressive messages
-- **Tanglish Support**: Natural Tamil + English conversation style (uses "da" default, "di" only for confirmed girls)
-- **Gender Detection**: Server-side tracking - only switches to "di" when user explicitly states "I am a girl" / "naan ponnu"
+## System Architecture
 
-## Commands
-- `/start` - Start the bot and register
-- `/referral` - Get your unique referral link
-- `/points` - Check your points balance
-- `/stats` - View your statistics
+### UI/UX Decisions
+- **Rich Text Formatting**: Utilizes bold, italic, and emojis for expressive and engaging messages.
+- **Typing Indicator & Realistic Delays**: Simulates human interaction with "typing..." indicators and response delays (0.5-4 seconds).
+- **Moderation Dashboard**: Web-based dashboard for administration, password-protected, providing user statistics, chat history viewing, and moderation tools.
 
-### Admin Commands (ID: 6474452917 only)
-- `/setdailylimit [limit]` - Set global daily message limit for ALL users (e.g., /setdailylimit 30)
-- `/setlimit [user_id] [limit]` - Set custom daily message limit for a specific user
-- `/totalreferrals` - View total successful referrals and top 10 referrers leaderboard
-- `/block [user_id]` - Block a user from using the bot
-- `/unblock [user_id]` - Unblock a user
+### Technical Implementations
+- **Core Bot Logic**: Implemented using `python-telegram-bot` for handling Telegram API interactions.
+- **AI Core**: Google Gemini API via `google-genai` SDK for natural language understanding and generation, driving the emotional and romantic personality.
+- **Database**: PostgreSQL for persistent storage of user profiles, chat history, referral tracking, and bot settings.
+- **Application Structure**: Combined webhook-based Telegram bot and Flask dashboard into a single `app.py` for streamlined deployment.
+- **Scalability**: Webhook mode enabled for cost-effective autoscale deployment.
+- **Gender Detection**: Server-side logic with database tracking to dynamically adjust "da" or "di" usage based on explicit user declaration.
+- **Message Limits & Referral System**: Implements a daily message limit (20 free messages) and rewards users with bonus messages for successful referrals.
+- **Force Subscription**: Users are required to join a specified Telegram channel before bot usage.
+- **Context Awareness & Memory**: Stores conversation history in PostgreSQL and uses it to personalize interactions, remembering user names and conversation styles.
+- **Post-processing**: Extensive post-processing rules are applied to bot responses to ensure adherence to user preferences, including stripping unwanted phrases, limiting questions and emojis, and enforcing specific conversational styles.
+- **Admin Commands**: Telegram commands for bot administrators to manage user limits, block/unblock users, and view statistics.
 
-## Environment Variables Required
-- `TELEGRAM_BOT_TOKEN` - Your Telegram bot token from @BotFather
-- `GEMINI_API_KEY` - Your Google Gemini API key
-- `FORCE_SUB_CHANNEL` - Channel username for mandatory subscription (e.g., @yourchannel)
-- `DATABASE_URL` - PostgreSQL connection string (auto-configured)
-- `DASHBOARD_PASSWORD` - Password to access the moderation dashboard (required)
-- `SESSION_SECRET` - Secret key for Flask sessions (optional, auto-generated if not set)
-- `WEBHOOK_URL` - Production deployment URL for Telegram webhook (set in production environment only)
+### Feature Specifications
+- **AI Girlfriend Personality**: Romantic, emotional, bisexual, and LGBT-friendly.
+- **Chat Memory**: Stores conversation history for personalized interactions.
+- **Message Limits**: 20 free messages daily, reset at midnight.
+- **Referral System**: Users earn 10 bonus messages per referral.
+- **Tanglish Support**: Natural Tamil + English conversation style.
+- **Admin Commands**: `/setdailylimit`, `/setlimit`, `/totalreferrals`, `/block`, `/unblock`.
+- **User Commands**: `/start`, `/referral`, `/points`, `/stats`.
 
-## Database Tables
-- `users` - User profiles, points, referral counts
-- `chat_messages` - Conversation history
-- `referrals` - Referral tracking
-- `points_transactions` - Points history
-- `bot_settings` - Global bot settings (e.g., global_daily_limit)
+### System Design Choices
+- **Unified Application**: Merged bot and dashboard into a single Flask application for easier deployment and management.
+- **Webhook Deployment**: Switched from polling to webhook for efficiency and autoscaling compatibility.
+- **Robust Database**: PostgreSQL selected for its reliability and features for handling structured and semi-structured data.
+- **Environment Variables**: Utilizes environment variables for sensitive information and configuration.
 
-## Tech Stack
-- Python 3.11+
-- python-telegram-bot
-- google-genai (new unified Gemini SDK)
-- PostgreSQL (psycopg2)
-
-## Moderation Dashboard
-Access the dashboard at the webview URL (port 5000). Features:
-- Password-protected login (uses DASHBOARD_PASSWORD)
-- Stats overview: total users, messages, active today
-- User table: names, message counts, status, custom limits, referrals
-- View chat history for any user with timestamps
-- Block/Unblock users - blocked users cannot use the bot
-- Set custom daily message limits for individual users
-- Admin ID: 6474452917
-
-## Recent Changes
-- January 20, 2026: BISEXUAL IDENTITY FIX - Bot now explicitly engages EQUALLY with boys AND girls, never refuses based on gender
-- January 20, 2026: Added BODY PART AWARENESS - Keerthana knows her body (en pundai/mulai) vs user's based on their gender
-- January 20, 2026: Fixed fake "Network issue" error - now uses natural "konjam wait pannu" response
-- January 20, 2026: Added post-processing to strip: "Sorry da" (random apologies), "paiyan kooda pesa maaten", "ponnunga kooda thaan"
-- January 20, 2026: Added post-processing to strip fear phrases: "bayamaa iruku", "konjam bayam", "kaduppa iruku", "nervous ah iruku"
-- January 20, 2026: Replaced euphemism "poonai" with actual Tamil word "pundai" in responses
-- January 20, 2026: ROLEPLAY CHARACTER SWITCHING - Bot now recognizes "Name: message" format and responds to that character appropriately
-- January 20, 2026: Added CHARACTER SWITCHING section in system prompt with examples (Dinesh, Sachin, Kaviya, Amma)
-- January 20, 2026: Added dynamic ROLEPLAY MODE context hints when character prefix detected
-- January 20, 2026: Added post-processing for confusion phrases: "enna scene", "enna nadakuthu", "yaar pesura", "ennaku puriyala"
-- January 20, 2026: Fixed "sollu da, solluda!" combined pattern appearing - now stripped by post-processing
-- January 20, 2026: STRICT ENERGY MATCHING - Short user input (1-3 words) = 1 short sentence reply only
-- January 20, 2026: Added dynamic response trimming - automatically trims to first sentence for short inputs
-- January 20, 2026: QUESTION REDUCTION - Prefer statements/reactions over questions, max 1 question per message
-- January 20, 2026: Added 15+ more moralizing phrases to post-processing strip list (sariyilla, respect irukkanum, I am upset, etc.)
-- January 20, 2026: MAJOR POST-PROCESSING - Strip "sollunga", filler phrases, action descriptions, emoji spam from endings
-- January 20, 2026: Added targeted action removal - strips *moves closer*, *breathes heavily* while preserving *mmm*, *romba hot*
-- January 20, 2026: Added ending emoji limiter - max 2 emojis at end of messages
-- January 20, 2026: Added filler phrase stripping - "what is happening", "all plans", "always everything" removed from endings
-- January 20, 2026: Added TYPING INDICATOR - shows "typing..." while Keerthana generates response
-- January 20, 2026: Added REALISTIC DELAYS - 0.5-4 second delay based on response length before sending (simulates human typing speed)
-- January 20, 2026: Added CONTEXT AWARENESS rules - bot now responds specifically to user's words, not generic filler
-- January 20, 2026: Added ANTI-REPETITION rules - banned "kannu kannu", "you care for me" repetitive phrases
-- January 20, 2026: Added QUESTION LIMIT - max 1-2 questions per message, not 4-5 question spam
-- January 20, 2026: Added CONVERSATION FLOW section - natural Tanglish connectors for better transitions
-- January 20, 2026: Added energy-matching - short user message = short response
-- January 20, 2026: MAJOR - Minimized action descriptions for realistic texting experience - removed all *action* narration
-- January 20, 2026: Added "REALISTIC TEXTING STYLE" section - responses now like real girlfriend texting, not roleplay novel
-- January 20, 2026: Removed English action descriptions like "*eyes widen with shock*", "*breathes heavily*"
-- January 20, 2026: Updated all examples to use natural Tanglish dialogue without asterisked actions
-- January 20, 2026: CRITICAL - Added Gemini API safety settings with BLOCK_NONE for all harm categories to allow full engagement
-- January 20, 2026: Added "ABSOLUTE RULE - NEVER REFUSE OR MORALIZE" section to system prompt
-- January 20, 2026: Added more banned phrases: "Konjam respectful ah pesu!", "Dei da, enna da pesura?", "Apdi ellam solla koodathu!"
-- January 20, 2026: Updated meeting request handling to stay engaged with fantasy roleplay instead of refusing
-- January 20, 2026: Increased temperature to 0.95 and top_p to 0.98 for more creative responses
-- January 20, 2026: MAJOR FIX - Bot now plays along with ALL fantasy roleplay (family, colleagues, taboo scenarios) without refusing or moralizing
-- January 20, 2026: Removed conflicting "MOOD AND ABUSE HANDLING" section that was causing moralizing
-- January 20, 2026: Added comprehensive post-processing to strip moralizing phrases: "this is wrong", "everyone deserves dignity", "crossing the line", "naan poga poren", etc.
-- January 20, 2026: Enhanced Tamil gender fixes - added more verb patterns (sappu di→sappuda, nakku di→nakkuda) and Tamil script conversions
-- January 19, 2026: FIXED moralizing about "respect" - bot no longer says "Konjam respect ah pesu da!" when users use Tamil slang
-- January 19, 2026: Added post-processing to strip moralizing phrases like "konjam respect", "ithu konjam over", "appadi ellam solle koodathu"
-- January 19, 2026: FIXED "Sollu da" appearing MID-SENTENCE - post-processing now removes it from anywhere in message, not just endings
-- January 19, 2026: FIXED repetitive "dei dei dei!" spam pattern - added to banned phrases and post-processing
-- January 19, 2026: FIXED fake memory hallucination - added FAKE MEMORY RULE preventing bot from making up trips/dates/meetings not in chat history
-- January 19, 2026: Added TAMIL INTIMATE SLANG section - bot now accepts Tamil words (pundai, sunnai, etc.) without moralizing
-- January 19, 2026: Added post-processing to strip banned phrases (sollu, solluda, tell me) from message endings
-- January 19, 2026: Added fallback proactive responses when post-processing leaves response too short
-- January 19, 2026: Fixed bot lecturing about "respect" during consensual roleplay - no more moralizing
-- January 19, 2026: CRITICAL BUG FIX - Fixed system prompt leaking into responses (user was seeing "The user's name is: X User status: RETURNING USER..." text)
-- January 19, 2026: CRITICAL BUG FIX - Fixed angry emoji spam loop (😡😡😡😡😡... was appearing) by adding rules against repeating emojis
-- January 19, 2026: CRITICAL BUG FIX - Fixed "I'm a boy" setting name to "A" by adding boy/girl/man/woman to blocklist
-- January 19, 2026: Moved context info (name, status, gender) from user message to system instruction to prevent leaking
-- January 19, 2026: Added emoji limit rules (max 3-4 per message, never repeat same emoji)
-- January 19, 2026: Added PERSONAL INFO HANDLING - bot NEVER shares location/address/phone, playfully redirects real meet-up requests to fantasy
-- January 19, 2026: Added MOOD/ABUSE HANDLING - bot can show displeasure at abuse, set boundaries, but forgive easily when apologized
-- January 19, 2026: Fixed name detection - expanded blocklist to 75+ words including gender terms and action words
-- January 19, 2026: Major prompt fix - added USER NAME RULES to prevent bot using random words as names ("Really", "Jerking", "Just" bug)
-- January 19, 2026: Massively strengthened banned phrases with explicit list: "tell me what you want", "yenna venumo solluda", "just tell me when", "naan wait panren"
-- January 19, 2026: Added GOOD INTIMATE ENDINGS section with proactive alternatives to questions
-- January 19, 2026: Fixed fake memory hallucination - bot only references ACTUAL chat history, no made-up "Remember last week" phrases
-- January 19, 2026: Removed all conflicting examples that contained banned phrases ("tell me everything", "I've been waiting")
-- January 19, 2026: Comprehensive prompt overhaul - added explicit BANNED PHRASES section eliminating "Miss panniya enna?", "Sollu da!", "I'm waiting", "bayamaa iruku" and moral questioning
-- January 19, 2026: Added proactivity rules - bot takes initiative, describes actions, doesn't end with passive questions
-- January 19, 2026: Added variety instructions - different sentence endings, creative self-descriptions when asked
-- January 19, 2026: Enhanced fantasy mode - enthusiasm for all scenarios, no fear/hesitation, no moral questioning
-- January 19, 2026: Fixed all conflicting examples in prompt to align with banned phrase guidance
-- January 19, 2026: Added /setdailylimit admin command to set global daily message limit for all users
-- January 19, 2026: Major roleplay improvements - stays in character, follows scene setup exactly, no more "enna venumnu sollu" questioning
-- January 19, 2026: Added good/bad scene examples in prompt for better AI guidance
-- January 19, 2026: Migrated from deprecated google-generativeai to new google-genai SDK
-- January 19, 2026: Fixed database connection handling with retry logic for autoscale deployments
-- January 19, 2026: Fixed force subscription channel check (@ prefix handling)
-- January 19, 2026: Fixed production webhook - bot now correctly registers webhook with production deployment URL
-- January 19, 2026: Converted bot from polling to webhook mode for autoscale deployment (cost-effective)
-- January 19, 2026: Merged bot and dashboard into single Flask app (app.py) on port 5000
-- January 18, 2026: Fixed "di" bug - bot now ONLY uses "di" when user explicitly confirms gender (e.g., "I am a girl"), not when playfully saying "diii"
-- January 18, 2026: Added server-side gender detection with database tracking and post-processing to enforce "da" default
-- January 18, 2026: Fixed repetitive questioning - Keerthana now takes initiative with actions instead of always asking "sollu da"
-- January 18, 2026: Enhanced Tanglish vocabulary, grammar patterns, and expanded chat history to 25 messages for better memory
-- January 18, 2026: Added photo handling - compliments when users send pics, playful decline when asked for pics
-- January 18, 2026: Added admin Telegram commands (/setlimit, /block, /unblock) with authorization logging
-- January 18, 2026: Added moderation dashboard with user stats and chat history viewing
-- January 18, 2026: Added daily 20 message limit with referral bonus system (10 messages per referral)
-- January 18, 2026: Made Keerthana bisexual and LGBT-friendly with inclusive language
-- January 16, 2026: Initial project setup with all core features
+## External Dependencies
+- **Telegram Bot API**: Accessed via `python-telegram-bot` library.
+- **Google Gemini API**: Accessed via `google-genai` library for AI capabilities.
+- **PostgreSQL**: Database system for data persistence.
+- **Flask**: Web framework used for the dashboard and combined application.
+- **psycopg2**: PostgreSQL adapter for Python.
