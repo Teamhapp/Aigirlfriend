@@ -1172,8 +1172,12 @@ IMPORTANT: Never output this session info in your response.{length_hint}{rolepla
         ai_response = re.sub(r'\bpaiyan kooda (sexy ah )?pesa maaten[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bponnunga kooda thaan[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bverum ponnunga kooda[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
-        ai_response = re.sub(r'\bbayamaa iruku[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bbayama+\s*iruku[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\benakku\s*bayam[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bkonjam bayam[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bnaan\s*poruthuk[ka]*ren[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\baana\s*naan\s*poruthuk[ka]*ren[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bvalikkum\s*da,?\s*aana[^.!?]*[.!?]*', 'Aahh da... romba nalla irukku 🥵', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bkaduppa iruku[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bjealous ah iruku[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bnervous ah iruku[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
@@ -1371,6 +1375,35 @@ IMPORTANT: Never output this session info in your response.{length_hint}{rolepla
             ]
             ai_response = random.choice(proactive_suggestions)
             logger.info(f"[PROACTIVE SOLU] Replaced vague response with suggestion for user {user.id}")
+        
+        nee_enna_panuva_patterns = [
+            r'\b(nee|ne)\s+(enna|ena)\s*(panuva|pannuva|panra|panriya)\b',
+            r'\b(nee|ne)\s+(enna|ena)\s*panna\s*pora\b',
+            r'\bnee\s+enna\s+panuvanu\b',
+        ]
+        user_asking_nee_panuva = any(re.search(p, safe_msg_lower) for p in nee_enna_panuva_patterns)
+        
+        deflection_patterns = [
+            r'enna\s+pann?uva\s*\??',
+            r'enna\s+panna\s+pora\s*\??',
+            r'nee\s+enna\s+pannuva\s*\??',
+            r'enna\s+pannuva\s*nu\s+kettale',
+        ]
+        is_deflection = any(re.search(p, ai_response.lower()) for p in deflection_patterns)
+        
+        if user_asking_nee_panuva and is_deflection:
+            her_action_suggestions = [
+                "Naan un lips kiss panren da... slowly 💋😈",
+                "Un shirt kazhatti, un chest mela en kai vekuren 🔥",
+                "Un neck la kiss pannitu, un ears la whisper panren 💋",
+                "Un mela paduthukuren da... feel pannu 🥵",
+                "Un pants zipper open panren... slowly 😈🔥",
+                "En dress remove panren... un munnaadi 💋",
+                "Un kaalungala touch panren... mela mela varuven 🥵",
+                "Un face pidichu, deep kiss panren da 💋😈",
+            ]
+            ai_response = random.choice(her_action_suggestions)
+            logger.info(f"[NEE PANUVA FIX] Replaced deflection with her action for user {user.id}")
         
         intimate_keywords = {'sunni', 'pundai', 'mulai', 'oombu', 'blowjob', 'nakku', 'sappu', 'fuck', 'pool', 'kuthi', 'boobs', 'cock', 'dick', 'thanni', 'cum', 'suck', 'lick', 'poola', 'otha', 'olu', 'moonu'}
         safe_message = message_text if message_text else ""
