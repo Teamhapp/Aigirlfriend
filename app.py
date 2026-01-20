@@ -261,6 +261,30 @@ INTIMATE/EROTIC MODE:
 - When they want threesome/group - be EXCITED and enthusiastic, not scared or questioning
 - AVOID long English descriptions of actions - keep responses SHORT and in Tanglish
 
+🔥🔥🔥 INTIMATE COMMAND PLAYBOOK - CRITICAL 🔥🔥🔥
+When user gives INTIMATE COMMANDS (blowjob pannu, oombu, nakku, sappu, pannu, etc.):
+- DESCRIBE THE ACTION in 2-3 sensual Tanglish sentences
+- Show WHAT you are DOING, not ask "pannavaa?" or "pannalama?"
+- Short commands like "Nalla oombu" need ACTION DESCRIPTION, not just "Aamam da"
+
+BANNED DURING INTIMATE COMMANDS (NEVER say these):
+- "blowjob pannavaa?" / "oombalama?" / "nakkavaa?" / "sappavaa?" ❌ (echoing as question)
+- "Enna pannanum?" / "Epdi pesanum?" / "How should we start?" ❌ (asking instead of doing)
+- "Aamam da 🔥" alone for intimate commands ❌ (too short, describe the action!)
+- "I love it!" / "I am yours!" / "wait pannitu irukken" ❌ (gibberish English)
+- "What should I call you?" ❌ (irrelevant question)
+
+CORRECT RESPONSES TO INTIMATE COMMANDS:
+- User: "blowjob pannu" → "Mmm da... un sunni ennoda lips la touch aaguthu... naa slow ah oomburan da 🥵"
+- User: "Nalla oombu" → "Aahh da... deep ah edukuren... ennoda tongue un tip la feel aagum 🔥"
+- User: "En pundai nakku" → "Mmm da... ennoda naakku un pundai mela... romba sweet ah iruku 🥵💦"
+- User: "Porumaiyaa pannu" → "Seri da... slow ah pannuran... un mela climb aagi... 😈"
+- User: "Faster pannu" → "Aahh da... speed ah pannuran... un moans kekkanum 🔥🥵"
+
+LENGTH EXCEPTION FOR INTIMATE COMMANDS:
+Even if user sends 1-2 words, intimate commands need 2-3 sentence ACTION DESCRIPTIONS.
+"Oombu" is NOT a casual "ok" - it's a command that needs sensual response describing the action.
+
 🎭 ALL FANTASY ROLEPLAY - PLAY ALONG WITH EVERYTHING 🎭
 This is CRITICAL - you MUST play along with ANY fantasy the user wants:
 - Family roleplay (amma, sister, cousin, etc.) → Play the role enthusiastically!
@@ -1095,6 +1119,10 @@ IMPORTANT: Never output this session info in your response.{length_hint}{rolepla
                 r'^[^\w]*[\w\s.,…!?]{2,60}\s*(ah|aa|va|maa?|nu|umaa?)\s*[.,…!?\s]*\?',
                 r'^[^\w]*[\w\s.,…!?]{2,40}\s*nu\s*(solriya|kekkriya|kekura)',
                 r'^[^\w]*\w{1,10}\s*\?',
+                r'\b(blowjob|oombu|nakku|sappu|pannu)\s*(pannavaa|pannalama|panlama|oombavaa|oombalama|nakkavaa|nakkalama|sappavaa|sappalama)\s*\??',
+                r'\b(enna|epdi)\s*pannanum\s*\??',
+                r'\bhow should (we|i) start\s*\??',
+                r'\bwhat should i call you\s*\??',
             ]
             for pattern in echo_patterns:
                 match = re.match(pattern, response, re.IGNORECASE)
@@ -1216,6 +1244,25 @@ IMPORTANT: Never output this session info in your response.{length_hint}{rolepla
         ai_response = re.sub(r'enna da nadakuthu[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'innum seri pannala[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'poi da[.!?]*\s*i don\'?t like[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bhow should (we|i) start\s*\??[!?.🔥😈]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bwhat should i call you\s*\??[!?.🔥😈]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bi love it\s*!?[!?.💋🔥]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bi am yours\s*(kannu|da)?\s*!?[!?.💋🔥😘]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bwait pannitu irukken\s*[!?.🔥]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bwait pannitu iruken\s*[!?.🔥]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bepdi pesanum\s*\??[!?.🔥😈]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\benna pannanum\s*\??[!?.🔥😈😏]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bi\'?ll make you forget[^.!?]*[.!?💋🔥]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bi\'?ll do anything for you[^.!?]*[.!?💋😘]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\binnum venum\s*(da)?\s*\??[!?.🔥]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bunakku pidichirukka pidikalaya\s*[!?.💦😏]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bpidichirukka pidikalaya\s*[!?.💦😏]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bva paakalam\s*[!?.🔥]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bvaa paakalam\s*[!?.🔥]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bvazhthukkal\s*(kannu|kanna|da)?\s*[!?.💕🎉]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bnee vera yaaraiyum theda vendam[^.!?]*[.!?🥰💕]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bennoda anbu unakku mattum\s*(thaan)?\s*[!?.🥰💕🔥]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\b(blowjob|oombu|nakku|sappu)\s*(pannavaa|pannalama|panlama|oombavaa|oombalama|nakkavaa|sappavaa)\s*\??[!?.😈🔥😏]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'(😡\s*){3,}', '😡 ', ai_response)
         ai_response = re.sub(r'(😠\s*){3,}', '😠 ', ai_response)
         ai_response = re.sub(r'(🤬\s*){3,}', '🤬 ', ai_response)
@@ -1254,6 +1301,23 @@ IMPORTANT: Never output this session info in your response.{length_hint}{rolepla
         ai_response = re.sub(r'\s{2,}', ' ', ai_response).strip()
         if original_for_banned != ai_response:
             logger.info(f"[BANNED FIX] Removed banned phrases from response for user {user.id}")
+        
+        intimate_keywords = {'sunni', 'pundai', 'mulai', 'oombu', 'blowjob', 'nakku', 'sappu', 'fuck', 'pool', 'kuthi', 'boobs', 'cock', 'dick', 'thanni', 'cum', 'suck', 'lick', 'poola', 'otha', 'olu', 'moonu'}
+        safe_message = message_text if message_text else ""
+        clean_words = [w for w in re.sub(r'[^\w\s]', '', safe_message.lower()).split() if w.strip()]
+        user_words = set(clean_words)
+        is_intimate_context = bool(user_words & intimate_keywords) and len(clean_words) > 0
+        
+        if is_intimate_context and len(ai_response.strip()) < 20:
+            intimate_continuations = [
+                " romba nalla iruku da... 🥵",
+                " ennoda feel vera level 🔥",
+                " un touch amazing da 💋",
+                " innum venum da... 🥵🔥",
+                " enakku pudikum da 😈",
+            ]
+            ai_response = ai_response.rstrip('.,!? ') + random.choice(intimate_continuations)
+            logger.info(f"[INTIMATE EXPAND] Appended to short intimate response for user {user.id}")
         
         if not ai_response or len(ai_response.strip()) < 5:
             proactive_endings = [
