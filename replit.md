@@ -57,6 +57,8 @@ Keerthana AI is a Telegram bot designed to act as a romantic AI girlfriend. It a
 - **Gibberish English Stripping**: 35+ patterns to remove awkward English endings while preserving context with proactive Tanglish starters
 - **Intimate Command Playbook**: System prompt section guiding bot to DESCRIBE actions (not ask "pannavaa?") when user gives intimate commands
 - **Intimate Context Expander**: Appends sensual continuations to ultra-short (<20 char) responses during intimate scenes, preserving model intent
+- **Proactive Suggestion System**: Detects when users say "solu", "enna panalam", "nee solu" and replaces vague responses with specific intimate action suggestions
+- **Deflection Prevention**: 13+ banned phrases including "secret/athu secret", "shy ah iruku", "naughty boy/girl" prevent bot from hiding intimate details or being evasive
 - **Admin Commands**: Telegram commands for bot administrators to manage user limits, block/unblock users, and view statistics.
 
 ### Feature Specifications
