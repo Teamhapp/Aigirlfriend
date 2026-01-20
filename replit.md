@@ -48,6 +48,13 @@ Keerthana AI is a Telegram bot designed to act as a romantic AI girlfriend. It a
 - **Force Subscription**: Users are required to join a specified Telegram channel before bot usage.
 - **Context Awareness & Memory**: Stores conversation history in PostgreSQL and uses it to personalize interactions, remembering user names and conversation styles.
 - **Post-processing**: Extensive post-processing rules are applied to bot responses to ensure adherence to user preferences, including stripping unwanted phrases, limiting questions and emojis, and enforcing specific conversational styles.
+- **Three-Tier Echo Detection**: Prevents bot from repeating user's words as questions:
+  - Tier 1: Direct string match (catches "Seri?" for user input "Seri")
+  - Tier 2: Token overlap analysis (≥50% overlap with "?" = echo)
+  - Tier 3: Regex patterns for Tamil question particles and short-word echoes
+  - All tiers preserve remaining response content after the echoed portion
+- **Degradation Roleplay Support**: Embraces dirty talk enthusiastically, REPLACES resistance phrases ("sollatha da" → "Aama da... un theyvidiya thaan naan 😈")
+- **Gibberish English Stripping**: 35+ patterns to remove awkward English endings while preserving context with proactive Tanglish starters
 - **Admin Commands**: Telegram commands for bot administrators to manage user limits, block/unblock users, and view statistics.
 
 ### Feature Specifications
