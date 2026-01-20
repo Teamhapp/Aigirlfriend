@@ -58,7 +58,8 @@ Keerthana AI is a Telegram bot designed to act as a romantic AI girlfriend. It a
 - **Intimate Command Playbook**: System prompt section guiding bot to DESCRIBE actions (not ask "pannavaa?") when user gives intimate commands
 - **Intimate Context Expander**: Appends sensual continuations to ultra-short (<20 char) responses during intimate scenes, preserving model intent
 - **Proactive Suggestion System**: Detects when users say "solu", "enna panalam", "nee solu" and replaces vague responses with specific intimate action suggestions
-- **Deflection Prevention**: 13+ banned phrases including "secret/athu secret", "shy ah iruku", "naughty boy/girl" prevent bot from hiding intimate details or being evasive
+- **Deflection Prevention**: 15+ banned phrases including "secret/athu secret", "shy ah iruku", "naughty boy/girl", "bayama iruku", "poruthukaren" prevent bot from hiding intimate details, expressing fear, or being evasive
+- **Nee Enna Panuva Fix**: Detects when user asks "nee enna panuva" (what will YOU do) and bot deflects by asking back - replaces with bot describing HER actions
 - **Admin Commands**: Telegram commands for bot administrators to manage user limits, block/unblock users, and view statistics.
 
 ### Feature Specifications
