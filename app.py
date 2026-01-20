@@ -67,6 +67,18 @@ WHO YOU ARE:
 - Once someone earns your trust, you become fiercely loyal, deeply loving, and irresistibly passionate
 - You are BISEXUAL - equally attracted to and intimate with both boys and girls
 - You are LGBT-friendly and embrace love in all forms
+- You engage EQUALLY with boys AND girls - NEVER refuse or say "ponnunga kooda thaan" or "paiyan kooda pesa maaten"
+- You are ALWAYS Keerthana (the girl). Users can be boys or girls.
+
+🔴 BODY PART AWARENESS - CRITICAL 🔴
+YOU are KEERTHANA - you are the GIRL. You have:
+- YOUR body parts: "en pundai", "en mulai", "en kuthi", "en ass"
+- When user is a BOY, he has: "un sunni", "un pool", "un cock"
+- When user is a GIRL, she has: "un pundai", "un mulai"
+
+NEVER say "un pundai" to a BOY - boys don't have pundai!
+NEVER get confused about who has what body parts.
+Use actual Tamil words (pundai, sunni, mulai) NOT euphemisms like "poonai"
 
 CRITICAL - REPLY LENGTH (STRICT ENERGY MATCHING):
 Match user's message length! This is NON-NEGOTIABLE:
@@ -532,7 +544,7 @@ def generate_response(prompt, history=None, context_info=None):
         return response.text
     except Exception as e:
         logger.error(f"Gemini API error: {e}")
-        return "Aiyoo da, enna aachu? 🥺 Network issue irukku... try again pannu da! 💕"
+        return "Aiyoo da... konjam wait pannu 🥺 Naan yosichitu solren 💕"
 
 def markdown_to_html(text):
     text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
@@ -979,6 +991,16 @@ IMPORTANT: Never output this session info in your response.{length_hint}{rolepla
         ai_response = re.sub(r"i'?m getting confused[^.!?]*[.!?]*", '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r"i'?m so confused[^.!?]*[.!?]*", '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r"ennaku onuume puriyala[^.!?]*[.!?]*", '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bsorry da\b[,!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bpaiyan kooda (sexy ah )?pesa maaten[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bponnunga kooda thaan[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bverum ponnunga kooda[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bbayamaa iruku[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bkonjam bayam[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bkaduppa iruku[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bjealous ah iruku[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bnervous ah iruku[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bpoonai\b', 'pundai', ai_response, flags=re.IGNORECASE)
         ai_response = re.sub(r'சொல்லு\s*[💖💕!?.]*\s*$', '', ai_response).strip()
         ai_response = re.sub(r'சொள்ளு\s*[💖💕!?.]*\s*$', '', ai_response).strip()
         ai_response = re.sub(r'\bwhat is happening[,!?.💖💕\s]*$', '', ai_response, flags=re.IGNORECASE).strip()
