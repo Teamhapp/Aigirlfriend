@@ -1650,6 +1650,14 @@ def ensure_initialized():
                     BotCommand("stats", "View your statistics")
                 ]
                 await application.bot.set_my_commands(commands)
+                
+                if WEBHOOK_DOMAIN:
+                    webhook_url = f"{WEBHOOK_DOMAIN}/webhook"
+                    await application.bot.set_webhook(url=webhook_url)
+                    logger.info(f"Webhook set to: {webhook_url}")
+                else:
+                    logger.warning("No WEBHOOK_DOMAIN configured - bot may not receive messages")
+                
                 logger.info("Bot initialized and started")
             
             future = asyncio.run_coroutine_threadsafe(init_app(), loop)
