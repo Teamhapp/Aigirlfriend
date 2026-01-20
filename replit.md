@@ -69,6 +69,10 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 20, 2026: MAJOR POST-PROCESSING - Strip "sollunga", filler phrases, action descriptions, emoji spam from endings
+- January 20, 2026: Added targeted action removal - strips *moves closer*, *breathes heavily* while preserving *mmm*, *romba hot*
+- January 20, 2026: Added ending emoji limiter - max 2 emojis at end of messages
+- January 20, 2026: Added filler phrase stripping - "what is happening", "all plans", "always everything" removed from endings
 - January 20, 2026: Added TYPING INDICATOR - shows "typing..." while Keerthana generates response
 - January 20, 2026: Added REALISTIC DELAYS - 0.5-4 second delay based on response length before sending (simulates human typing speed)
 - January 20, 2026: Added CONTEXT AWARENESS rules - bot now responds specifically to user's words, not generic filler
