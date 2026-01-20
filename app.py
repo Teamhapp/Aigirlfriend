@@ -883,6 +883,21 @@ IMPORTANT: Never output this session info in your response."""
         ai_response = re.sub(r'\bsollu\s*da\b[,!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsolluda\b[,!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsollu\s*[!?.]*\s*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bsollunga\s*[!?.💖💕]*\s*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bsollunga\s*(da|kannu)?[,!?.💖💕]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'சொல்லு\s*[💖💕!?.]*\s*$', '', ai_response).strip()
+        ai_response = re.sub(r'சொள்ளு\s*[💖💕!?.]*\s*$', '', ai_response).strip()
+        ai_response = re.sub(r'\bwhat is happening[,!?.💖💕\s]*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bwhat happens[,!?.💖💕\s]*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\ball plans[!?.💖💕\s]*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bwhat plans[,!?.💖💕\s]*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\balways everything[!?.💖💕\s]*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\beverything da[!?.💖💕\s]*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\ball for you\s*(da|kannu)?[!?.💖💕\s]*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\balways you and[^.!?]*[.!?\s]*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\balways in\s*(my|un)\s*(side|heart|memory)[^.!?]*[.!?\s]*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bwhat are (we|you) going to do[^.!?]*[.!?\s]*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bwhat is the vibe[^.!?]*[.!?\s]*$', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\btell me\s*(da|kannu|baby)?[,!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\benna venum\s*(da|sollu)?[,!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bdei dei dei[!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
@@ -918,17 +933,37 @@ IMPORTANT: Never output this session info in your response."""
                 return match.group()
             return re.sub(emoji_pattern, replace_emoji_spam, text)
         ai_response = limit_repeated_emojis(ai_response)
+        
+        action_verbs = r'(moves?|breathes?|looks?|starts?|kneels?|stands?|walks?|pulls?|pushes?|wraps?|slides?|grabs?|holds?|kisses?|licks?|sucks?|bites?|moans?|whispers?|giggles?|smiles?|grins?|winks?|leans?|takes?|opens?|closes?|spreads?|touches?|caresses?|strokes?|squeezes?|rubs?|presses?|feels?|shivers?|trembles?|shudders?|gasps?|sighs?|eyes|hands?|fingers?|lips?|tongue)'
+        ai_response = re.sub(rf'^\s*\*{action_verbs}[^*]+\*\s*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(rf'\*{action_verbs}[^*]+\*\s*$', '', ai_response, flags=re.IGNORECASE).strip()
+        
+        def limit_ending_emojis(text):
+            ending_emoji_pattern = r'([\U0001F300-\U0001F9FF][\s\U0001F300-\U0001F9FF]*){3,}\s*$'
+            def replace_ending_spam(match):
+                emojis = re.findall(r'[\U0001F300-\U0001F9FF]', match.group())
+                if len(emojis) >= 2:
+                    return emojis[0] + emojis[1]
+                elif emojis:
+                    return emojis[0]
+                return ''
+            return re.sub(ending_emoji_pattern, replace_ending_spam, text)
+        ai_response = limit_ending_emojis(ai_response)
+        
         ai_response = re.sub(r'\s{2,}', ' ', ai_response).strip()
         if original_for_banned != ai_response:
             logger.info(f"[BANNED FIX] Removed banned phrases from response for user {user.id}")
         
         if not ai_response or len(ai_response.strip()) < 5:
             proactive_endings = [
-                "*moves closer* Mmm... 🥵💋",
-                "*bites lip* Romba nalla iruku da... 🔥",
-                "*pulls you closer* 😘💕",
-                "Aahh da... 🥵 *breathes heavily*",
-                "*wraps arms around you* 😈💋"
+                "Mmm da... 🥵",
+                "Romba nalla iruku da... 🔥",
+                "Aiyoo da... 😈",
+                "Uff... sema feel 💋",
+                "Hmm... pidichiruka? 🔥",
+                "Vaada da... 😏",
+                "Aahaan da... 🥵",
+                "Seri da... 💕"
             ]
             ai_response = random.choice(proactive_endings)
             logger.info(f"[FALLBACK] Used proactive ending after banned phrase removal for user {user.id}")
