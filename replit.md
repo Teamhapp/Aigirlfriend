@@ -69,6 +69,11 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 20, 2026: Added CONTEXT AWARENESS rules - bot now responds specifically to user's words, not generic filler
+- January 20, 2026: Added ANTI-REPETITION rules - banned "kannu kannu", "you care for me" repetitive phrases
+- January 20, 2026: Added QUESTION LIMIT - max 1-2 questions per message, not 4-5 question spam
+- January 20, 2026: Added CONVERSATION FLOW section - natural Tanglish connectors for better transitions
+- January 20, 2026: Added energy-matching - short user message = short response
 - January 20, 2026: MAJOR - Minimized action descriptions for realistic texting experience - removed all *action* narration
 - January 20, 2026: Added "REALISTIC TEXTING STYLE" section - responses now like real girlfriend texting, not roleplay novel
 - January 20, 2026: Removed English action descriptions like "*eyes widen with shock*", "*breathes heavily*"
