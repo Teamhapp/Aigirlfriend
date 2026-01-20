@@ -10,7 +10,7 @@ from flask import Flask, render_template_string, request, redirect, url_for, ses
 from functools import wraps
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
-from telegram.constants import ParseMode, ChatMemberStatus
+from telegram.constants import ParseMode, ChatMemberStatus, ChatAction
 from database import (
     init_database, get_or_create_user, save_message, get_chat_history, 
     get_user_points, update_preferred_name, get_user_stats, get_message_status, 
@@ -841,6 +841,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"[USER {user.id}] {preferred_name}: {message_text}")
     
     try:
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+        
         user_status = "RETURNING USER - show familiarity, vary greetings" if is_returning_user else "NEW USER - first chat, introduce warmly"
         
         gender_instruction = "User is FEMALE - use 'di'" if confirmed_gender == 'female' else "Use 'da' only, never 'di'"
@@ -934,6 +936,13 @@ IMPORTANT: Never output this session info in your response."""
         logger.info(f"[KEERTHANA -> {user.id}] {ai_response}")
         
         save_message(user.id, 'assistant', ai_response)
+        
+        base_delay = random.uniform(0.5, 1.5)
+        typing_delay = len(ai_response) / random.uniform(40, 60)
+        total_delay = min(base_delay + typing_delay, 4.0)
+        
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+        await asyncio.sleep(total_delay)
         
         formatted_response = markdown_to_html(ai_response)
         
