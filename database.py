@@ -556,3 +556,28 @@ def get_user_daily_limit(conn, user_id):
     if result and result[0]:
         return result[0]
     return _get_global_limit_from_conn(conn)
+
+@with_db_retry()
+def get_total_referral_stats(conn):
+    cur = conn.cursor()
+    cur.execute('SELECT COUNT(*) FROM referrals')
+    total_referrals = cur.fetchone()[0]
+    cur.execute('SELECT SUM(referral_count) FROM users')
+    total_from_users = cur.fetchone()[0] or 0
+    cur.execute('''
+        SELECT u.user_id, u.preferred_name, u.username, u.referral_count 
+        FROM users u 
+        WHERE u.referral_count > 0 
+        ORDER BY u.referral_count DESC 
+        LIMIT 10
+    ''')
+    top_referrers = cur.fetchall()
+    cur.close()
+    return {
+        'total_referrals': total_referrals,
+        'total_from_users': total_from_users,
+        'top_referrers': [
+            {'user_id': r[0], 'name': r[1] or r[2] or str(r[0]), 'count': r[3]} 
+            for r in top_referrers
+        ]
+    }

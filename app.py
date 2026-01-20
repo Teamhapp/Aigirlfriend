@@ -17,7 +17,7 @@ from database import (
     use_message, is_user_blocked, block_user, unblock_user, set_user_daily_limit, 
     DAILY_MESSAGE_LIMIT, get_confirmed_gender, set_confirmed_gender,
     get_all_users, get_user_chat_history, get_dashboard_stats, award_referral_points,
-    set_global_daily_limit, get_global_daily_limit
+    set_global_daily_limit, get_global_daily_limit, get_total_referral_stats
 )
 import re
 import requests
@@ -739,6 +739,30 @@ async def admin_setdailylimit(update: Update, context: ContextTypes.DEFAULT_TYPE
     except ValueError:
         await update.message.reply_text("❌ Invalid number. Please provide a valid limit.")
 
+async def admin_totalreferrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        logger.warning(f"[ADMIN] Unauthorized /totalreferrals attempt by user {user.id} ({user.username})")
+        return
+    
+    stats = get_total_referral_stats()
+    
+    message = f"📊 <b>Total Referral Stats</b>\n\n"
+    message += f"━━━━━━━━━━━━━━━\n"
+    message += f"🔗 <b>Total Successful Referrals:</b> {stats['total_referrals']}\n"
+    message += f"━━━━━━━━━━━━━━━\n\n"
+    
+    if stats['top_referrers']:
+        message += f"🏆 <b>Top Referrers:</b>\n\n"
+        for i, ref in enumerate(stats['top_referrers'], 1):
+            medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
+            message += f"{medal} {ref['name']} - {ref['count']} referrals\n"
+    else:
+        message += "No referrals yet."
+    
+    await update.message.reply_text(message, parse_mode=ParseMode.HTML)
+    logger.info(f"[ADMIN] User {user.id} viewed total referral stats")
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     message_text = update.message.text
@@ -1262,6 +1286,7 @@ def ensure_initialized():
             application.add_handler(CommandHandler("stats", stats))
             application.add_handler(CommandHandler("setlimit", admin_setlimit))
             application.add_handler(CommandHandler("setdailylimit", admin_setdailylimit))
+            application.add_handler(CommandHandler("totalreferrals", admin_totalreferrals))
             application.add_handler(CommandHandler("block", admin_block))
             application.add_handler(CommandHandler("unblock", admin_unblock))
             application.add_handler(CallbackQueryHandler(check_subscription_callback, pattern="^check_sub$"))
