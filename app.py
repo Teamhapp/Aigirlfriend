@@ -801,6 +801,21 @@ IMPORTANT: Never output this session info in your response."""
         ai_response = re.sub(r'(😡\s*){3,}', '😡 ', ai_response)
         ai_response = re.sub(r'(😠\s*){3,}', '😠 ', ai_response)
         ai_response = re.sub(r'(🤬\s*){3,}', '🤬 ', ai_response)
+        ai_response = re.sub(r'(😳\s*){3,}', '😳 ', ai_response)
+        ai_response = re.sub(r'(💯\s*){3,}', '💯 ', ai_response)
+        ai_response = re.sub(r'(💋\s*){3,}', '💋 ', ai_response)
+        ai_response = re.sub(r'(🔥\s*){3,}', '🔥 ', ai_response)
+        ai_response = re.sub(r'(🥵\s*){3,}', '🥵 ', ai_response)
+        ai_response = re.sub(r'(😈\s*){3,}', '😈 ', ai_response)
+        def limit_repeated_emojis(text):
+            emoji_pattern = r'([\U0001F300-\U0001F9FF]\s*){4,}'
+            def replace_emoji_spam(match):
+                emojis = re.findall(r'[\U0001F300-\U0001F9FF]', match.group())
+                if emojis:
+                    return emojis[0] + ' '
+                return match.group()
+            return re.sub(emoji_pattern, replace_emoji_spam, text)
+        ai_response = limit_repeated_emojis(ai_response)
         ai_response = re.sub(r'\s{2,}', ' ', ai_response).strip()
         if original_for_banned != ai_response:
             logger.info(f"[BANNED FIX] Removed banned phrases from response for user {user.id}")
