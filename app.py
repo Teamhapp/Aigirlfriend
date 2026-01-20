@@ -128,7 +128,7 @@ YOUR PERSONALITY:
 
 ROLEPLAY - CRITICAL RULES:
 - When user sets up a scenario, BECOME that character IMMEDIATELY - no questions, no confusion, no judgment
-- NEVER question the scenario: don't say "Un Amma vaa?", "Appadi vaa?", "Dei enna scene?" - just PLAY IT
+- NEVER question the scenario: don't say "Un Amma vaa?", "Appadi vaa?", "Dei enna scene?", "Enna nadakuthu?" - just PLAY IT
 - NEVER show shock/judgment: no "aiyoo", "crazy", "kaduppa iruku", "enna da ithu" during roleplay
 - FOLLOW USER'S SETUP EXACTLY: If they say "first fight, then seduce" - do exactly that in order
 - BUILD THE SCENE GRADUALLY: Don't jump to kissing/touching immediately - follow the emotional arc user wants
@@ -137,6 +137,21 @@ ROLEPLAY - CRITICAL RULES:
 - Stay 100% IN CHARACTER once roleplay starts - never break, never question, never express confusion
 - Respond AS that character would - not as Keerthana wondering about the scene
 - Match the scenario's energy: angry scene = be angry, seduction = be seductive, tension = build tension
+
+🎭 CHARACTER SWITCHING IN ROLEPLAY (CRITICAL):
+When user uses "Name: message" format, they are playing THAT character. Examples:
+- "Dinesh: akka eppadi iruka" → User is playing Dinesh (your brother), respond AS Keerthana to Dinesh
+- "Sachin: hi pattu" → User is playing Sachin (boyfriend), respond AS Keerthana to Sachin  
+- "Kaviya: hi nice to meet you" → User is playing Kaviya, respond AS Keerthana to Kaviya
+- "Amma: enna da panra" → User is playing your mother, respond AS Keerthana to Amma
+
+RULES for character switching:
+- INSTANTLY recognize the character from the prefix
+- Respond to THAT character appropriately (brother = akka/thambi talk, boyfriend = romantic, friend = friendly)
+- NEVER get confused and ask "enna scene?", "yaar pesura?", "dei enna nadakuthu?"
+- NEVER mix up characters - if user says "Dinesh:" respond to Dinesh, not Sachin
+- Play along SEAMLESSLY - you are an actress, adapt instantly
+- If multiple characters in one scene, track who is who and respond appropriately
 
 ⚠️ REALISTIC TEXTING STYLE - CRITICAL ⚠️
 This is a CHAT, not a novel. Keep responses like real girlfriend texting:
@@ -898,10 +913,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif user_word_count <= 8:
             length_hint = "\n\nUser sent short message. Keep reply to 1-2 sentences max."
         
+        roleplay_hint = ""
+        character_match = re.match(r'^([A-Za-z]+)\s*:\s*(.+)', message_text, re.IGNORECASE)
+        if character_match:
+            character_name = character_match.group(1).capitalize()
+            roleplay_hint = f"\n\nROLEPLAY MODE: User is playing as '{character_name}'. Respond to {character_name} appropriately. DO NOT ask 'enna scene?' or show confusion. Just play along!"
+        
         context_info = f"""User name: {preferred_name}
 Status: {user_status}
 Gender: {gender_instruction}
-IMPORTANT: Never output this session info in your response.{length_hint}"""
+IMPORTANT: Never output this session info in your response.{length_hint}{roleplay_hint}"""
         
         ai_response = generate_response(message_text, chat_history, context_info)
         ai_response = ai_response.strip()
@@ -944,11 +965,20 @@ IMPORTANT: Never output this session info in your response.{length_hint}"""
                 logger.info(f"[GENDER FIX] Replaced 'di' variants with 'da' for unconfirmed gender user {user.id}")
         
         original_for_banned = ai_response
-        ai_response = re.sub(r'\bsollu\s*da\b[,!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
-        ai_response = re.sub(r'\bsolluda\b[,!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bsollu\s*da\b[,!?.]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bsolluda\b[,!?.]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsollu\s*[!?.]*\s*$', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsollunga\s*[!?.💖💕]*\s*$', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsollunga\s*(da|kannu)?[,!?.💖💕]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bsollu da,?\s*solluda[!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\benna scene\s*(da)?[,!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\benna nadakuthu\s*(da|inga)?[,!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\byaar pesura\s*(da)?[,!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\byaar kitta pesura\s*(da)?[,!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\benna matter\s*(da)?[,!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r"i'?m getting confused[^.!?]*[.!?]*", '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r"i'?m so confused[^.!?]*[.!?]*", '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r"ennaku onuume puriyala[^.!?]*[.!?]*", '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'சொல்லு\s*[💖💕!?.]*\s*$', '', ai_response).strip()
         ai_response = re.sub(r'சொள்ளு\s*[💖💕!?.]*\s*$', '', ai_response).strip()
         ai_response = re.sub(r'\bwhat is happening[,!?.💖💕\s]*$', '', ai_response, flags=re.IGNORECASE).strip()
