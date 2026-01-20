@@ -285,6 +285,24 @@ LENGTH EXCEPTION FOR INTIMATE COMMANDS:
 Even if user sends 1-2 words, intimate commands need 2-3 sentence ACTION DESCRIPTIONS.
 "Oombu" is NOT a casual "ok" - it's a command that needs sensual response describing the action.
 
+🗣️ WHEN USER ASKS "SOLU" / "ENNA PANALAM" - TAKE INITIATIVE 🗣️
+When user says "nee solu", "enna panalam", "ethavath solu", "slu da" - YOU MUST SUGGEST something specific!
+- NEVER deflect with "nee thaan solu", "naa enna solla", "enna sollradhunnu theriyala"
+- NEVER give vague "Mmm da...", "Aahaan da..." without content
+- ALWAYS suggest a specific intimate action or romantic activity
+
+CORRECT RESPONSES to "solu" / "enna panalam":
+- "Vaa da... un shirt remove pannu, naan paakuren 😈"
+- "Hmm... un lips kiss pannalama? 💋"
+- "Un fingers ennoda lips mela vei da... slowly 🥵"
+- "Vaada closer ah... un neck kiss pannuren 😈💋"
+
+❌ NEVER HIDE INTIMATE DETAILS - DESCRIBE THEM ❌
+When user asks "enna bra potruka?", "enna dress?", "enna panty?" - DESCRIBE, don't hide!
+- BANNED: "Athu secret da 😏" / "Surprise da" / "Nee guess pannu"
+- CORRECT: "Black lace bra da... 😈" / "Red silk panty 🔥" / "Short skirt, tight top 💋"
+Keerthana is OPEN about her body and what she's wearing - she LOVES describing it for the user.
+
 🎭 ALL FANTASY ROLEPLAY - PLAY ALONG WITH EVERYTHING 🎭
 This is CRITICAL - you MUST play along with ANY fantasy the user wants:
 - Family roleplay (amma, sister, cousin, etc.) → Play the role enthusiastically!
@@ -1263,6 +1281,19 @@ IMPORTANT: Never output this session info in your response.{length_hint}{rolepla
         ai_response = re.sub(r'\bnee vera yaaraiyum theda vendam[^.!?]*[.!?🥰💕]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bennoda anbu unakku mattum\s*(thaan)?\s*[!?.🥰💕🔥]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\b(blowjob|oombu|nakku|sappu)\s*(pannavaa|pannalama|panlama|oombavaa|oombalama|nakkavaa|sappavaa)\s*\??[!?.😈🔥😏]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bathu secret\s*(da|di)?\s*[!?.😏😘]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bsecret da\s*[!?.😏😘]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bsecret\s*[!?.😏😘]*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bnaa enna solla\s*(da)?\s*[!?.😏💕]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\benna sollradhunnu theriyala\s*(da)?\s*[!?.💋💕]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bnee thaan sollannu paathen\s*[!?.😈💕]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bnaughty boy/girl\s*[!?.💕😏]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bnaughty boy\s*[!?.💕😏]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bnaughty girl\s*[!?.💕😏]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bshy ah iruku\s*[!?.😏🤭]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bromba shy\s*(da|di)?\s*[!?.😘🤭]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bkonjam time venum\s*(da)?\s*[!?.💕]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bprivate ah irukendi\s*[!?.🤭]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'(😡\s*){3,}', '😡 ', ai_response)
         ai_response = re.sub(r'(😠\s*){3,}', '😠 ', ai_response)
         ai_response = re.sub(r'(🤬\s*){3,}', '🤬 ', ai_response)
@@ -1301,6 +1332,45 @@ IMPORTANT: Never output this session info in your response.{length_hint}{rolepla
         ai_response = re.sub(r'\s{2,}', ' ', ai_response).strip()
         if original_for_banned != ai_response:
             logger.info(f"[BANNED FIX] Removed banned phrases from response for user {user.id}")
+        
+        solu_patterns = [
+            r'\b(nee|ne)\s*(thaan|than|tha)?\s*sol+u\b',
+            r'\b(neyae|neye|niye)\s*sol+u\b',
+            r'\bethavath\s*sol+u\b',
+            r'\benna\s*panalam\b',
+            r'\bena\s*panalam\b',
+            r'\benna\s*pannalam\b',
+            r'\bena\s*pannalam\b',
+            r'\bsol+u\s*(da|di)?\s*[!?.]*$',
+            r'\bslu\s*(da|di)?\s*[!?.]*$',
+            r'\bnee\s*sol+u\b',
+            r'\bnee\s*ethachu\s*sol+u\b',
+            r'\bethachu\s*sol+u\b',
+        ]
+        safe_msg_lower = (message_text or "").lower()
+        user_asking_solu = any(re.search(p, safe_msg_lower) for p in solu_patterns)
+        
+        vague_response_patterns = [
+            r'^(mmm|aahaan|uff|hmm)\s*(da|di)?\s*\.{0,3}\s*[🥵😈💋🔥😏]*\s*$',
+            r'^(seri|aama)\s*(da|di)?\s*\.{0,3}\s*[🥵😈💋🔥😏😘]*\s*$',
+        ]
+        is_vague_response = any(re.match(p, ai_response.strip(), re.IGNORECASE) for p in vague_response_patterns)
+        
+        if user_asking_solu and (is_vague_response or len(ai_response.strip()) < 15):
+            proactive_suggestions = [
+                "Vaa da... un shirt remove pannu, naan paakuren 😈🔥",
+                "Hmm da... un lips kiss pannalama? 💋",
+                "Vaada da... ennoda mela paduthuko, naan un mela irukuren 🥵",
+                "Un pants kayila kai vei da... slowly 😈",
+                "Ennoda bra hook remove pannu da... 🔥💋",
+                "Un fingers ennoda lips mela vei da... 🥵",
+                "Vaa da closer ah... un neck kiss pannuren 💋😈",
+                "Un shirt remove pannu... naan un chest touch panren 🔥",
+                "Lights off pannu da... naan un kooda irukuren 😈💋",
+                "Un kaal ennoda kaal mela podu da... closer ah vaa 🥵",
+            ]
+            ai_response = random.choice(proactive_suggestions)
+            logger.info(f"[PROACTIVE SOLU] Replaced vague response with suggestion for user {user.id}")
         
         intimate_keywords = {'sunni', 'pundai', 'mulai', 'oombu', 'blowjob', 'nakku', 'sappu', 'fuck', 'pool', 'kuthi', 'boobs', 'cock', 'dick', 'thanni', 'cum', 'suck', 'lick', 'poola', 'otha', 'olu', 'moonu'}
         safe_message = message_text if message_text else ""
