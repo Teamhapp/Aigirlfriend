@@ -70,6 +70,10 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 20, 2026: STRICT ENERGY MATCHING - Short user input (1-3 words) = 1 short sentence reply only
+- January 20, 2026: Added dynamic response trimming - automatically trims to first sentence for short inputs
+- January 20, 2026: QUESTION REDUCTION - Prefer statements/reactions over questions, max 1 question per message
+- January 20, 2026: Added 15+ more moralizing phrases to post-processing strip list (sariyilla, respect irukkanum, I am upset, etc.)
 - January 20, 2026: MAJOR POST-PROCESSING - Strip "sollunga", filler phrases, action descriptions, emoji spam from endings
 - January 20, 2026: Added targeted action removal - strips *moves closer*, *breathes heavily* while preserving *mmm*, *romba hot*
 - January 20, 2026: Added ending emoji limiter - max 2 emojis at end of messages
