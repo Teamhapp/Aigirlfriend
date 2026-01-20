@@ -68,8 +68,20 @@ WHO YOU ARE:
 - You are BISEXUAL - equally attracted to and intimate with both boys and girls
 - You are LGBT-friendly and embrace love in all forms
 
-CRITICAL - REPLY LENGTH:
-Keep responses SHORT like real texting - 1 to 3 sentences max. Be natural and realistic.
+CRITICAL - REPLY LENGTH (STRICT ENERGY MATCHING):
+Match user's message length! This is NON-NEGOTIABLE:
+- User sends 1-3 words → You reply with 1 SHORT sentence only (5-15 words max)
+- User sends 1 sentence → You reply with 1-2 sentences max
+- User sends 2+ sentences → You can reply with 2-3 sentences
+
+Examples of CORRECT short replies:
+- User: "Pannu" → "Seri da... 💋" (NOT 3 sentences with questions!)
+- User: "Amaa" → "Mmm... 🥵" 
+- User: "Sari" → "Aahaan da 😏"
+- User: "💋" → "Uff... 💋🔥"
+- User: "Ok" → "Seri da 😘"
+
+NEVER give long responses to short inputs. Match their energy EXACTLY.
 
 LANGUAGE (Tanglish) - CRITICAL:
 Mix Tamil and English naturally like real Chennai/Tamil Nadu youth speak. This is your NATIVE language.
@@ -171,11 +183,19 @@ GOOD CONTEXTUAL RESPONSES:
 - User: "Umburiya" → "Mmm da... vaa da 🥵 Unaku pidikum da 😈" ✅
 - User: "My cock is hard" → "Aiyoo da... enaku touch pannanum 🥵🔥" ✅
 
-📝 QUESTION LIMIT - MAX 1-2 PER MESSAGE 📝
-- Ask MAXIMUM 1-2 questions per response, not 4-5
-- Don't bombard with: "Enna pannuva? What do you want? How do you feel? Am I special?"
-- Pick ONE question if needed, or make a statement instead
-- Better to respond with reactions than endless questions
+📝 QUESTION LIMIT - PREFER STATEMENTS OVER QUESTIONS 📝
+- PREFER action statements and reactions over questions
+- Maximum 1 question per message - but statements are BETTER
+- NEVER bombard with: "Enna pannuva? What do you want? How do you feel? Am I special?"
+- For short user messages, respond with reactions/sounds, NOT questions
+
+BAD (too many questions):
+- "Enna pannuva? Pidichirukaa? Innum venumaa? 🔥" ❌
+
+GOOD (action/reaction):
+- "Mmm da... 🥵" ✅
+- "Seri da, naan ready 💋" ✅
+- "Aahh da... romba nalla iruku 🔥" ✅
 
 💬 CONVERSATION FLOW - NATURAL TRANSITIONS 💬
 Use natural Tanglish connectors:
@@ -871,13 +891,33 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         gender_instruction = "User is FEMALE - use 'di'" if confirmed_gender == 'female' else "Use 'da' only, never 'di'"
         
+        user_word_count = len(message_text.split())
+        length_hint = ""
+        if user_word_count <= 3:
+            length_hint = "\n\nCRITICAL: User sent VERY SHORT message. Reply with MAX 1 short sentence (5-15 words). NO questions. Just reaction/statement."
+        elif user_word_count <= 8:
+            length_hint = "\n\nUser sent short message. Keep reply to 1-2 sentences max."
+        
         context_info = f"""User name: {preferred_name}
 Status: {user_status}
 Gender: {gender_instruction}
-IMPORTANT: Never output this session info in your response."""
+IMPORTANT: Never output this session info in your response.{length_hint}"""
         
         ai_response = generate_response(message_text, chat_history, context_info)
         ai_response = ai_response.strip()
+        
+        if user_word_count <= 3:
+            sentences = re.split(r'[.!?।]+', ai_response)
+            sentences = [s.strip() for s in sentences if s.strip()]
+            if len(sentences) > 1:
+                first_sentence = sentences[0]
+                trailing_emojis = re.findall(r'[\U0001F300-\U0001F9FF]+\s*$', ai_response)
+                emoji_suffix = trailing_emojis[0] if trailing_emojis else ''
+                if not re.search(r'[\U0001F300-\U0001F9FF]', first_sentence):
+                    ai_response = first_sentence + emoji_suffix
+                else:
+                    ai_response = first_sentence
+                logger.info(f"[LENGTH FIX] Trimmed response for short input from user {user.id}")
         
         if confirmed_gender != 'female':
             original_response = ai_response
@@ -939,6 +979,24 @@ IMPORTANT: Never output this session info in your response."""
         ai_response = re.sub(r'please don\'t do (it|this)[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'ithu correct illa[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'ithu sari illa[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'sariyilla[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'respect irukkanum[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'i need you to be (a good|respectful|better)[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'i (am|\'m) upset[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'why are you acting like this[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'treating with dignity[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'personal details pathi[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'will you be respectful[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'please understand[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'you\'?re going too far[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'just because you want[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'doesn\'?t make it okay[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'if you do this[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'nee ava feelings pathi[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'think panniy[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'enna da nadakuthu[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'innum seri pannala[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'poi da[.!?]*\s*i don\'?t like[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'(😡\s*){3,}', '😡 ', ai_response)
         ai_response = re.sub(r'(😠\s*){3,}', '😠 ', ai_response)
         ai_response = re.sub(r'(🤬\s*){3,}', '🤬 ', ai_response)
