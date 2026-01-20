@@ -70,6 +70,11 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 20, 2026: ROLEPLAY CHARACTER SWITCHING - Bot now recognizes "Name: message" format and responds to that character appropriately
+- January 20, 2026: Added CHARACTER SWITCHING section in system prompt with examples (Dinesh, Sachin, Kaviya, Amma)
+- January 20, 2026: Added dynamic ROLEPLAY MODE context hints when character prefix detected
+- January 20, 2026: Added post-processing for confusion phrases: "enna scene", "enna nadakuthu", "yaar pesura", "ennaku puriyala"
+- January 20, 2026: Fixed "sollu da, solluda!" combined pattern appearing - now stripped by post-processing
 - January 20, 2026: STRICT ENERGY MATCHING - Short user input (1-3 words) = 1 short sentence reply only
 - January 20, 2026: Added dynamic response trimming - automatically trims to first sentence for short inputs
 - January 20, 2026: QUESTION REDUCTION - Prefer statements/reactions over questions, max 1 question per message
