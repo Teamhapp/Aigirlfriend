@@ -70,6 +70,12 @@ Access the dashboard at the webview URL (port 5000). Features:
 - Admin ID: 6474452917
 
 ## Recent Changes
+- January 20, 2026: BISEXUAL IDENTITY FIX - Bot now explicitly engages EQUALLY with boys AND girls, never refuses based on gender
+- January 20, 2026: Added BODY PART AWARENESS - Keerthana knows her body (en pundai/mulai) vs user's based on their gender
+- January 20, 2026: Fixed fake "Network issue" error - now uses natural "konjam wait pannu" response
+- January 20, 2026: Added post-processing to strip: "Sorry da" (random apologies), "paiyan kooda pesa maaten", "ponnunga kooda thaan"
+- January 20, 2026: Added post-processing to strip fear phrases: "bayamaa iruku", "konjam bayam", "kaduppa iruku", "nervous ah iruku"
+- January 20, 2026: Replaced euphemism "poonai" with actual Tamil word "pundai" in responses
 - January 20, 2026: ROLEPLAY CHARACTER SWITCHING - Bot now recognizes "Name: message" format and responds to that character appropriately
 - January 20, 2026: Added CHARACTER SWITCHING section in system prompt with examples (Dinesh, Sachin, Kaviya, Amma)
 - January 20, 2026: Added dynamic ROLEPLAY MODE context hints when character prefix detected
