@@ -1134,7 +1134,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     confirmed_gender = get_confirmed_gender(user.id)
     
-    chat_history = get_chat_history(user.id, limit=25)
+    chat_history = get_chat_history(user.id, limit=20)
     
     is_returning_user = len(chat_history) > 2
     
