@@ -40,7 +40,7 @@ run = ["gunicorn", "--bind=0.0.0.0:5000", "--workers=2", "--timeout=120", "app:a
 [userenv]
 
 [userenv.production]
-WEBHOOK_URL = "https://abc723b5-66c5-4fd7-85c9-50cd0034ad57-00-27bf5guvipxu0.worf.replit.dev/webhook"
+WEBHOOK_URL = "https://ai-girlfriend.replit.app/webhook"
 SKIP_WEBHOOK_SETUP = "true"
 
 [userenv.development]
