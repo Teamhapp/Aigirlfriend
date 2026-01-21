@@ -62,6 +62,9 @@ Keerthana AI is a Telegram bot designed to act as a romantic AI girlfriend. It a
 - **Nee Enna Panuva Fix**: Detects when user asks "nee enna panuva" (what will YOU do) and bot deflects by asking back - replaces with bot describing HER actions
 - **Jailbreak Protection**: 27 regex patterns detect prompt injection attempts ("ignore instructions", "system prompt", "developer mode") and block them with in-character responses
 - **Response Leak Prevention**: Post-processing filters detect and block responses containing JSON, code blocks, or system prompt sections from being sent to users
+- **Mood Tracking System**: Detects intimate, romantic, and casual conversation moods using word-boundary regex patterns on recent messages; adds mood hints to maintain conversation flow
+- **Romantic Flow Enhancement**: System prompt section for mood continuity with romantic expressions vocabulary (pet names, emotional phrases, desire expressions)
+- **Cold Response Prevention**: Replaces generic cold responses ("hmm ok", "seri") with warm alternatives during explicitly intimate conversations
 - **Admin Commands**: Telegram commands for bot administrators to manage user limits, block/unblock users, and view statistics.
 
 ### Feature Specifications
