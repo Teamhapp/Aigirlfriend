@@ -2112,6 +2112,7 @@ def set_limit_route(user_id):
         set_user_daily_limit(user_id, None)
     return redirect(url_for('dashboard'))
 
+ensure_initialized()
+
 if __name__ == '__main__':
-    ensure_initialized()
     app.run(host='0.0.0.0', port=5000, debug=False)
