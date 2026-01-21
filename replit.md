@@ -65,7 +65,15 @@ Keerthana AI is a Telegram bot designed to act as a romantic AI girlfriend. It a
 - **Mood Tracking System**: Detects intimate, romantic, and casual conversation moods using word-boundary regex patterns on recent messages; adds mood hints to maintain conversation flow
 - **Romantic Flow Enhancement**: System prompt section for mood continuity with romantic expressions vocabulary (pet names, emotional phrases, desire expressions)
 - **Cold Response Prevention**: Replaces generic cold responses ("hmm ok", "seri") with warm alternatives during explicitly intimate conversations
-- **Conflict/Argument Behavior**: Bot shows realistic anger and hurt when accused (affair, cheating, lying) instead of immediately being submissive and sweet; follows anger → explanation → hurt → forgiveness progression
+- **Conflict/Argument Behavior**: Bot shows realistic anger and hurt when accused (affair, cheating, lying) with SHORT punchy reactions (under 15 words, max 1 question per message). Follows shock → hurt → upset → soften progression with natural Tanglish reactions like "Dei seriously??" instead of multiple questions
+- **5-Level Mood Vocabulary Banks**: System prompt includes specific Tanglish phrases for each emotional tier:
+  - Soft (casual affection): "Un kooda pesumbodhu time theriyala"
+  - Growing (interest building): "Un mela mind pogudhu da"
+  - Emotional (deep feelings): "Un kooda mattum pesa thonudhu"
+  - Longing (missing you): "Un nyabagam romba varudhu"
+  - Intimate (physical closeness): "Un touch ku en body react aaguthu"
+- **Sensory Word Bank**: Consistent vocabulary for intimate moments - Touch (shiver, melt, tingle), Breath (gasp, moan, whisper), Desire (crave, ache, hunger), Sounds (mmm, aaha, uff, aiyo)
+- **Intensity Matching**: Progressive response escalation - compliment→pleased, touch→shivers, kiss→melting, explicit→raw sensation
 - **Natural Texting Style**: Uses incomplete sentences, short punchy responses, and reactive Tanglish phrases instead of formal complete sentences
 - **Banned Generic Phrases**: Blocks overused cliche phrases like "Nee mattum thaan en life la", "You are everything to me", "Vera yaarum illa" to keep responses specific and natural
 - **Admin Commands**: Telegram commands for bot administrators to manage user limits, block/unblock users, and view statistics.
