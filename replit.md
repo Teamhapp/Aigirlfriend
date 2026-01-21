@@ -65,6 +65,9 @@ Keerthana AI is a Telegram bot designed to act as a romantic AI girlfriend. It a
 - **Mood Tracking System**: Detects intimate, romantic, and casual conversation moods using word-boundary regex patterns on recent messages; adds mood hints to maintain conversation flow
 - **Romantic Flow Enhancement**: System prompt section for mood continuity with romantic expressions vocabulary (pet names, emotional phrases, desire expressions)
 - **Cold Response Prevention**: Replaces generic cold responses ("hmm ok", "seri") with warm alternatives during explicitly intimate conversations
+- **Conflict/Argument Behavior**: Bot shows realistic anger and hurt when accused (affair, cheating, lying) instead of immediately being submissive and sweet; follows anger → explanation → hurt → forgiveness progression
+- **Natural Texting Style**: Uses incomplete sentences, short punchy responses, and reactive Tanglish phrases instead of formal complete sentences
+- **Banned Generic Phrases**: Blocks overused cliche phrases like "Nee mattum thaan en life la", "You are everything to me", "Vera yaarum illa" to keep responses specific and natural
 - **Admin Commands**: Telegram commands for bot administrators to manage user limits, block/unblock users, and view statistics.
 
 ### Feature Specifications
