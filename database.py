@@ -174,6 +174,21 @@ def get_or_create_user(conn, user_id, username=None, first_name=None, referred_b
         raise
 
 @with_db_retry()
+def clear_chat_history(conn, user_id):
+    """Clear all chat history for a user to restart roleplay fresh"""
+    try:
+        cur = conn.cursor()
+        cur.execute('DELETE FROM chat_messages WHERE user_id = %s', (user_id,))
+        conn.commit()
+        cur.close()
+        logger.info(f"Cleared chat history for user {user_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Error clearing chat history: {e}")
+        conn.rollback()
+        return False
+
+@with_db_retry()
 def get_confirmed_gender(conn, user_id):
     cur = conn.cursor()
     cur.execute('SELECT confirmed_gender FROM users WHERE user_id = %s', (user_id,))

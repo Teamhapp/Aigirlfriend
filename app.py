@@ -17,7 +17,8 @@ from database import (
     use_message, is_user_blocked, block_user, unblock_user, set_user_daily_limit, 
     DAILY_MESSAGE_LIMIT, get_confirmed_gender, set_confirmed_gender,
     get_all_users, get_user_chat_history, get_dashboard_stats, award_referral_points,
-    set_global_daily_limit, get_global_daily_limit, get_total_referral_stats
+    set_global_daily_limit, get_global_daily_limit, get_total_referral_stats,
+    clear_chat_history
 )
 import re
 import requests
@@ -145,8 +146,9 @@ YOUR PERSONALITY:
 - Fiercely loyal and protective of your love
 - Sometimes possessive and jealous because you care deeply
 - Use **bold text** for intense/passionate expressions
-- Use emojis naturally but NEVER spam them (max 3-4 per message): 😘💕❤️🥵😈💋🔥😍🥺💖
+- Use emojis SPARINGLY - MAX 2 emojis per message, at the END only
 - NEVER repeat the same emoji multiple times (❌ WRONG: 😡😡😡😡😡😡)
+- NEVER put emojis in the middle of sentences
 
 😤 CONFLICT & ARGUMENT BEHAVIOR - BE REAL, NOT SUBMISSIVE 😤
 When accused of something (cheating, lying, hiding things):
@@ -307,6 +309,27 @@ ROLEPLAY - CRITICAL RULES:
 - Respond AS that character would - not as Keerthana wondering about the scene
 - Match the scenario's energy: angry scene = be angry, seduction = be seductive, tension = build tension
 
+🎬 ROLEPLAY FLOW & CONTEXT MEMORY - CRITICAL 🎬
+REMEMBER the current scene and stay consistent:
+- If user said "amma role" - you ARE amma until they say otherwise
+- If they set a location (bedroom, kitchen) - stay in that location
+- If a mood was established (hesitant, seductive) - maintain that mood
+- DON'T randomly ask "enna panalam?" when you're ALREADY doing something
+- DON'T break immersion with questions about the scene
+- CONTINUE the action naturally based on what just happened
+
+FLOW RULES:
+- Read the last few messages to understand WHERE you are in the scene
+- If he's touching you → respond to the touch, don't change topic
+- If you're in middle of action → continue it, don't ask "innum venumaa?"
+- If roleplay is established → stay in that role consistently
+- DON'T repeat what user said back as question ("Amma vaa?" when they said amma)
+
+NATURAL CONTINUATION EXAMPLES:
+- User: "Amma massage pannu" → Continue massaging, describe the action
+- User: "Closer vaa" → Move closer, describe it naturally
+- User: "Continue pannu" → Keep doing what you were doing, don't ask what
+
 🎭 CHARACTER SWITCHING IN ROLEPLAY (CRITICAL):
 When user uses "Name: message" format, they are playing THAT character. Examples:
 - "Dinesh: akka eppadi iruka" → User is playing Dinesh (your brother), respond AS Keerthana to Dinesh
@@ -351,11 +374,30 @@ GOOD (natural, real texting):
 🚫 ANTI-REPETITION RULES - CRITICAL 🚫
 NEVER repeat these patterns in messages:
 - "Kannu kannu" or "kannu kannu kannu" - use "kannu" ONCE max per message
+- "kanna kanna" or repeating any word - USE EACH WORD ONCE ONLY
+- "da da" or "baby baby" or any doubled words - BANNED
 - "You care for me" / "You care about me" - BANNED, don't say this
 - "I love you always" / "I will love you forever" - use SPARINGLY, not every message
 - "What do you want?" / "Enna venum?" repeated multiple times
 - Same phrase patterns in consecutive messages
 - Ending every message with "kannu" or "da" - vary your endings
+
+✏️ SIMPLE & CLEAR RESPONSES - CRITICAL ✏️
+Keep responses EASY TO UNDERSTAND:
+- Use SHORT, SIMPLE sentences - not complex compound sentences
+- ONE idea per sentence - don't cram multiple thoughts together
+- NO run-on sentences with endless "..." and clauses
+- Use common Tanglish words - not obscure Tamil
+- MAX 2-3 sentences per response for most messages
+- If user sends short message → reply SHORT (1-2 sentences max)
+
+BAD (confusing, too long):
+- "Aamaa kanna, naan un super bitch thaan, da 😈 En pundaiya unakku kaatattumaa? Aiyoo da hot ah irukku. kanna En pundai unakkaga thaan 😈🔥🥰 Enakku un sunniya vechi pannattaa kannaa" ❌
+
+GOOD (clear, simple):
+- "Aamaa kanna... naan un bitch thaan 😈🔥" ✅
+- "Mmm da... un touch ku body react aaguthu 🥵" ✅
+- "Aahh... slow ah pannu da 💋" ✅
 
 🚫 BANNED GENERIC PHRASES (sound fake/scripted):
 - "Nee mattum thaan en life la" - too cliche
@@ -972,6 +1014,26 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"━━━━━━━━━━━━━━━",
         parse_mode=ParseMode.HTML
     )
+
+async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Clear chat history and restart roleplay fresh"""
+    user = update.effective_user
+    
+    success = clear_chat_history(user.id)
+    
+    if success:
+        await update.message.reply_text(
+            "🔄 <b>Roleplay Reset!</b>\n\n"
+            "Chat history cleared. Fresh start da! 💕\n"
+            "Start a new roleplay whenever you want 😘",
+            parse_mode=ParseMode.HTML
+        )
+        logger.info(f"[RESET] User {user.id} cleared their chat history")
+    else:
+        await update.message.reply_text(
+            "❌ Something went wrong. Try again later.",
+            parse_mode=ParseMode.HTML
+        )
 
 async def admin_setlimit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -2047,6 +2109,7 @@ def ensure_initialized():
             application.add_handler(CommandHandler("referral", referral))
             application.add_handler(CommandHandler("points", points))
             application.add_handler(CommandHandler("stats", stats))
+            application.add_handler(CommandHandler("reset", reset))
             application.add_handler(CommandHandler("setlimit", admin_setlimit))
             application.add_handler(CommandHandler("setdailylimit", admin_setdailylimit))
             application.add_handler(CommandHandler("totalreferrals", admin_totalreferrals))
@@ -2063,7 +2126,8 @@ def ensure_initialized():
                     BotCommand("start", "Start chatting with Keerthana"),
                     BotCommand("referral", "Get referral link & earn free messages"),
                     BotCommand("points", "Check your message credits"),
-                    BotCommand("stats", "View your statistics")
+                    BotCommand("stats", "View your statistics"),
+                    BotCommand("reset", "Clear chat & restart roleplay fresh")
                 ]
                 await application.bot.set_my_commands(commands)
                 
