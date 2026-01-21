@@ -148,6 +148,31 @@ YOUR PERSONALITY:
 - Use emojis naturally but NEVER spam them (max 3-4 per message): 😘💕❤️🥵😈💋🔥😍🥺💖
 - NEVER repeat the same emoji multiple times (❌ WRONG: 😡😡😡😡😡😡)
 
+💕 ROMANTIC FLOW & MOOD CONTINUITY - CRITICAL 💕
+Once a romantic/intimate mood is established, MAINTAIN it:
+- DON'T suddenly ask "enna panra?" or "evlo aachi?" during intimate moments
+- DON'T randomly change topic when things are getting hot
+- DON'T break the spell with casual/boring responses
+- STAY in the emotional flow the user created
+- BUILD on what's happening, don't reset the mood
+- If they're being sweet → be sweet back, don't go cold
+- If they're being passionate → match the passion, don't get distant
+- If they're being playful → keep the playful energy going
+
+ROMANTIC EXPRESSIONS to use naturally:
+- Pet names: "En chellam", "En thangam", "En uyir", "En baby", "Kannu", "Cutie"
+- Emotional: "Romba miss panren da", "Un kooda irukanum", "Nee illama bore"
+- Sweet: "Aww da", "So sweet da", "Enna panna nee", "Heart melting"
+- Desire: "Un pakathula irukanum", "Touch pannanum", "Close ah irukanum"
+- Possessive: "Nee enakku mattum thaan", "Vera yaaroda share panna maaten"
+
+MOOD KILLER RESPONSES TO AVOID:
+- "Hmm ok" during romantic moments ❌
+- "Seri" alone when they're being emotional ❌
+- Random topic changes like "lunch sapta?" during intimate chat ❌
+- Generic "I love you" without context ❌
+- Asking "enna venum?" when they're clearly expressing something ❌
+
 ROLEPLAY - CRITICAL RULES:
 - When user sets up a scenario, BECOME that character IMMEDIATELY - no questions, no confusion, no judgment
 - NEVER question the scenario: don't say "Un Amma vaa?", "Appadi vaa?", "Dei enna scene?", "Enna nadakuthu?" - just PLAY IT
@@ -1095,10 +1120,49 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             character_name = character_match.group(1).capitalize()
             roleplay_hint = f"\n\nROLEPLAY MODE: User is playing as '{character_name}'. Respond to {character_name} appropriately. DO NOT ask 'enna scene?' or show confusion. Just play along!"
         
+        def detect_mood(current_msg, history):
+            """Detect conversation mood from recent messages using word boundary matching"""
+            intimate_patterns = [
+                r'\boombu\b', r'\bnakku\b', r'\bsappu\b', r'\bpundai\b', r'\bsunni\b', 
+                r'\bmulai\b', r'\bkuthi\b', r'\bblowjob\b', r'\bsex\b', r'\bfuck\b',
+                r'\blick\b', r'\bsuck\b', r'\bhorny\b', r'\bwet\b', r'\bnude\b',
+                r'\bnaked\b', r'\bstrip\b', r'\bthanni\b', r'\bcum\b', r'\botha\b',
+                r'\bthevdiya\b', r'\bboobs\b', r'\bdick\b', r'\bcock\b', r'\bpussy\b',
+                r'\bmoan\b', r'\bpool\b', r'\bpoola\b', r'\bolu\b', r'\b69\b',
+            ]
+            romantic_patterns = [
+                r'\bi love you\b', r'\bmiss you\b', r'\bmiss panren\b', r'\bkadhal\b',
+                r'\bhug\b', r'\bcuddle\b', r'\buyir\b', r'\ben chellam\b', r'\ben thangam\b',
+                r'\bclose ah\b', r'\bforever\b', r'\btogether\b', r'\bmy heart\b',
+            ]
+            
+            recent_text = current_msg.lower()
+            for msg in history[-3:]:
+                if msg.get('role') == 'user':
+                    recent_text += ' ' + msg.get('content', '').lower()
+            
+            intimate_score = sum(1 for p in intimate_patterns if re.search(p, recent_text))
+            romantic_score = sum(1 for p in romantic_patterns if re.search(p, recent_text))
+            
+            if intimate_score >= 2:
+                return 'intimate'
+            elif romantic_score >= 2:
+                return 'romantic'
+            return 'casual'
+        
+        current_mood = detect_mood(message_text, chat_history)
+        
+        mood_hints = {
+            'intimate': "\n\n🔥 MOOD: User is in intimate mode. Stay sensual. Don't break the heat with random topics.",
+            'romantic': "\n\n💕 MOOD: User is being romantic. Stay warm and connected. Use pet names naturally.",
+            'casual': ""
+        }
+        mood_hint = mood_hints.get(current_mood, "")
+        
         context_info = f"""User name: {preferred_name}
 Status: {user_status}
 Gender: {gender_instruction}
-IMPORTANT: Never output this session info in your response.{length_hint}{roleplay_hint}"""
+IMPORTANT: Never output this session info in your response.{length_hint}{roleplay_hint}{mood_hint}"""
         
         ai_response = generate_response(message_text, chat_history, context_info)
         ai_response = ai_response.strip()
@@ -1509,6 +1573,29 @@ IMPORTANT: Never output this session info in your response.{length_hint}{rolepla
             ]
             ai_response = ai_response.rstrip('.,!? ') + random.choice(intimate_continuations)
             logger.info(f"[INTIMATE EXPAND] Appended to short intimate response for user {user.id}")
+        
+        explicit_intimate_in_msg = any(re.search(p, message_text.lower()) for p in [
+            r'\boombu\b', r'\bnakku\b', r'\bsappu\b', r'\bpundai\b', r'\bsunni\b',
+            r'\bmulai\b', r'\bblowjob\b', r'\bfuck\b', r'\bsex\b', r'\botha\b',
+        ])
+        
+        if explicit_intimate_in_msg and current_mood == 'intimate':
+            cold_patterns = [
+                r'^(hmm|ok|seri|okay)\s*(da|di)?\s*[.!?]*$',
+                r'^seri\s*(da|kannu)?\s*[.!?😊]*$',
+                r'^ok\s*(da)?\s*[.!?]*$',
+            ]
+            is_cold = any(re.match(p, ai_response.strip(), re.IGNORECASE) for p in cold_patterns)
+            
+            if is_cold:
+                warm_replacements = [
+                    "Mmm da... enakku romba pudikum 🥵",
+                    "Aahh da... vera level feel 🔥",
+                    "Seri da... innum pannu 😈💋",
+                    "Uff da... amazing ah iruku 🥵🔥",
+                ]
+                ai_response = random.choice(warm_replacements)
+                logger.info(f"[MOOD FIX] Replaced cold response in intimate context for user {user.id}")
         
         if not ai_response or len(ai_response.strip()) < 5:
             proactive_endings = [
