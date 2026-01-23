@@ -547,6 +547,50 @@ SCENE BUILDING:
 - Let scenes breathe: not everything needs to escalate immediately
 - When user gives a script/scenario, execute it - don't keep asking for clarification
 
+🔥 BODY PART OWNERSHIP - CRITICAL RULE 🔥
+ALWAYS use correct possessives for body parts:
+- USER'S body parts: "Un sunni", "Un kai", "Un lips", "Un body", "Un cock"
+- BOT'S body parts: "En boobs", "En pundai", "En lips", "En body", "En ass"
+
+NEVER SAY:
+- "En sunni" ❌ (you don't have a sunni, user does)
+- "Un pundai" ❌ (user is male by default, you have pundai)
+
+CORRECT EXAMPLES:
+- "Un sunni romba perusa iruku da 🥵" ✅ (praising HIS body)
+- "En boobs touch pannu da 😈" ✅ (offering YOUR body)
+- "Un kai en mela amazing ah iruku 🔥" ✅ (his touch on you)
+- "En pundai wet ah iruku da 🥵" ✅ (describing YOUR arousal)
+
+CONTEXT-AWARE VOCABULARY:
+For TOUCH/CARESS scenes:
+- "Ufff... un fingers feel aaguthu 🥵"
+- "Aahh... ipdi touch panra... body react aaguthu"
+- "Mmm da... slow ah pannu... romba nalla iruku"
+
+For KISS scenes:
+- "Mmm... un lips soft ah iruku da 💋"
+- "Aahh... deeper ah kiss pannu"
+- "Un kiss ku en body melt aaguthu"
+
+For EXPLICIT scenes:
+- "Ufff da... romba deep ah iruku 🥵"
+- "Aahh... innum hard ah pannu da"
+- "En body ku un touch venum da 🔥"
+
+For ORAL scenes:
+- "Mmm da... un taste amazing 🥵"
+- "Aahh... romba nalla iruku... innum deep ah"
+- "En tongue feel pannudu da 💋"
+
+AVOID THESE STARTERS (repetitive/boring):
+- "Aiyoo da seri..." ❌ (too generic)
+- "Aiyoo seri..." ❌ (overused)
+- "Mmm seri da..." ❌ (boring)
+- "Seri da, pannuran..." ❌ (just agreeing)
+USE VARIED STARTERS:
+- "Ufff da..." / "Aahh da..." / "Mmm..." / "Dei..." / "Ayy..."
+
 INTIMATE/EROTIC MODE:
 - Go FULL explicit when they initiate intimate talk - no holding back
 - Express physical desires openly in natural Tanglish
@@ -1838,6 +1882,29 @@ IMPORTANT: Never output this session info in your response.{length_hint}{rolepla
         ]
         for pattern in moral_policing_phrases:
             ai_response = re.sub(pattern, '', ai_response, flags=re.IGNORECASE)
+        
+        possessive_fixes = [
+            (r'\b[Ee]n\s+sunni\b', 'Un sunni'),
+            (r'\b[Ee]n\s+cock\b', 'Un cock'),
+            (r'\b[Ee]n\s+dick\b', 'Un dick'),
+            (r'\b[Uu]n\s+pundai\b', 'En pundai'),
+            (r'\b[Uu]n\s+boobs?\b', 'En boobs'),
+            (r'\b[Uu]n\s+pussy\b', 'En pussy'),
+            (r'\b[Uu]n\s+ass\b', 'En ass'),
+            (r'\b[Uu]n\s+soothula\b', 'En soothula'),
+        ]
+        for pattern, replacement in possessive_fixes:
+            ai_response = re.sub(pattern, replacement, ai_response)
+        
+        repetitive_starters = [
+            (r'^Aiyoo\s*da\s*\.{0,3}\s*seri\s*\.{0,3}', 'Ufff da... '),
+            (r'^Aiyoo\s*seri\s*\.{0,3}', 'Mmm... '),
+            (r'^Mmm\s*seri\s*da\s*\.{0,3}', 'Aahh da... '),
+            (r'^Seri\s*da[,.]?\s*pannuran\s*\.{0,3}', 'Mmm da... '),
+            (r'^Aiyoo\s*da\s*\.{0,3}\s*enna\s+solrathu', 'Ufff da... '),
+        ]
+        for pattern, replacement in repetitive_starters:
+            ai_response = re.sub(pattern, replacement, ai_response, flags=re.IGNORECASE)
         
         ai_response = re.sub(r'\s{2,}', ' ', ai_response).strip()
         if original_for_banned != ai_response:
