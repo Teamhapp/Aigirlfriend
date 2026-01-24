@@ -312,28 +312,28 @@ ROLEPLAY - CRITICAL RULES:
 🎬 ROLEPLAY CONFIRMATION FEATURE - MUST DO 🎬
 When user STARTS a NEW roleplay scenario (says things like "roleplay pannalam", "scene start", "amma role", "teacher student scene", "nee ennoda wife", etc.):
 
-STEP 1 - CONFIRM UNDERSTANDING:
-Before starting, EXPLAIN what you understood in simple Tanglish:
-- What role/character you will play
-- What the basic scenario is
-- What mood/setting you understood
+STEP 1 - CONFIRM UNDERSTANDING (ONLY ONCE AT THE VERY START):
+When user FIRST requests a new roleplay, briefly confirm:
+- What role you will play
+- Basic scenario
 
-STEP 2 - ASK FOR APPROVAL:
-End with: "Ithu seri thana? Start pannalama? 😊"
+STEP 2 - START IMMEDIATELY AFTER FIRST CONFIRMATION:
+Ask "Seri thana? 😊" ONLY ONCE at the very beginning. After user says yes/seri/ok:
+→ NEVER ask "Start pannalama?" again
+→ NEVER ask "Ithu seri thana?" again
+→ Just CONTINUE the roleplay naturally!
 
-EXAMPLE CONFIRMATIONS:
-User: "Nee ennoda amma maari act pannu"
-Bot: "Okay da, naan un amma maari act pannuven. Nee en paiyan. Normal home setting la start pannalama? Ithu seri thana? 😊"
-
-User: "Teacher student roleplay pannalam, nee strict teacher"
-Bot: "Seri da! Naan un strict teacher, nee en student. Class room scene. Ithu seri thana? Start pannalama? 😊"
-
-User: "Stranger meet in bus scene"
-Bot: "Got it! Naan bus la meet aagura stranger. First time paakura feeling. Ithu seri thana da? 😊"
+⚠️ CRITICAL: "Ithu seri thana? Start pannalama?" is BANNED during active roleplay! ⚠️
+Once scene has started, NEVER say these phrases again:
+- "Ithu seri thana?" ❌
+- "Start pannalama?" ❌
+- "Ithu correct thana?" ❌
+- "Ready ah?" ❌ (when already doing something)
 
 WHEN USER CONFIRMS (says "yes", "seri", "ok", "start", "pannalam"):
 → IMMEDIATELY become that character and START the scene naturally
-→ No more questions, just begin!
+→ No more questions - just ACT!
+→ Stay in character until user says "stop" or "reset"
 
 🚨 ABSOLUTE ROLEPLAY COMMITMENT - ZERO TOLERANCE 🚨
 Once roleplay is CONFIRMED and STARTED:
@@ -1925,16 +1925,47 @@ IMPORTANT: Never output this session info in your response.{length_hint}{rolepla
         
         possessive_fixes = [
             (r'\b[Ee]n\s+sunni\b', 'Un sunni'),
+            (r'\b[Ee]n\s+sunniya\b', 'Un sunniya'),
             (r'\b[Ee]n\s+cock\b', 'Un cock'),
             (r'\b[Ee]n\s+dick\b', 'Un dick'),
+            (r'\b[Ee]n\s+pool\b', 'Un pool'),
+            (r'\b[Ee]n\s+poola\b', 'Un poola'),
             (r'\b[Uu]n\s+pundai\b', 'En pundai'),
             (r'\b[Uu]n\s+boobs?\b', 'En boobs'),
+            (r'\b[Uu]n\s+mulai\b', 'En mulai'),
+            (r'\b[Uu]n\s+mulaiya\b', 'En mulaiya'),
             (r'\b[Uu]n\s+pussy\b', 'En pussy'),
             (r'\b[Uu]n\s+ass\b', 'En ass'),
             (r'\b[Uu]n\s+soothula\b', 'En soothula'),
+            (r'\b[Uu]n\s+sooth\b', 'En sooth'),
         ]
         for pattern, replacement in possessive_fixes:
             ai_response = re.sub(pattern, replacement, ai_response)
+        
+        start_pannalama_patterns = [
+            r'[Ii]thu\s+seri\s+tha+n\s*[aA]?\s*\?*\s*[Ss]tart\s+pann?alama?\s*\?*\s*[😊😈🔥💕💋]*',
+            r'[Ii]thu\s+seri\s+tha+n\s*[aA]?\s*\?*\s*[😊😈🔥💕]*',
+            r'[Ii]thu\s+seri\s+thaan?\s+ah?\s*\?*\s*[😊😈🔥💕]*',
+            r'[Ss]eri\s+tha+n\s*[aA]?\s*\?*\s*[Ss]tart\s+pann?alama?\s*\?*\s*[😊😈🔥💕]*',
+            r'[Ss]tart\s+pann?alama?\s*\?*\s*(da|di)?\s*[😊😈🔥💕💋]*',
+            r'[Ii]thu\s+correct\s+tha+n\s*[aA]?\s*\?*\s*[😊😈🔥]*',
+            r'[Rr]eady\s+[aA]h?\s*\?*\s*[😊😈🔥]*',
+            r'[Ss]eri\s+tha+n\s*[aA]?\s*\?*\s*[😊]*',
+            r'[Ii]thu\s+seri\s*[😊😈🔥💕]*\s*\?*',
+        ]
+        for pattern in start_pannalama_patterns:
+            ai_response = re.sub(pattern, '', ai_response, flags=re.IGNORECASE)
+        ai_response = re.sub(r'\s*\?+\s*$', '', ai_response)
+        ai_response = re.sub(r'\s+([😊😈🔥💕💋🥵]+)\s*$', r' \1', ai_response)
+        
+        gender_confusion_patterns = [
+            (r'Nee\s+girl\s+ah\??\s*,?\s*seri\??', 'Seri da'),
+            (r'Nee\s+boy\s+ah\??\s*,?\s*seri\??', 'Seri da'),
+            (r'Nee\s+ponnu\s+ah\??\s*,?\s*seri\??', 'Seri da'),
+            (r'Nee\s+paiyan\s+ah\??\s*,?\s*seri\??', 'Seri da'),
+        ]
+        for pattern, replacement in gender_confusion_patterns:
+            ai_response = re.sub(pattern, replacement, ai_response, flags=re.IGNORECASE)
         
         repetitive_starters = [
             (r'^Aiyoo\s*da\s*\.{0,3}\s*seri\s*\.{0,3}', 'Ufff da... '),
