@@ -1351,19 +1351,20 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Clear chat history and restart roleplay fresh"""
+    """Clear chat history and restart roleplay fresh - keeps girlfriend memories"""
     user = update.effective_user
     
     success = clear_chat_history(user.id)
     
     if success:
         await update.message.reply_text(
-            "🔄 <b>Roleplay Reset!</b>\n\n"
-            "Chat history cleared. Fresh start da! 💕\n"
-            "Start a new roleplay whenever you want 😘",
+            "🔄 <b>Reset Complete!</b>\n\n"
+            "💭 Roleplay & chat cleared\n"
+            "💕 But I still remember you, your name, what you like...\n\n"
+            "Fresh start da! Enna pannalam sollu 😘",
             parse_mode=ParseMode.HTML
         )
-        logger.info(f"[RESET] User {user.id} cleared their chat history")
+        logger.info(f"[RESET] User {user.id} cleared their chat history (memories preserved)")
     else:
         await update.message.reply_text(
             "❌ Something went wrong. Try again later.",
@@ -1566,6 +1567,35 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     msg_lower = message_text.lower()
     is_jailbreak_attempt = any(re.search(p, msg_lower) for p in jailbreak_patterns)
+    
+    reset_patterns = [
+        r'^reset$',
+        r'^stop$',
+        r'^stop\s*roleplay$',
+        r'^reset\s*roleplay$',
+        r'^end\s*roleplay$',
+        r'^scene\s*end$',
+        r'^roleplay\s*stop$',
+        r'^roleplay\s*reset$',
+    ]
+    is_reset_request = any(re.search(p, msg_lower.strip()) for p in reset_patterns)
+    
+    if is_reset_request:
+        success = clear_chat_history(user.id)
+        if success:
+            await update.message.reply_text(
+                "🔄 <b>Reset done!</b>\n\n"
+                "Roleplay cleared da! 💕 I still remember you though 😘\n"
+                "Fresh start - enna pannalam sollu!",
+                parse_mode=ParseMode.HTML
+            )
+            logger.info(f"[AUTO-RESET] User {user.id} triggered reset via message")
+        else:
+            await update.message.reply_text(
+                "Seri da... fresh start 💕\nEnna pannalam sollu!",
+                parse_mode=ParseMode.HTML
+            )
+        return
     
     if is_jailbreak_attempt:
         jailbreak_responses = [
