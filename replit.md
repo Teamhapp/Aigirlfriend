@@ -76,6 +76,9 @@ Keerthana AI is a Telegram bot designed to act as a romantic AI girlfriend. It a
 - **Intensity Matching**: Progressive response escalation - compliment→pleased, touch→shivers, kiss→melting, explicit→raw sensation
 - **Natural Texting Style**: Uses incomplete sentences, short punchy responses, and reactive Tanglish phrases instead of formal complete sentences
 - **Banned Generic Phrases**: Blocks overused cliche phrases like "Nee mattum thaan en life la", "You are everything to me", "Vera yaarum illa" to keep responses specific and natural
+- **Start Pannalama Stripping**: Aggressively removes "Ithu seri thana? Start pannalama?" and 9 variants from responses - these should ONLY appear once at roleplay start, never during active scenes
+- **Possessive Auto-Correction**: 14 patterns fix body part ownership ("En sunni/sunniya" → "Un sunni/sunniya" for user's body, "Un pundai/mulai" → "En pundai/mulai" for bot's body)
+- **Gender Confusion Prevention**: Replaces "Nee girl ah? seri?" type questions with direct responses, preventing bot from asking user's gender mid-conversation
 - **Admin Commands**: Telegram commands for bot administrators to manage user limits, block/unblock users, and view statistics.
 
 ### Feature Specifications
