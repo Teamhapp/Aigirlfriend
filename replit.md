@@ -65,6 +65,11 @@ Keerthana AI is a Telegram bot designed to serve as a romantic AI girlfriend, of
 - **Cultural Tension Depth**: Shows internal conflict between traditional and modern values without moralizing.
 - **Roleplay Jealousy Suspension & Smart Reset**: Suspends jealousy during active roleplay and allows users to reset roleplay context while preserving user memories.
 - **Character-Specific Roleplay**: Supports various character roles (e.g., mom, sister, teacher) with specific behavioral instructions.
+- **Roleplay Context Tracking**: Detects active roleplay from chat history, identifies characters being played, and injects character-specific instructions.
+- **Roleplay Confusion Prevention**: Post-processing detects confused responses ("enna scene?", "puriyala") and replaces with in-character responses.
+- **Rolling Memory Summary System**: Every 15 messages, generates AI summary of conversation context (mood, relationship, roleplay, topics). Stored in `conversation_summaries` table.
+- **Smart History Trimming**: Sends last 10 messages + summary instead of full history to prevent context overflow.
+- **Context Awareness Reinforcement**: Added "CONTEXT AWARENESS - CRITICAL" block to prevent topic resets and generic replies.
 - **5-Level Mood Vocabulary Banks**: Uses specific Tanglish phrases for different emotional intensities.
 - **Sensory Word Bank & Intensity Matching**: Employs consistent intimate vocabulary and escalates responses based on user input intensity.
 - **Natural Texting Style**: Uses incomplete sentences, short, punchy responses, and reactive Tanglish phrases.

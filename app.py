@@ -18,7 +18,8 @@ from database import (
     DAILY_MESSAGE_LIMIT, get_confirmed_gender, set_confirmed_gender,
     get_all_users, get_user_chat_history, get_dashboard_stats, award_referral_points,
     set_global_daily_limit, get_global_daily_limit, get_total_referral_stats,
-    clear_chat_history, save_user_memory, get_user_memories
+    clear_chat_history, save_user_memory, get_user_memories,
+    get_message_count, save_conversation_summary, get_conversation_summary, clear_conversation_summary
 )
 import re
 import requests
@@ -1121,6 +1122,79 @@ def markdown_to_html(text):
     text = re.sub(r'__(.+?)__', r'<u>\1</u>', text)
     return text
 
+SUMMARY_INTERVAL = 15
+
+def generate_conversation_summary(user_id, chat_history, current_mood=None, active_roleplay=None):
+    """Generate a condensed summary of the conversation using Gemini"""
+    if not chat_history or len(chat_history) < 5:
+        return None
+    
+    summary_prompt = """You are a conversation summarizer. Create a BRIEF summary (max 100 words) of this chat history.
+
+Focus on:
+1. Current mood/emotional state (intimate/romantic/playful/angry/casual)
+2. Relationship dynamics (how close they seem, any tension)
+3. Active roleplay if any (what character/scenario)
+4. Key unresolved topics or ongoing threads
+5. User's recent requests or preferences
+
+Format your response as a single paragraph summary. Be concise and factual.
+
+Chat history:
+"""
+    history_text = ""
+    for msg in chat_history[-15:]:
+        role = "User" if msg['role'] == 'user' else "Keerthana"
+        history_text += f"{role}: {msg['content']}\n"
+    
+    try:
+        response = genai_client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=[{"role": "user", "parts": [{"text": summary_prompt + history_text}]}],
+            config=types.GenerateContentConfig(
+                temperature=0.3,
+                max_output_tokens=150,
+            )
+        )
+        summary = response.text.strip()
+        
+        save_conversation_summary(
+            user_id, 
+            summary,
+            mood=current_mood,
+            active_roleplay=active_roleplay,
+            message_count=len(chat_history)
+        )
+        logger.info(f"[SUMMARY] Generated summary for user {user_id}: {summary[:50]}...")
+        return summary
+    except Exception as e:
+        logger.error(f"Error generating summary: {e}")
+        return None
+
+def should_generate_summary(user_id, current_message_count):
+    """Check if we should generate a new summary based on message count"""
+    existing_summary = get_conversation_summary(user_id)
+    if not existing_summary:
+        return current_message_count >= SUMMARY_INTERVAL
+    
+    last_summary_count = existing_summary.get('message_count', 0)
+    return (current_message_count - last_summary_count) >= SUMMARY_INTERVAL
+
+def get_summary_context(user_id):
+    """Get the conversation summary to inject into context"""
+    summary_data = get_conversation_summary(user_id)
+    if not summary_data or not summary_data.get('summary'):
+        return ""
+    
+    summary_lines = ["\n📋 CONVERSATION MEMORY (reference this to maintain continuity):"]
+    summary_lines.append(f"Previous context: {summary_data['summary']}")
+    if summary_data.get('mood'):
+        summary_lines.append(f"Last known mood: {summary_data['mood']}")
+    if summary_data.get('active_roleplay'):
+        summary_lines.append(f"Active roleplay: {summary_data['active_roleplay']}")
+    
+    return "\n".join(summary_lines)
+
 def extract_and_save_memories(user_id, message_text):
     """Extract personal info from user messages and save as memories"""
     msg_lower = message_text.lower()
@@ -1355,6 +1429,7 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
     success = clear_chat_history(user.id)
+    clear_conversation_summary(user.id)
     
     if success:
         await update.message.reply_text(
@@ -1582,6 +1657,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if is_reset_request:
         success = clear_chat_history(user.id)
+        clear_conversation_summary(user.id)
         if success:
             await update.message.reply_text(
                 "🔄 <b>Reset done!</b>\n\n"
@@ -1842,12 +1918,29 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         memory_context = get_memory_context(user.id)
         
+        summary_context = get_summary_context(user.id)
+        
+        total_message_count = get_message_count(user.id)
+        if should_generate_summary(user.id, total_message_count):
+            roleplay_char = current_character if roleplay_active else None
+            generate_conversation_summary(user.id, chat_history, current_mood, roleplay_char)
+            logger.info(f"[SUMMARY] Triggered summary generation for user {user.id} at message count {total_message_count}")
+            summary_context = get_summary_context(user.id)
+        
+        trimmed_history = chat_history[-10:] if len(chat_history) > 10 else chat_history
+        
         context_info = f"""User name: {preferred_name}
 Status: {user_status}
 Gender: {gender_instruction}
-IMPORTANT: Never output this session info in your response.{length_hint}{roleplay_hint}{mood_hint}{memory_context}"""
+IMPORTANT: Never output this session info in your response.
+
+🧠 CONTEXT AWARENESS - CRITICAL:
+- ALWAYS maintain exact mood continuity from conversation memory below
+- NEVER reset topic or become generic - build directly on user's last input
+- If context feels fuzzy, lean on CONVERSATION MEMORY first
+- Reference past events/moods naturally without asking reset questions like "enna da?" or "enna scene?"{summary_context}{length_hint}{roleplay_hint}{mood_hint}{memory_context}"""
         
-        ai_response = generate_response(message_text, chat_history, context_info)
+        ai_response = generate_response(message_text, trimmed_history, context_info)
         ai_response = ai_response.strip()
         
         leak_patterns = [

@@ -146,6 +146,23 @@ def init_database():
         ''')
         cur.execute('CREATE INDEX IF NOT EXISTS idx_user_memories_user_id ON user_memories(user_id)')
         
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS conversation_summaries (
+                id SERIAL PRIMARY KEY,
+                user_id BIGINT REFERENCES users(user_id),
+                summary TEXT,
+                mood VARCHAR(50),
+                relationship_level VARCHAR(50),
+                active_roleplay VARCHAR(100),
+                last_topic TEXT,
+                message_count INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id)
+            )
+        ''')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_conversation_summaries_user_id ON conversation_summaries(user_id)')
+        
         conn.commit()
         logger.info("Database initialized successfully")
     except Exception as e:
@@ -449,6 +466,74 @@ def get_chat_history(conn, user_id, limit=20):
     messages = cur.fetchall()
     cur.close()
     return [{'role': msg[0], 'content': msg[1]} for msg in reversed(messages)]
+
+@with_db_retry()
+def get_message_count(conn, user_id):
+    """Get total message count for a user"""
+    cur = conn.cursor()
+    cur.execute('SELECT COUNT(*) FROM chat_messages WHERE user_id = %s', (user_id,))
+    count = cur.fetchone()[0]
+    cur.close()
+    return count
+
+@with_db_retry()
+def save_conversation_summary(conn, user_id, summary, mood=None, relationship_level=None, active_roleplay=None, last_topic=None, message_count=0):
+    """Save or update conversation summary for a user"""
+    try:
+        cur = conn.cursor()
+        cur.execute('''
+            INSERT INTO conversation_summaries (user_id, summary, mood, relationship_level, active_roleplay, last_topic, message_count, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id) DO UPDATE SET
+                summary = EXCLUDED.summary,
+                mood = COALESCE(EXCLUDED.mood, conversation_summaries.mood),
+                relationship_level = COALESCE(EXCLUDED.relationship_level, conversation_summaries.relationship_level),
+                active_roleplay = EXCLUDED.active_roleplay,
+                last_topic = EXCLUDED.last_topic,
+                message_count = EXCLUDED.message_count,
+                updated_at = CURRENT_TIMESTAMP
+        ''', (user_id, summary, mood, relationship_level, active_roleplay, last_topic, message_count))
+        conn.commit()
+        cur.close()
+        logger.info(f"Saved conversation summary for user {user_id}")
+    except Exception as e:
+        logger.error(f"Error saving conversation summary: {e}")
+        conn.rollback()
+
+@with_db_retry()
+def get_conversation_summary(conn, user_id):
+    """Get conversation summary for a user"""
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT summary, mood, relationship_level, active_roleplay, last_topic, message_count, updated_at
+        FROM conversation_summaries WHERE user_id = %s
+    ''', (user_id,))
+    result = cur.fetchone()
+    cur.close()
+    if result:
+        return {
+            'summary': result[0],
+            'mood': result[1],
+            'relationship_level': result[2],
+            'active_roleplay': result[3],
+            'last_topic': result[4],
+            'message_count': result[5],
+            'updated_at': result[6]
+        }
+    return None
+
+@with_db_retry()
+def clear_conversation_summary(conn, user_id):
+    """Clear conversation summary for a user (on reset)"""
+    try:
+        cur = conn.cursor()
+        cur.execute('DELETE FROM conversation_summaries WHERE user_id = %s', (user_id,))
+        conn.commit()
+        cur.close()
+        logger.info(f"Cleared conversation summary for user {user_id}")
+    except Exception as e:
+        logger.error(f"Error clearing conversation summary: {e}")
+        conn.rollback()
 
 @with_db_retry()
 def get_user_stats(conn, user_id):
