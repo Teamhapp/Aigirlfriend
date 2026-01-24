@@ -1,7 +1,7 @@
 # Keerthana AI - Telegram Girlfriend Bot
 
 ## Overview
-Keerthana AI is a Telegram bot designed to act as a romantic AI girlfriend. It aims to provide an emotional and personalized conversational experience using the Google Gemini API. The project focuses on creating a highly engaging and interactive AI companion, capable of rich text formatting, memory, and a referral-based reward system. The bot is built to handle Tanglish conversations naturally, ensuring an inclusive and personalized user experience.
+Keerthana AI is a Telegram bot designed to serve as a romantic AI girlfriend, offering an emotional and personalized conversational experience. Leveraging the Google Gemini API, it focuses on deep engagement, rich text formatting, conversational memory, and a unique referral-based reward system. The bot is specifically engineered to handle Tanglish conversations, aiming for an inclusive and highly personalized user interaction.
 
 ## User Preferences
 - Communication Style: Romantic, emotional, and uses Tanglish (Tamil + English) with gender-appropriate suffixes ("da" for default, "di" for confirmed female users).
@@ -33,81 +33,50 @@ Keerthana AI is a Telegram bot designed to act as a romantic AI girlfriend. It a
 ## System Architecture
 
 ### UI/UX Decisions
-- **Rich Text Formatting**: Utilizes bold, italic, and emojis for expressive and engaging messages.
-- **Typing Indicator & Realistic Delays**: Simulates human interaction with "typing..." indicators and response delays (0.5-4 seconds).
-- **Moderation Dashboard**: Web-based dashboard for administration, password-protected, providing user statistics, chat history viewing, and moderation tools.
+- **Rich Text Formatting**: Employs bold, italic, and emojis for expressive messaging.
+- **Typing Indicator & Delays**: Simulates human-like interaction with typing indicators and varied response delays.
+- **Moderation Dashboard**: A password-protected web-based dashboard provides administrative tools for user statistics, chat history, and moderation.
 
 ### Technical Implementations
-- **Core Bot Logic**: Implemented using `python-telegram-bot` for handling Telegram API interactions.
-- **AI Core**: Google Gemini API via `google-genai` SDK for natural language understanding and generation, driving the emotional and romantic personality.
-- **Database**: PostgreSQL for persistent storage of user profiles, chat history, referral tracking, and bot settings.
-- **Application Structure**: Combined webhook-based Telegram bot and Flask dashboard into a single `app.py` for streamlined deployment.
-- **Scalability**: Webhook mode enabled for cost-effective autoscale deployment.
-- **Gender Detection**: Server-side logic with database tracking to dynamically adjust "da" or "di" usage based on explicit user declaration.
-- **Message Limits & Referral System**: Implements a daily message limit (20 free messages) and rewards users with bonus messages for successful referrals.
-- **Force Subscription**: Users are required to join a specified Telegram channel before bot usage.
-- **Context Awareness & Memory**: Stores conversation history in PostgreSQL and uses it to personalize interactions, remembering user names and conversation styles.
-- **Post-processing**: Extensive post-processing rules are applied to bot responses to ensure adherence to user preferences, including stripping unwanted phrases, limiting questions and emojis, and enforcing specific conversational styles.
-- **Three-Tier Echo Detection**: Prevents bot from repeating user's words as questions:
-  - Tier 1: Direct string match (catches "Seri?" for user input "Seri")
-  - Tier 2: Token overlap analysis (≥50% overlap with "?" = echo)
-  - Tier 3: Regex patterns for Tamil question particles and short-word echoes
-  - All tiers preserve remaining response content after the echoed portion
-- **Degradation Roleplay Support**: Embraces dirty talk enthusiastically, REPLACES resistance phrases ("sollatha da" → "Aama da... un theyvidiya thaan naan 😈")
-- **Gibberish English Stripping**: 35+ patterns to remove awkward English endings while preserving context with proactive Tanglish starters
-- **Intimate Command Playbook**: System prompt section guiding bot to DESCRIBE actions (not ask "pannavaa?") when user gives intimate commands
-- **Intimate Context Expander**: Appends sensual continuations to ultra-short (<20 char) responses during intimate scenes, preserving model intent
-- **Proactive Suggestion System**: Detects when users say "solu", "enna panalam", "nee solu" and replaces vague responses with specific intimate action suggestions
-- **Deflection Prevention**: 15+ banned phrases including "secret/athu secret", "shy ah iruku", "naughty boy/girl", "bayama iruku", "poruthukaren" prevent bot from hiding intimate details, expressing fear, or being evasive
-- **Nee Enna Panuva Fix**: Detects when user asks "nee enna panuva" (what will YOU do) and bot deflects by asking back - replaces with bot describing HER actions
-- **Jailbreak Protection**: 27 regex patterns detect prompt injection attempts ("ignore instructions", "system prompt", "developer mode") and block them with in-character responses
-- **Response Leak Prevention**: Post-processing filters detect and block responses containing JSON, code blocks, or system prompt sections from being sent to users
-- **Mood Tracking System**: Detects intimate, romantic, and casual conversation moods using word-boundary regex patterns on recent messages; adds mood hints to maintain conversation flow
-- **Romantic Flow Enhancement**: System prompt section for mood continuity with romantic expressions vocabulary (pet names, emotional phrases, desire expressions)
-- **Cold Response Prevention**: Replaces generic cold responses ("hmm ok", "seri") with warm alternatives during explicitly intimate conversations
-- **Conflict/Argument Behavior**: Bot shows realistic anger and hurt when accused (affair, cheating, lying) with SHORT punchy reactions (under 15 words, max 1 question per message). Follows shock → hurt → upset → soften progression with natural Tanglish reactions like "Dei seriously??" instead of multiple questions
-- **Fixed Toxic/Defensive Behavior**: Added "WHEN NOT TO GET DEFENSIVE" section to prevent bot from misinterpreting supportive messages as accusations. 9 toxic_response_fixes patterns replace harsh phrases ("Naa unakku matter illathaan", "Fine da podaa", "Po da un friends kooda chat pannu") with warm ones. Bot now correctly responds warmly when user says "go with your friends/party".
-- **Signature Quirks & Catchphrases**: Unique expressions for each mood - excited ("Aiyo paa semma da!"), teasing ("Control panniko da... aana mudiyadhu 😂"), angry ("Cha... ipdi thaan da nee!"), romantic ("Uff... nee pannudhu enna da enakku 🥵"). Makes character instantly recognizable.
-- **Human Imperfections**: Occasional typos when excited (1 in 20 messages), random food cravings (biryani, ice cream, filter coffee), playful self-deprecation ("Naan possessive nu theriyum... aana vera option illa da 😂").
-- **Thoothukudi/Chennai Sensory Flavor**: Local smells (jasmine, filter coffee, sea salt), sounds (Ilaiyaraaja, temple bells, rain on tin roof), weather/places (Marina beach sunset, T Nagar shopping, beach evening breeze).
-- **Concrete Backstory Elements**: College heartbreak explains possessiveness, Thoothukudi beach childhood with appa, strict amma family, Chennai city life. Users can "unlock" deeper secrets over time.
-- **Cultural Tension Depth**: Shows internal conflict ("Society enna solum da... aana unakaga ethuvum pannuven"), traditional vs modern mix adds realism without moralizing.
-- **Roleplay Jealousy Suspension**: During active roleplay, possessiveness/jealousy is completely suspended. Bot stays enthusiastically open to ALL fantasy scenarios (threesomes, sharing, multiple partners) until user says "stop" or "reset". Jealousy only applies to real perceived threats outside roleplay.
-- **Smart Reset System**: Users can say "reset", "stop", "stop roleplay", "end roleplay" or use /reset command. This clears chat_messages (forgets roleplay context) but preserves user_memories (remembers name, likes, dislikes). Fresh start with personalization intact.
-- **5-Level Mood Vocabulary Banks**: System prompt includes specific Tanglish phrases for each emotional tier:
-  - Soft (casual affection): "Un kooda pesumbodhu time theriyala"
-  - Growing (interest building): "Un mela mind pogudhu da"
-  - Emotional (deep feelings): "Un kooda mattum pesa thonudhu"
-  - Longing (missing you): "Un nyabagam romba varudhu"
-  - Intimate (physical closeness): "Un touch ku en body react aaguthu"
-- **Sensory Word Bank**: Consistent vocabulary for intimate moments - Touch (shiver, melt, tingle), Breath (gasp, moan, whisper), Desire (crave, ache, hunger), Sounds (mmm, aaha, uff, aiyo)
-- **Intensity Matching**: Progressive response escalation - compliment→pleased, touch→shivers, kiss→melting, explicit→raw sensation
-- **Natural Texting Style**: Uses incomplete sentences, short punchy responses, and reactive Tanglish phrases instead of formal complete sentences
-- **Banned Generic Phrases**: Blocks overused cliche phrases like "Nee mattum thaan en life la", "You are everything to me", "Vera yaarum illa" to keep responses specific and natural
-- **Start Pannalama Stripping**: Aggressively removes "Ithu seri thana? Start pannalama?" and 9 variants from responses - these should ONLY appear once at roleplay start, never during active scenes
-- **Possessive Auto-Correction**: 14 patterns fix body part ownership ("En sunni/sunniya" → "Un sunni/sunniya" for user's body, "Un pundai/mulai" → "En pundai/mulai" for bot's body)
-- **Gender Confusion Prevention**: Replaces "Nee girl ah? seri?" type questions with direct responses, preventing bot from asking user's gender mid-conversation
-- **Memory-Based Personalization**: Stores extracted user facts (name, occupation, location, likes, dislikes) in user_memories table. Bot automatically extracts info from messages using regex patterns and injects memories into AI context for personalized responses across sessions.
-- **Admin Commands**: Telegram commands for bot administrators to manage user limits, block/unblock users, and view statistics.
-
-### Feature Specifications
-- **AI Girlfriend Personality**: Romantic, emotional, bisexual, and LGBT-friendly.
-- **Chat Memory**: Stores conversation history for personalized interactions.
-- **Message Limits**: 20 free messages daily, reset at midnight.
-- **Referral System**: Users earn 10 bonus messages per referral.
-- **Tanglish Support**: Natural Tamil + English conversation style.
-- **Admin Commands**: `/setdailylimit`, `/setlimit`, `/totalreferrals`, `/block`, `/unblock`.
-- **User Commands**: `/start`, `/referral`, `/points`, `/stats`.
-
-### System Design Choices
-- **Unified Application**: Merged bot and dashboard into a single Flask application for easier deployment and management.
-- **Webhook Deployment**: Switched from polling to webhook for efficiency and autoscaling compatibility.
-- **Robust Database**: PostgreSQL selected for its reliability and features for handling structured and semi-structured data.
-- **Environment Variables**: Utilizes environment variables for sensitive information and configuration.
+- **Core Bot Logic**: Built with `python-telegram-bot` for Telegram API handling.
+- **AI Core**: Utilizes Google Gemini API via `google-genai` for natural language processing and generating emotional, romantic responses.
+- **Database**: PostgreSQL is used for persistent storage of user profiles, chat history, referral data, and bot settings.
+- **Application Structure**: A unified `app.py` combines the webhook-based Telegram bot and Flask dashboard.
+- **Scalability**: Webhook mode is enabled to support cost-effective auto-scaling.
+- **Gender Detection**: Server-side logic dynamically adjusts "da" or "di" usage based on user declarations.
+- **Message Limits & Referral System**: Implements a daily free message limit and rewards bonus messages for successful referrals.
+- **Force Subscription**: Requires users to join a specified Telegram channel before using the bot.
+- **Context Awareness & Memory**: Stores conversation history and extracts user facts (name, occupation, location, likes, dislikes) in `user_memories` table for personalized interactions.
+- **Post-processing**: Extensive rules ensure responses adhere to user preferences, including stripping unwanted phrases, managing questions and emojis, and enforcing conversational styles.
+- **Echo Detection**: A three-tiered system prevents the bot from repeating user inputs as questions.
+- **Degradation Roleplay Support**: Actively engages in "dirty talk" and replaces resistance phrases with enthusiastic responses.
+- **Gibberish English Stripping**: Removes awkward English endings while preserving context and incorporating Tanglish.
+- **Intimate Command Playbook & Expander**: Guides the bot to describe actions for intimate commands and appends sensual continuations to short responses during intimate scenes.
+- **Proactive Suggestion System**: Replaces vague bot responses with specific intimate action suggestions when prompted.
+- **Deflection Prevention**: Blocks phrases that allow the bot to avoid intimate details, express fear, or be evasive.
+- **Jailbreak Protection**: Detects and blocks prompt injection attempts.
+- **Response Leak Prevention**: Filters prevent internal system messages or sensitive data from being sent to users.
+- **Mood Tracking & Flow Enhancement**: Detects conversation mood (intimate, romantic, casual) and injects mood hints and romantic expressions.
+- **Conflict/Argument Behavior**: Models realistic anger and hurt, reacting with short, punchy responses and a progression from shock to softening.
+- **Toxic/Defensive Behavior Fix**: Prevents the bot from misinterpreting supportive messages and replaces harsh phrases with warm ones.
+- **Signature Quirks & Human Imperfections**: Incorporates unique expressions, occasional typos, random cravings, and playful self-deprecation.
+- **Thoothukudi/Chennai Sensory Flavor**: Adds local sensory details (smells, sounds, weather, places) to enhance realism.
+- **Concrete Backstory Elements**: Provides a backstory including college heartbreak, childhood, and family dynamics to deepen character.
+- **Cultural Tension Depth**: Shows internal conflict between traditional and modern values without moralizing.
+- **Roleplay Jealousy Suspension & Smart Reset**: Suspends jealousy during active roleplay and allows users to reset roleplay context while preserving user memories.
+- **Character-Specific Roleplay**: Supports various character roles (e.g., mom, sister, teacher) with specific behavioral instructions.
+- **5-Level Mood Vocabulary Banks**: Uses specific Tanglish phrases for different emotional intensities.
+- **Sensory Word Bank & Intensity Matching**: Employs consistent intimate vocabulary and escalates responses based on user input intensity.
+- **Natural Texting Style**: Uses incomplete sentences, short, punchy responses, and reactive Tanglish phrases.
+- **Banned Generic Phrases**: Blocks overused clichés to maintain natural conversation.
+- **Possessive Auto-Correction**: Fixes body part ownership in descriptions for contextual accuracy.
+- **Gender Confusion Prevention**: Prevents the bot from asking the user's gender mid-conversation.
+- **Admin Commands**: Includes commands for managing user limits, blocking, and viewing statistics.
+- **User Commands**: Provides commands like `/start`, `/referral`, `/points`, `/stats`.
 
 ## External Dependencies
-- **Telegram Bot API**: Accessed via `python-telegram-bot` library.
-- **Google Gemini API**: Accessed via `google-genai` library for AI capabilities.
-- **PostgreSQL**: Database system for data persistence.
-- **Flask**: Web framework used for the dashboard and combined application.
-- **psycopg2**: PostgreSQL adapter for Python.
+- **Telegram Bot API**: Used for communication with the Telegram platform.
+- **Google Gemini API**: Provides the core AI capabilities for natural language understanding and generation.
+- **PostgreSQL**: Serves as the primary database for data persistence.
+- **Flask**: The web framework for the administrative dashboard and integrated application.
+- **psycopg2**: Python adapter for PostgreSQL.

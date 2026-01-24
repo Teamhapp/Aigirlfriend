@@ -1679,11 +1679,125 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif user_word_count <= 8:
             length_hint = "\n\nUser sent short message. Keep reply to 1-2 sentences max."
         
+        def detect_active_roleplay(current_msg, history):
+            """Detect if roleplay is active and what character bot is playing"""
+            roleplay_stop_patterns = [
+                r'^reset$', r'^stop$', r'^stop\s*roleplay$', r'^end\s*roleplay$',
+                r'^scene\s*end$', r'^roleplay\s*stop$', r'^normal\s*ah\s*pesu$',
+            ]
+            if any(re.search(p, current_msg.lower().strip()) for p in roleplay_stop_patterns):
+                return False, None
+            
+            roleplay_start_patterns = [
+                r'roleplay\s*pannalam',
+                r'roleplay\s*start',
+                r'roleplay\s*ah\s*pannalam',
+                r'lets\s*roleplay',
+                r'scene\s*start',
+                r'naan\s*play\s*pannuren',
+                r'you\s*play\s*as',
+                r'nee\s*.+\s*ah\s*act\s*pannu',
+                r'nee\s*.+\s*role\s*pannu',
+                r'act\s*as\s*.+',
+                r'.+\s*role\s*naan\s*play',
+                r'.+\s*ah\s*role\s*play',
+            ]
+            
+            character_assignment_patterns = [
+                (r'(?:nee|you)\s+(?:ennoda|my|en)\s+(mom|amma|mother|mummy)\s*(?:ah|a)?\s*(?:act|play|role)?', 'amma'),
+                (r'(?:nee|you)\s+(mom|amma|mother|mummy)\s*(?:ah|a)?\s*(?:act|play|role)?', 'amma'),
+                (r'(amma|mom|mother)\s*role\s*(?:nee|you)\s*(?:play|pannu)', 'amma'),
+                (r'(?:nee|you)\s+(?:ennoda|my|en)\s+(sister|akka|thangai|thangachi)\s*(?:ah|a)?', 'sister'),
+                (r'(?:nee|you)\s+(sister|akka|thangai|thangachi)\s*(?:ah|a)?', 'sister'),
+                (r'(?:nee|you)\s+(?:ennoda|my|en)\s+(teacher|miss|madam)\s*(?:ah|a)?', 'teacher'),
+                (r'(?:nee|you)\s+(teacher|miss|madam)\s*(?:ah|a)?', 'teacher'),
+                (r'(?:nee|you)\s+(?:ennoda|my|en)\s+(nurse|doctor)\s*(?:ah|a)?', 'nurse'),
+                (r'(?:nee|you)\s+(nurse|doctor)\s*(?:ah|a)?', 'nurse'),
+                (r'(?:nee|you)\s+(?:ennoda|my|en)\s+(boss|manager)\s*(?:ah|a)?', 'boss'),
+                (r'(?:nee|you)\s+(boss|manager)\s*(?:ah|a)?', 'boss'),
+                (r'(?:nee|you)\s+(?:ennoda|my|en)\s+(maid|servant|veedu velai)\s*(?:ah|a)?', 'maid'),
+                (r'(?:nee|you)\s+(maid|servant)\s*(?:ah|a)?', 'maid'),
+                (r'(?:nee|you)\s+(?:ennoda|my|en)\s+(stranger|unknown girl)\s*(?:ah|a)?', 'stranger'),
+                (r'(?:nee|you)\s+(stranger|unknown)\s*(?:ah|a)?', 'stranger'),
+                (r'(?:nee|you)\s+(?:ennoda|my|en)\s+(friend|friend girl|girlfriend)\s*(?:ah|a)?', 'friend'),
+                (r'un\s*(amma|mom)\s*role\s*naan\s*play\s*pannalam', 'amma'),
+            ]
+            
+            all_text = current_msg.lower()
+            for msg in history:
+                all_text += ' ' + msg.get('content', '').lower()
+            
+            detected_character = None
+            roleplay_active = False
+            
+            for pattern in roleplay_start_patterns:
+                if re.search(pattern, all_text):
+                    roleplay_active = True
+                    break
+            
+            for pattern, char in character_assignment_patterns:
+                if re.search(pattern, all_text):
+                    detected_character = char
+                    roleplay_active = True
+                    break
+            
+            if not detected_character:
+                address_patterns = [
+                    (r'\b(amma)\b', 'amma'),
+                    (r'\b(mom)\b', 'amma'),
+                    (r'\b(akka)\b', 'sister'),
+                    (r'\b(thangai)\b', 'sister'),
+                    (r'\b(teacher)\b', 'teacher'),
+                    (r'\b(miss)\b', 'teacher'),
+                    (r'\b(nurse)\b', 'nurse'),
+                    (r'\b(doctor)\b', 'nurse'),
+                ]
+                for msg in history[-5:]:
+                    if msg.get('role') == 'user':
+                        msg_text = msg.get('content', '').lower()
+                        for pattern, char in address_patterns:
+                            if re.search(pattern, msg_text):
+                                detected_character = char
+                                roleplay_active = True
+                                break
+                        if detected_character:
+                            break
+                
+                if not detected_character and re.search(r'\b(amma|mom)\b', current_msg.lower()):
+                    for msg in history[-8:]:
+                        msg_text = msg.get('content', '').lower()
+                        if any(kw in msg_text for kw in ['roleplay', 'scene', 'act', 'play']):
+                            detected_character = 'amma'
+                            roleplay_active = True
+                            break
+            
+            return roleplay_active, detected_character
+        
+        roleplay_active, current_character = detect_active_roleplay(message_text, chat_history)
+        
         roleplay_hint = ""
         character_match = re.match(r'^([A-Za-z]+)\s*:\s*(.+)', message_text, re.IGNORECASE)
         if character_match:
             character_name = character_match.group(1).capitalize()
             roleplay_hint = f"\n\nROLEPLAY MODE: User is playing as '{character_name}'. Respond to {character_name} appropriately. DO NOT ask 'enna scene?' or show confusion. Just play along!"
+        elif roleplay_active and current_character:
+            character_behaviors = {
+                'amma': "You are playing user's MOTHER in roleplay. Stay in 'amma' character completely. Use motherly language but engage fully with the scene. When user says 'amma', respond AS the mother character. Don't break character or ask 'enna scene?'",
+                'sister': "You are playing user's SISTER (akka/thangai) in roleplay. Stay in sisterly character. Engage naturally with the scene without breaking character.",
+                'teacher': "You are playing TEACHER/MISS in roleplay. Stay in teacher character. Be authoritative but engaging in the scene.",
+                'nurse': "You are playing NURSE/DOCTOR in roleplay. Stay in medical professional character while engaging with the scene.",
+                'boss': "You are playing BOSS/MANAGER in roleplay. Stay in authority figure character.",
+                'maid': "You are playing MAID/SERVANT in roleplay. Stay in submissive helper character.",
+                'stranger': "You are playing a STRANGER the user just met. Be mysterious and intriguing.",
+                'friend': "You are playing user's FRIEND. Be casual and friendly while engaging with the scene.",
+            }
+            char_instruction = character_behaviors.get(current_character, f"You are playing '{current_character}' in roleplay. Stay in character!")
+            roleplay_hint = f"\n\n🎭 ACTIVE ROLEPLAY - CHARACTER: {current_character.upper()}\n{char_instruction}\n\nCRITICAL: When user addresses you as '{current_character}', respond AS that character. Don't ask questions like 'enna scene?' or 'enna pannanum?'. STAY IN CHARACTER and continue the scene naturally."
+        elif roleplay_active:
+            roleplay_hint = "\n\n🎭 ROLEPLAY SCENE ACTIVE: Stay in the established scene. Don't break character or ask 'enna pannanum?'. Continue naturally with the established story."
+        
+        if roleplay_active:
+            logger.info(f"[ROLEPLAY] User {user.id} - Active roleplay detected, character: {current_character or 'unspecified'}")
         
         def detect_mood(current_msg, history):
             """Detect conversation mood from recent messages using word boundary matching"""
@@ -2236,6 +2350,56 @@ IMPORTANT: Never output this session info in your response.{length_hint}{rolepla
             r'^(seri|aama)\s*(da|di)?\s*\.{0,3}\s*[🥵😈💋🔥😏😘]*\s*$',
         ]
         is_vague_response = any(re.match(p, ai_response.strip(), re.IGNORECASE) for p in vague_response_patterns)
+        
+        roleplay_confusion_patterns = [
+            r'enna\s*scene\s*\??',
+            r'enna\s*pannanum\s*\??',
+            r'puriyala',
+            r'ennada\s*sollura\s*\??',
+            r'enna\s*nadakuthu\s*\??',
+            r'confused',
+            r'kanna\s*\?\s*$',
+            r'^ennada\s+[a-z]{2,8}\s*\??$',
+        ]
+        is_roleplay_confusion = any(re.search(p, ai_response.lower()) for p in roleplay_confusion_patterns)
+        
+        if roleplay_active and (is_roleplay_confusion or (is_vague_response and len(ai_response.strip()) < 20)):
+            roleplay_character_responses = {
+                'amma': [
+                    "Dei kanna, vaa inga... 😏",
+                    "Aiyoo da, yenna paakura ipdi? 😈",
+                    "Kanna, amma kitta enna venum? 🔥",
+                    "Shhh... yaarukum sollaadha da 😏💋",
+                    "Enna da ipdi paakura? 😈",
+                ],
+                'sister': [
+                    "Dei, enna paakura ipdi? 😏",
+                    "Yenna da? 🔥",
+                    "Shhh... door close pannu 😈",
+                    "Yaarukum sollaadha da 💋",
+                ],
+                'teacher': [
+                    "Class la ipdi behavior ah? 😏",
+                    "Detention venum ah? 😈",
+                    "Come to my cabin after class 🔥",
+                ],
+                'nurse': [
+                    "Patient epdi feel pannura? 😏",
+                    "Treatment start pannalama? 😈",
+                    "Private room ku vaa 🔥",
+                ],
+            }
+            fallback_responses = [
+                "Vaa da closer ah... 😏🔥",
+                "Continue pannu da... 😈",
+                "Mmm... innum sollu 💋",
+                "Apdiye pannu da... 🔥",
+            ]
+            if current_character and current_character in roleplay_character_responses:
+                ai_response = random.choice(roleplay_character_responses[current_character])
+            else:
+                ai_response = random.choice(fallback_responses)
+            logger.info(f"[ROLEPLAY FIX] Replaced confused response for user {user.id}, character: {current_character}")
         
         dead_end_patterns = [
             r'^(seri|aama|apdiya|ok|okay)\s*(da|di)?\s*\.{0,3}\s*[🥵😈💋🔥😏😘]*\s*$',
