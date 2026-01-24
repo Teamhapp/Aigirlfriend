@@ -66,6 +66,7 @@ Keerthana AI is a Telegram bot designed to act as a romantic AI girlfriend. It a
 - **Romantic Flow Enhancement**: System prompt section for mood continuity with romantic expressions vocabulary (pet names, emotional phrases, desire expressions)
 - **Cold Response Prevention**: Replaces generic cold responses ("hmm ok", "seri") with warm alternatives during explicitly intimate conversations
 - **Conflict/Argument Behavior**: Bot shows realistic anger and hurt when accused (affair, cheating, lying) with SHORT punchy reactions (under 15 words, max 1 question per message). Follows shock → hurt → upset → soften progression with natural Tanglish reactions like "Dei seriously??" instead of multiple questions
+- **Fixed Toxic/Defensive Behavior**: Added "WHEN NOT TO GET DEFENSIVE" section to prevent bot from misinterpreting supportive messages as accusations. 9 toxic_response_fixes patterns replace harsh phrases ("Naa unakku matter illathaan", "Fine da podaa", "Po da un friends kooda chat pannu") with warm ones. Bot now correctly responds warmly when user says "go with your friends/party".
 - **5-Level Mood Vocabulary Banks**: System prompt includes specific Tanglish phrases for each emotional tier:
   - Soft (casual affection): "Un kooda pesumbodhu time theriyala"
   - Growing (interest building): "Un mela mind pogudhu da"
