@@ -131,6 +131,21 @@ def init_database():
             ON CONFLICT (key) DO NOTHING
         ''')
         
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS user_memories (
+                id SERIAL PRIMARY KEY,
+                user_id BIGINT REFERENCES users(user_id),
+                memory_type VARCHAR(50),
+                memory_key VARCHAR(100),
+                memory_value TEXT,
+                confidence FLOAT DEFAULT 1.0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, memory_type, memory_key)
+            )
+        ''')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_user_memories_user_id ON user_memories(user_id)')
+        
         conn.commit()
         logger.info("Database initialized successfully")
     except Exception as e:
@@ -596,3 +611,63 @@ def get_total_referral_stats(conn):
             for r in top_referrers
         ]
     }
+
+@with_db_retry()
+def save_user_memory(conn, user_id, memory_type, memory_key, memory_value, confidence=1.0):
+    """Save or update a memory for a user"""
+    try:
+        cur = conn.cursor()
+        cur.execute('''
+            INSERT INTO user_memories (user_id, memory_type, memory_key, memory_value, confidence, updated_at)
+            VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id, memory_type, memory_key) 
+            DO UPDATE SET memory_value = %s, confidence = %s, updated_at = CURRENT_TIMESTAMP
+        ''', (user_id, memory_type, memory_key, memory_value, confidence, memory_value, confidence))
+        conn.commit()
+        cur.close()
+        logger.info(f"Saved memory for user {user_id}: {memory_type}/{memory_key}")
+        return True
+    except Exception as e:
+        logger.error(f"Error saving memory: {e}")
+        conn.rollback()
+        return False
+
+@with_db_retry()
+def get_user_memories(conn, user_id, memory_type=None, limit=50):
+    """Get all memories for a user, optionally filtered by type"""
+    cur = conn.cursor()
+    if memory_type:
+        cur.execute('''
+            SELECT memory_type, memory_key, memory_value, confidence, updated_at
+            FROM user_memories WHERE user_id = %s AND memory_type = %s
+            ORDER BY updated_at DESC LIMIT %s
+        ''', (user_id, memory_type, limit))
+    else:
+        cur.execute('''
+            SELECT memory_type, memory_key, memory_value, confidence, updated_at
+            FROM user_memories WHERE user_id = %s
+            ORDER BY updated_at DESC LIMIT %s
+        ''', (user_id, limit))
+    memories = cur.fetchall()
+    cur.close()
+    return [
+        {'type': m[0], 'key': m[1], 'value': m[2], 'confidence': m[3], 'updated_at': m[4]}
+        for m in memories
+    ]
+
+@with_db_retry()
+def delete_user_memory(conn, user_id, memory_type, memory_key):
+    """Delete a specific memory"""
+    try:
+        cur = conn.cursor()
+        cur.execute('''
+            DELETE FROM user_memories 
+            WHERE user_id = %s AND memory_type = %s AND memory_key = %s
+        ''', (user_id, memory_type, memory_key))
+        conn.commit()
+        cur.close()
+        return True
+    except Exception as e:
+        logger.error(f"Error deleting memory: {e}")
+        conn.rollback()
+        return False

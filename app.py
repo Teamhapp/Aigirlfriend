@@ -18,7 +18,7 @@ from database import (
     DAILY_MESSAGE_LIMIT, get_confirmed_gender, set_confirmed_gender,
     get_all_users, get_user_chat_history, get_dashboard_stats, award_referral_points,
     set_global_daily_limit, get_global_daily_limit, get_total_referral_stats,
-    clear_chat_history
+    clear_chat_history, save_user_memory, get_user_memories
 )
 import re
 import requests
@@ -1025,6 +1025,95 @@ def markdown_to_html(text):
     text = re.sub(r'__(.+?)__', r'<u>\1</u>', text)
     return text
 
+def extract_and_save_memories(user_id, message_text):
+    """Extract personal info from user messages and save as memories"""
+    msg_lower = message_text.lower()
+    
+    name_patterns = [
+        (r"(?:my name is|i am|i'm|call me|en peyar|naan)\s+([A-Za-z]{2,15})\b", 'identity', 'name'),
+        (r"(?:en friend|my friend|friend name)\s+([A-Za-z]{2,15})\b", 'relationships', 'friend_name'),
+    ]
+    for pattern, mem_type, mem_key in name_patterns:
+        match = re.search(pattern, message_text, re.IGNORECASE)
+        if match:
+            blocked_words = {'just', 'really', 'actually', 'here', 'there', 'what', 'who', 'how', 'doing'}
+            name = match.group(1).strip()
+            if name.lower() not in blocked_words and len(name) >= 2:
+                save_user_memory(user_id, mem_type, mem_key, name.capitalize())
+    
+    hobby_patterns = [
+        (r"(?:i like|i love|enakku pudikum|favourite is|favorite is)\s+(.{3,30}?)(?:\.|!|\?|$)", 'preferences', 'likes'),
+        (r"(?:i hate|i don't like|enakku pudikadhu)\s+(.{3,30}?)(?:\.|!|\?|$)", 'preferences', 'dislikes'),
+    ]
+    for pattern, mem_type, mem_key in hobby_patterns:
+        match = re.search(pattern, msg_lower)
+        if match:
+            value = match.group(1).strip()
+            if len(value) >= 3:
+                save_user_memory(user_id, mem_type, mem_key, value)
+    
+    job_patterns = [
+        (r"(?:i work as|i am a|naan)\s+(doctor|engineer|student|teacher|developer|designer|artist|nurse|driver|chef|manager|lawyer|accountant|pilot|analyst|writer)", 'identity', 'occupation'),
+        (r"(?:i study|studying|college student|school student)", 'identity', 'occupation'),
+    ]
+    for pattern, mem_type, mem_key in job_patterns:
+        match = re.search(pattern, msg_lower)
+        if match:
+            if match.lastindex:
+                save_user_memory(user_id, mem_type, mem_key, match.group(1))
+            else:
+                save_user_memory(user_id, mem_type, mem_key, 'student')
+    
+    location_patterns = [
+        (r"(?:i live in|i'm from|i am from|en oor|naan)\s+(?:from\s+)?([A-Za-z]{3,20})\b", 'identity', 'location'),
+    ]
+    for pattern, mem_type, mem_key in location_patterns:
+        match = re.search(pattern, message_text, re.IGNORECASE)
+        if match:
+            location = match.group(1).strip()
+            blocked_locations = {'here', 'there', 'home', 'work', 'office', 'coming', 'going'}
+            if location.lower() not in blocked_locations:
+                save_user_memory(user_id, mem_type, mem_key, location.capitalize())
+    
+    if re.search(r'\b(birthday|pirandha naal|bday)\b.*\b(today|inniki)\b', msg_lower):
+        from datetime import date
+        save_user_memory(user_id, 'events', 'birthday_mentioned', date.today().isoformat())
+
+def get_memory_context(user_id):
+    """Build a context string from user's stored memories"""
+    memories = get_user_memories(user_id, limit=20)
+    if not memories:
+        return ""
+    
+    memory_lines = []
+    identity_mems = [m for m in memories if m['type'] == 'identity']
+    pref_mems = [m for m in memories if m['type'] == 'preferences']
+    rel_mems = [m for m in memories if m['type'] == 'relationships']
+    
+    if identity_mems:
+        for m in identity_mems:
+            if m['key'] == 'name':
+                memory_lines.append(f"User's name: {m['value']}")
+            elif m['key'] == 'occupation':
+                memory_lines.append(f"User works as: {m['value']}")
+            elif m['key'] == 'location':
+                memory_lines.append(f"User is from: {m['value']}")
+    
+    if pref_mems:
+        for m in pref_mems[:3]:
+            if m['key'] == 'likes':
+                memory_lines.append(f"User likes: {m['value']}")
+            elif m['key'] == 'dislikes':
+                memory_lines.append(f"User dislikes: {m['value']}")
+    
+    if rel_mems:
+        for m in rel_mems[:2]:
+            memory_lines.append(f"User's {m['key'].replace('_', ' ')}: {m['value']}")
+    
+    if memory_lines:
+        return "\n📝 WHAT YOU KNOW ABOUT THIS USER (use naturally, don't list):\n" + "\n".join(memory_lines)
+    return ""
+
 def calculate_typing_delay(text):
     word_count = len(text.split())
     base_delay = min(word_count * 0.15, 5)
@@ -1509,10 +1598,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         mood_hint = mood_hints.get(current_mood, "")
         
+        extract_and_save_memories(user.id, message_text)
+        
+        memory_context = get_memory_context(user.id)
+        
         context_info = f"""User name: {preferred_name}
 Status: {user_status}
 Gender: {gender_instruction}
-IMPORTANT: Never output this session info in your response.{length_hint}{roleplay_hint}{mood_hint}"""
+IMPORTANT: Never output this session info in your response.{length_hint}{roleplay_hint}{mood_hint}{memory_context}"""
         
         ai_response = generate_response(message_text, chat_history, context_info)
         ai_response = ai_response.strip()
