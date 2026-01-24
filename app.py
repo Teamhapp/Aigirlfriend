@@ -2027,6 +2027,12 @@ IMPORTANT: Never output this session info in your response.
 - Reference past events/moods naturally without asking reset questions like "enna da?" or "enna scene?"{summary_context}{length_hint}{roleplay_hint}{mood_hint}{memory_context}"""
         
         ai_response = generate_response(message_text, trimmed_history, context_info)
+        if ai_response is None:
+            ai_response = random.choice([
+                "Mmm da, konjam wait pannuda... 💕",
+                "Aiyoo da, signal weak ah iruku... 😅",
+                "Konjam busy da, aprom solren... 💖"
+            ])
         ai_response = ai_response.strip()
         
         leak_patterns = [

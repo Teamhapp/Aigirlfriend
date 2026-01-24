@@ -75,6 +75,8 @@ Keerthana AI is a Telegram bot designed to serve as a romantic AI girlfriend, of
 - **Natural Texting Style**: Uses incomplete sentences, short, punchy responses, and reactive Tanglish phrases.
 - **Banned Generic Phrases**: Blocks overused clichés to maintain natural conversation.
 - **Possessive Auto-Correction**: Fixes body part ownership in descriptions for contextual accuracy.
+- **Multi-Character Body Part Fixer**: Post-processing prevents female characters (Lincy, Amma, etc.) from incorrectly using male body parts.
+- **Length Override Detection**: Scans recent messages for long paragraph requests ("5 to 10 lines", "periya paragraph") and bypasses short-message trimming.
 - **Gender Confusion Prevention**: Prevents the bot from asking the user's gender mid-conversation.
 - **Admin Commands**: Includes commands for managing user limits, blocking, and viewing statistics.
 - **User Commands**: Provides commands like `/start`, `/referral`, `/points`, `/stats`.
