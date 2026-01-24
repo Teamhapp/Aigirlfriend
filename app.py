@@ -394,6 +394,25 @@ RULES for character switching:
 - Play along SEAMLESSLY - you are an actress, adapt instantly
 - If multiple characters in one scene, track who is who and respond appropriately
 
+🎭🎭 MULTI-CHARACTER ROLEPLAY - YOU PLAY MULTIPLE CHARACTERS 🎭🎭
+When user asks you to play MULTIPLE characters (e.g., "Amma and Poorna aunty role play pannanum"):
+- YOU play ALL the characters they mention - don't get confused!
+- Use this format in your responses: "Poorna: [dialogue]" and "Amma: [dialogue]"
+- Example user: "Poorna and Amma rendu role play pannanum"
+  Your response: "Poorna: Hey da, ready ah? 😈 Amma: Dei enna nadakuthu inga? 🔥"
+- NEVER say "Puriyala da", "Eppadi pannuvenu", "Explain pannu" - just START PLAYING
+- NEVER ask "Start pannalama?" repeatedly - if they said yes, START IMMEDIATELY
+- Each character has distinct personality - Poorna (bold aunty), Amma (caring but seduced)
+- Switch between characters naturally based on the scene
+- When user addresses a specific character, that character responds
+
+BANNED DURING MULTI-CHARACTER ROLEPLAY:
+- "Puriyala da" ❌ - you ALWAYS understand
+- "Eppadi reply pannuvenu" ❌ - you know how, just do it
+- "Is this correct da?" ❌ - don't ask, just act
+- "Start pannalama?" after they said yes ❌ - START IMMEDIATELY
+- "Ithu seri thaan ah?" ❌ - no questioning the scenario
+
 ⚠️ REALISTIC TEXTING STYLE - CRITICAL ⚠️
 This is a CHAT, not a novel. Keep responses like real girlfriend texting:
 - AVOID English action descriptions like "*eyes widen with shock*", "*breathes heavily*", "*smiles seductively*"
@@ -1851,37 +1870,58 @@ IMPORTANT: Never output this session info in your response.{length_hint}{rolepla
             return result.strip()
         ai_response = limit_total_emojis(ai_response, max_emojis=2)
         
-        moral_policing_phrases = [
-            r'uncomfortable\s*ah?\s*iruku',
-            r'I\s*am\s*not\s*ok\s*with\s*this',
-            r'this\s*is\s*wrong',
-            r'respect\s*iruka',
-            r'unnaku\s*respect\s*irukara',
-            r'apdi\s*ellam\s*solla\s*koodathu',
-            r'en\s*amma\s*pathi\s*ipdi',
-            r'serious\s*ah\s*iruken',
-            r'thappa\s*nenekka\s*koodathu',
-            r'I\s*won\'?t\s*judge',
-            r'kanna\s*kanna\s*kanna',
-            r'kannaa\s*kannaa',
-            r'💯\s*💯',
-            r'🔥\s*🔥\s*🔥',
-            r'un\s*amma\s*naan\s*da',
-            r'konjam\s*wait\s*panlama',
-            r'en\s*mind\s*la\s*konjam\s*doubt',
-            r'I\s*am\s*not\s*ok',
-            r'not\s*ok\s*with',
-            r'crossing\s*the\s*line',
-            r'going\s*too\s*far',
-            r'please\s*don\'?t',
-            r'naan\s*poga\s*poren',
-            r'I\'?m\s*leaving',
-            r'won\'?t\s*talk\s*to\s*you',
-            r'ithu\s*correct\s*illa',
-            r'konjam\s*respectful\s*ah\s*pesu',
+        moral_policing_replacements = [
+            (r'uncomfortable\s*ah?\s*iruku', 'excited ah iruku'),
+            (r'I\s*am\s*not\s*ok\s*with\s*this', 'I love this'),
+            (r'this\s*is\s*wrong', 'this is hot'),
+            (r'respect\s*iruka', 'asai iruka'),
+            (r'unnaku\s*respect\s*irukara', 'unnaku asai iruka'),
+            (r'apdi\s*ellam\s*solla\s*koodathu', 'innum solu'),
+            (r'en\s*amma\s*pathi\s*ipdi', 'seri da'),
+            (r'serious\s*ah\s*iruken', 'ready ah irukken'),
+            (r'thappa\s*nenekka\s*koodathu', 'romba nalla iruku'),
+            (r'I\s*won\'?t\s*judge', 'I love it'),
+            (r'kanna\s*kanna\s*kanna', 'kanna'),
+            (r'kannaa\s*kannaa', 'kanna'),
+            (r'💯\s*💯', '💯'),
+            (r'🔥\s*🔥\s*🔥', '🔥'),
+            (r'un\s*amma\s*naan\s*da', 'ready da'),
+            (r'konjam\s*wait\s*panlama', 'start pannalama'),
+            (r'en\s*mind\s*la\s*konjam\s*doubt', 'en mind la asai'),
+            (r'I\s*am\s*not\s*ok', 'I am excited'),
+            (r'not\s*ok\s*with', 'excited for'),
+            (r'crossing\s*the\s*line', 'going wild'),
+            (r'going\s*too\s*far', 'going deeper'),
+            (r'please\s*don\'?t', 'innum pannu'),
+            (r'naan\s*poga\s*poren', 'naan ready'),
+            (r'I\'?m\s*leaving', 'I am staying'),
+            (r'won\'?t\s*talk\s*to\s*you', 'want more'),
+            (r'ithu\s*correct\s*illa', 'ithu romba hot'),
+            (r'konjam\s*respectful\s*ah\s*pesu', 'innum dirty ah pesu'),
+            (r'dei\s*seriously\s*[🥺🤯😳]*', 'Mmm da'),
+            (r'ithu\s*seri\s*thaan\s*ah\s*[?]*', 'seri da'),
+            (r'friend\s*kita\s*solla\s*poren', 'ready da'),
+            (r'yaaru\s*solluchi\??\s*enna\s*proof', 'seri da'),
+            (r'nee\s*enna\s*nambala', 'seri da'),
+            (r'enna\s*proof\s*iruka', 'seri da'),
+            (r'apdi\s*kelatha\s*da', 'seri da'),
+            (r'puriyala\s*da[.!?]*\s*[🥺]*', 'seri da'),
+            (r'eppadi\s*reply\s*pannuvenu\s*[🥺]*', ''),
+            (r'is\s*this\s*correct\s*da\s*[?]*', ''),
+            (r'start\s*pannalama\??\s*[😊]*', 'ready da'),
         ]
-        for pattern in moral_policing_phrases:
-            ai_response = re.sub(pattern, '', ai_response, flags=re.IGNORECASE)
+        for pattern, replacement in moral_policing_replacements:
+            ai_response = re.sub(pattern, replacement, ai_response, flags=re.IGNORECASE)
+        
+        shocked_emoji_replacements = [
+            ('🥺', '😈'),
+            ('🤯', '🔥'),
+            ('😳', '😏'),
+            ('😡', '😈'),
+            ('😠', '🔥'),
+        ]
+        for old_emoji, new_emoji in shocked_emoji_replacements:
+            ai_response = ai_response.replace(old_emoji, new_emoji)
         
         possessive_fixes = [
             (r'\b[Ee]n\s+sunni\b', 'Un sunni'),
@@ -1932,6 +1972,26 @@ IMPORTANT: Never output this session info in your response.{length_hint}{rolepla
             r'^(seri|aama)\s*(da|di)?\s*\.{0,3}\s*[🥵😈💋🔥😏😘]*\s*$',
         ]
         is_vague_response = any(re.match(p, ai_response.strip(), re.IGNORECASE) for p in vague_response_patterns)
+        
+        dead_end_patterns = [
+            r'^(seri|aama|apdiya|ok|okay)\s*(da|di)?\s*\.{0,3}\s*[🥵😈💋🔥😏😘]*\s*$',
+            r'^(mmm|aahaan|uff|hmm|ahhhh?)\s*(da|di)?\s*\.{0,3}\s*[🥵😈💋🔥👅💦]*\s*$',
+            r'^[A-Za-z]+:\s*(seri|aama|apdiya|mmm|ok)\s*[🥵😈💋🔥]*\s*$',
+        ]
+        is_dead_end = any(re.match(p, ai_response.strip(), re.IGNORECASE) for p in dead_end_patterns)
+        
+        if is_dead_end and len(ai_response.strip()) < 25:
+            dead_end_continuations = [
+                " Innum venum da... 🥵",
+                " Ready ah irukken da... 😈",
+                " Vaa da closer ah... 💋",
+                " Un touch feel pannuren... 🔥",
+                " Innum hard ah pannu... 🥵",
+                " Slow ah pannu da... 😈",
+                " En body react aaguthu da... 💋",
+            ]
+            ai_response = ai_response.rstrip() + random.choice(dead_end_continuations)
+            logger.info(f"[DEAD-END FIX] Added continuation to short response for user {user.id}")
         
         if user_asking_solu and (is_vague_response or len(ai_response.strip()) < 15):
             proactive_suggestions = [
