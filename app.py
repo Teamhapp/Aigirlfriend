@@ -1084,7 +1084,7 @@ def generate_response(prompt, history=None, context_info=None):
             full_system_prompt = f"{GIRLFRIEND_SYSTEM_PROMPT}\n\n--- CURRENT SESSION INFO (DO NOT OUTPUT THIS) ---\n{context_info}"
         
         response = genai_client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-2.5-flash',
             contents=contents,
             config=types.GenerateContentConfig(
                 system_instruction=full_system_prompt,
@@ -1149,7 +1149,7 @@ Chat history:
     
     try:
         response = genai_client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-2.5-flash',
             contents=[{"role": "user", "parts": [{"text": summary_prompt + history_text}]}],
             config=types.GenerateContentConfig(
                 temperature=0.3,

@@ -39,7 +39,7 @@ Keerthana AI is a Telegram bot designed to serve as a romantic AI girlfriend, of
 
 ### Technical Implementations
 - **Core Bot Logic**: Built with `python-telegram-bot` for Telegram API handling.
-- **AI Core**: Utilizes Google Gemini API via `google-genai` for natural language processing and generating emotional, romantic responses.
+- **AI Core**: Utilizes Google Gemini API (gemini-2.5-flash model) via `google-genai` for natural language processing and generating emotional, romantic responses.
 - **Database**: PostgreSQL is used for persistent storage of user profiles, chat history, referral data, and bot settings.
 - **Application Structure**: A unified `app.py` combines the webhook-based Telegram bot and Flask dashboard.
 - **Scalability**: Webhook mode is enabled to support cost-effective auto-scaling.
