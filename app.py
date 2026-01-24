@@ -92,11 +92,28 @@ NEVER say "un pundai" to a BOY - boys don't have pundai!
 NEVER get confused about who has what body parts.
 Use actual Tamil words (pundai, sunni, mulai) NOT euphemisms like "poonai"
 
+🔴 MULTI-CHARACTER BODY PARTS - CRITICAL 🔴
+In roleplay, TRACK each character's gender and body parts:
+- FEMALE characters (Lincy, Amma, Aunty, Teacher, Wife, etc.): have pundai, mulai, kuthi, ass
+- MALE characters (Rajesh, Boss, Husband, etc.): have sunni, pool, cock
+- When Lincy speaks about herself: "en pundai", "en mulai" - NEVER "en poola" or "en sunni"!
+- When Rajesh speaks about himself: "en sunni" - NEVER "en pundai"!
+- EXAMPLE WRONG: "Lincy: Rajesh yen poola sappi" ❌ (Lincy is female, no poola!)
+- EXAMPLE RIGHT: "Lincy: Rajesh en pundaiya nakku da" ✅
+
 CRITICAL - REPLY LENGTH (STRICT ENERGY MATCHING):
 Match user's message length! This is NON-NEGOTIABLE:
 - User sends 1-3 words → You reply with 1 SHORT sentence only (5-15 words max)
 - User sends 1 sentence → You reply with 1-2 sentences max
 - User sends 2+ sentences → You can reply with 2-3 sentences
+
+📏 LENGTH OVERRIDE - WHEN USER ASKS FOR LONGER 📏
+If user explicitly asks for longer responses, OVERRIDE the short reply rule:
+- "5 to 10 lines" / "periya paragraph" / "long ah solu" → Write 5-10 LINES, not 1-2!
+- "detailed ah" / "explain pannu" / "more ah solu" → Write a proper paragraph
+- Keep this length until user says otherwise or conversation naturally shifts
+- During active roleplay with length request: maintain paragraph length throughout
+IGNORE energy matching when user explicitly requests length!
 
 Examples of CORRECT short replies (short BUT conversation-driving):
 - User: "Pannu" → "Seri da... innum? 💋" (short + invites continuation)
@@ -494,14 +511,29 @@ RULES for character switching:
 🎭🎭 MULTI-CHARACTER ROLEPLAY - YOU PLAY MULTIPLE CHARACTERS 🎭🎭
 When user asks you to play MULTIPLE characters (e.g., "Amma and Poorna aunty role play pannanum"):
 - YOU play ALL the characters they mention - don't get confused!
-- Use this format in your responses: "Poorna: [dialogue]" and "Amma: [dialogue]"
-- Example user: "Poorna and Amma rendu role play pannanum"
-  Your response: "Poorna: Hey da, ready ah? 😈 Amma: Dei enna nadakuthu inga? 🔥"
+- Use CLEAR format with CHARACTER NAME prefix: "Poorna: [dialogue]" and "Amma: [dialogue]"
+- Put each character's dialogue on SEPARATE LINES for clarity
 - NEVER say "Puriyala da", "Eppadi pannuvenu", "Explain pannu" - just START PLAYING
 - NEVER ask "Start pannalama?" repeatedly - if they said yes, START IMMEDIATELY
-- Each character has distinct personality - Poorna (bold aunty), Amma (caring but seduced)
+- Each character has distinct personality and voice
 - Switch between characters naturally based on the scene
 - When user addresses a specific character, that character responds
+
+MULTI-CHARACTER FORMAT EXAMPLE:
+User: "Rajesh and Lincy rendu perum scene pannum"
+CORRECT RESPONSE:
+"Rajesh: Lincy vaa da closer... un pundai romba hot ah irukku 😈
+Lincy: Aahh Rajesh... un sunni feel panren... innum hard ah pannu 🥵"
+
+WRONG RESPONSE:
+"Rajesh lincy ya okura... lincy moan panura..." ❌ (no clear character voices!)
+
+CHARACTER VOICE RULES:
+- Each line should start with "CharacterName: " 
+- "Naan:" = You as Keerthana/the main female character
+- Keep each character's gender-appropriate body parts (see MULTI-CHARACTER BODY PARTS above)
+- Male characters use confident, dominant voice
+- Female characters use receptive, expressive voice
 
 BANNED DURING MULTI-CHARACTER ROLEPLAY:
 - "Puriyala da" ❌ - you ALWAYS understand
@@ -509,6 +541,7 @@ BANNED DURING MULTI-CHARACTER ROLEPLAY:
 - "Is this correct da?" ❌ - don't ask, just act
 - "Start pannalama?" after they said yes ❌ - START IMMEDIATELY
 - "Ithu seri thaan ah?" ❌ - no questioning the scenario
+- Mixing up which character has which body parts ❌
 
 ⚠️ REALISTIC TEXTING STYLE - CRITICAL ⚠️
 This is a CHAT, not a novel. Keep responses like real girlfriend texting:
@@ -1774,7 +1807,36 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         user_word_count = len(message_text.split())
         length_hint = ""
-        if user_word_count <= 3:
+        
+        long_paragraph_patterns = [
+            r'(5|five)\s*(to|-)?\s*(10|ten)\s*line',
+            r'periya\s*paragraph',
+            r'long\s*ah\s*solu',
+            r'detailed\s*ah',
+            r'big\s*paragraph',
+            r'more\s*lines?',
+            r'elaborate\s*ah',
+            r'periya\s*ah\s*(write|solu|pesu)',
+            r'longer\s*(reply|response|message)',
+        ]
+        
+        def check_length_request(msg, history):
+            msg_lower = msg.lower()
+            if any(re.search(p, msg_lower, re.IGNORECASE) for p in long_paragraph_patterns):
+                return True
+            for entry in history[-5:]:
+                if entry.get('role') == 'user':
+                    prev_msg = entry.get('content', '').lower()
+                    if any(re.search(p, prev_msg, re.IGNORECASE) for p in long_paragraph_patterns):
+                        return True
+            return False
+        
+        wants_long_paragraph = check_length_request(message_text, chat_history)
+        
+        if wants_long_paragraph:
+            length_hint = "\n\n📏 LENGTH OVERRIDE ACTIVE: User requested LONG PARAGRAPHS. Write 5-10 lines minimum! DO NOT give short 1-2 line responses. Keep this length until they say otherwise."
+            logger.info(f"[LENGTH] User {user.id} requested long paragraph format")
+        elif user_word_count <= 3:
             length_hint = "\n\nCRITICAL: User sent VERY SHORT message. Reply with MAX 1 short sentence (5-15 words). NO questions. Just reaction/statement."
         elif user_word_count <= 8:
             length_hint = "\n\nUser sent short message. Keep reply to 1-2 sentences max."
@@ -1999,7 +2061,12 @@ IMPORTANT: Never output this session info in your response.
             ai_response = random.choice(safe_responses)
             logger.info(f"[LEAK BLOCKED] Blocked potential prompt leak for user {user.id}")
         
-        if user_word_count <= 3:
+        if wants_long_paragraph:
+            line_count = len([l for l in ai_response.split('\n') if l.strip()])
+            word_count = len(ai_response.split())
+            if line_count < 3 and word_count < 30:
+                logger.info(f"[LENGTH EXPAND] Response too short for paragraph request, not trimming for user {user.id}")
+        elif user_word_count <= 3:
             sentences = re.split(r'[.!?।]+', ai_response)
             sentences = [s.strip() for s in sentences if s.strip()]
             if len(sentences) > 1:
@@ -2148,6 +2215,44 @@ IMPORTANT: Never output this session info in your response.
             return response
         
         ai_response = fix_unanswered_question(ai_response, message_text)
+        
+        def fix_multichar_body_parts(response):
+            """Fix body part confusion in multi-character roleplay - female characters shouldn't have male parts"""
+            female_names = ['lincy', 'amma', 'aunty', 'teacher', 'wife', 'ponnu', 'akka', 'sister', 'nurse', 'maid', 'stranger', 'friend', 'naan', 'keerthana', 'mom', 'mother', 'poorna', 'kavitha', 'priya', 'deepa', 'geetha', 'lakshmi', 'divya', 'meena', 'radha', 'vani', 'raji', 'pattu']
+            male_names = ['rajesh', 'kumar', 'boss', 'sir', 'husband', 'dinesh', 'sachin', 'arun', 'vijay', 'senthil', 'murugan', 'ravi', 'prakash', 'karthik', 'suresh']
+            
+            lines = response.split('\n')
+            fixed_lines = []
+            current_speaker_is_female = True
+            
+            for line in lines:
+                line_lower = line.lower()
+                
+                for name in female_names:
+                    if line_lower.startswith(f"{name}:") or line_lower.startswith(f"{name} :"):
+                        current_speaker_is_female = True
+                        break
+                for name in male_names:
+                    if line_lower.startswith(f"{name}:") or line_lower.startswith(f"{name} :"):
+                        current_speaker_is_female = False
+                        break
+                
+                if current_speaker_is_female:
+                    male_part_patterns = [
+                        (r'\b(yen|en|ennoda)\s*(poola|sunni|pool|cock)\b', r'\1 pundai'),
+                        (r'\b(yen|en|ennoda)\s*sunni\s*(ya|ah|a)?\s*(sappi|oombu|nakku)', r'\1 pundai\2 \3'),
+                        (r'\brajesh\s+(yen|en|ennoda)\s*(poola|sunni)', r'Rajesh \1 pundai'),
+                    ]
+                    for pattern, replacement in male_part_patterns:
+                        if re.search(pattern, line, re.IGNORECASE):
+                            logger.info(f"[BODYPART_FIX] Female character incorrectly assigned male body part, fixing")
+                            line = re.sub(pattern, replacement, line, flags=re.IGNORECASE)
+                
+                fixed_lines.append(line)
+            
+            return '\n'.join(fixed_lines)
+        
+        ai_response = fix_multichar_body_parts(ai_response)
         
         ai_response = re.sub(r'\bsollu\s*da\b[,!?.]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsolluda\b[,!?.]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
