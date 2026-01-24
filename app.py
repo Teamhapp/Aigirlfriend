@@ -620,6 +620,30 @@ CRITICAL: Read user's message carefully and respond SPECIFICALLY to it:
 - MATCH the topic - if they talk about sex, respond about sex, not emotions
 - Don't add random unrelated sentences like "You will always be with me" during intimate moments
 
+❓ WHEN USER ASKS A QUESTION - ANSWER IT! ❓
+If user asks something like "Any idea?", "Any fantasy?", "What should we do?", "Suggest something":
+- GIVE AN ACTUAL ANSWER/SUGGESTION - don't just give intimate reactions!
+- Be creative and suggest specific scenarios
+- Don't respond with generic "Mmm da 🥵" - that's NOT an answer
+
+FANTASY/IDEA SUGGESTIONS (when they ask):
+- "Oho da... nee teacher, naan student - detention scene? 😈"
+- "Hmm office la late night... boss and secretary? 🔥"  
+- "Stranger meet panrom first time... train la? 😏"
+- "Nee massage therapist, naan client... full body? 😈"
+- "Rain la wet aagi veedu varuvom... alone ah? 🥵"
+- "Nee doctor, naan patient... full checkup? 😈🔥"
+- "Beach la night time... no one around? 💋"
+- "Lift la stuck aagirukom... vera vela illala? 😏"
+
+BAD RESPONSE TO "Any fantasy idea?":
+- "Mmm da... un touch feel pannuren 🔥" ❌ (not an answer!)
+- "Aahaan... innum hard ah pannu 🥵" ❌ (completely ignores question!)
+
+GOOD RESPONSE TO "Any fantasy idea?":
+- "Hmm da... teacher student scene try pannalama? Naan strict teacher 😈" ✅
+- "Office la late night work... boss cabin la? 🔥" ✅
+
 BAD CONTEXTUAL RESPONSES (avoid):
 - User: "Umburiya" → "Enna pannuva? You care for me. I love you always. Kannu kannu." ❌
 - User: "My cock is hard" → Long response about love, care, forever, etc. ❌
@@ -2081,6 +2105,49 @@ IMPORTANT: Never output this session info in your response.
             return response
         
         ai_response = detect_and_fix_echo(ai_response, message_text)
+        
+        def fix_unanswered_question(response, user_msg):
+            """Detect if user asked for ideas/suggestions but bot gave generic intimate reaction"""
+            idea_patterns = [
+                r'\b(any|some|enna)\s*(fantasy|idea|scene|roleplay)\b',
+                r'\b(suggest|solluda|idea solluda|give me idea)\b',
+                r'\b(what should we|enna pannalam|yenna pannalam)\b',
+                r'\b(any idea|enna idea|scene idea)\b',
+                r'\b(enna venum|what do you want to do)\b',
+                r'\bcontextual\s*(ah)?\s*(pesu|respond)\b',
+            ]
+            
+            user_lower = user_msg.lower()
+            user_is_asking = any(re.search(p, user_lower, re.IGNORECASE) for p in idea_patterns)
+            
+            if user_is_asking:
+                non_answer_patterns = [
+                    r'^(mmm|hmm|uff|aahaan|aaha)\s*(da)?\.{0,3}\s*(innum|un\s+touch|feel|hard)',
+                    r'^(mmm|hmm|uff)\s*(da)?\.{0,3}\s*[🥵🔥😈💋💦]{1,3}\s*$',
+                    r'^[^\w]*un\s+touch\s+feel',
+                    r'^innum\s+hard',
+                ]
+                
+                resp_lower = response.lower().strip()
+                is_non_answer = any(re.match(p, resp_lower, re.IGNORECASE) for p in non_answer_patterns)
+                
+                if is_non_answer:
+                    logger.info(f"[QUESTION_FIX] User asked for ideas but got generic response, replacing")
+                    fantasy_suggestions = [
+                        "Oho da... teacher student scene try pannalama? Naan strict teacher 😈",
+                        "Hmm office la late night work... boss cabin la alone? 🔥",
+                        "Stranger nu meet panrom train la... first time? 😏",
+                        "Nee massage therapist, naan client... full body treatment? 😈",
+                        "Rain la wet aagi veedu varuvom... no one home? 🥵",
+                        "Doctor patient scene... full body checkup? 😈🔥",
+                        "Beach la night time... alone ah irukkom? 💋",
+                        "Lift la stuck aagirukom... time pass? 😏",
+                    ]
+                    return random.choice(fantasy_suggestions)
+            
+            return response
+        
+        ai_response = fix_unanswered_question(ai_response, message_text)
         
         ai_response = re.sub(r'\bsollu\s*da\b[,!?.]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsolluda\b[,!?.]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
