@@ -2041,6 +2041,11 @@ IMPORTANT: Never output this session info in your response.
             ])
         ai_response = ai_response.strip()
         
+        intimate_keywords = {'sunni', 'pundai', 'mulai', 'oombu', 'blowjob', 'nakku', 'sappu', 'fuck', 'pool', 'kuthi', 'boobs', 'cock', 'dick', 'thanni', 'cum', 'suck', 'lick', 'poola', 'otha', 'olu', 'moonu', 'boob', 'sexy', 'strip', 'nude', 'naked', 'kiss', 'touch', 'bed', 'romance'}
+        recent_msgs = ' '.join([m.get('content', '') for m in chat_history[-5:]]).lower()
+        user_msg_lower = (message_text or '').lower()
+        is_intimate = current_mood == 'intimate' or bool(set(re.sub(r'[^\w\s]', '', recent_msgs + ' ' + user_msg_lower).split()) & intimate_keywords)
+        
         leak_patterns = [
             r'```\s*json',
             r'"system_prompt"',
@@ -2777,13 +2782,7 @@ IMPORTANT: Never output this session info in your response.
             ai_response = random.choice(her_action_suggestions)
             logger.info(f"[NEE PANUVA FIX] Replaced deflection with her action for user {user.id}")
         
-        intimate_keywords = {'sunni', 'pundai', 'mulai', 'oombu', 'blowjob', 'nakku', 'sappu', 'fuck', 'pool', 'kuthi', 'boobs', 'cock', 'dick', 'thanni', 'cum', 'suck', 'lick', 'poola', 'otha', 'olu', 'moonu'}
-        safe_message = message_text if message_text else ""
-        clean_words = [w for w in re.sub(r'[^\w\s]', '', safe_message.lower()).split() if w.strip()]
-        user_words = set(clean_words)
-        is_intimate_context = bool(user_words & intimate_keywords) and len(clean_words) > 0
-        
-        if is_intimate_context and len(ai_response.strip()) < 20:
+        if is_intimate and len(ai_response.strip()) < 20:
             intimate_continuations = [
                 " romba nalla iruku da... 🥵",
                 " ennoda feel vera level 🔥",
