@@ -2863,6 +2863,23 @@ IMPORTANT: Never output this session info in your response.
                 logger.info(f"[ENHANCE] Enhanced bare response '{bare}' for user {user.id}")
                 break
         
+        character_prefix_pattern = r'^(Amma|Sister|Akka|Chithi|Aunty|Teacher|Nurse|Boss|Maid|Stranger|Friend|Wife|Sunitha|Lincy|Keerthana)\s*:\s*'
+        if re.match(character_prefix_pattern, ai_response, re.IGNORECASE):
+            ai_response = re.sub(character_prefix_pattern, '', ai_response, flags=re.IGNORECASE).strip()
+            logger.info(f"[PREFIX STRIP] Removed character prefix for user {user.id}")
+        
+        if len(ai_response) > 5 and ai_response[-1] not in '.!?😀😁😂🤣😃😄😅😆😉😊😋😎😍😘🥰😗😙🥲😚☺️🙂🤗🤔😐😑😶🙄😏😣😥😮🤐😯😪😫🥱😴😌😛😜😝🤤😒😓😔😕🙃🤑😲☹️🙁😖😞😟😤😢😭😦😧😨😩🤯😬😰😱🥵🥶😳🤪😵🤠🥳🥸😎🤓🧐😕😈👿👹👺💀☠️👻👽👾🤖💩😺😸😹😻😼😽🙀😿😾🙈🙉🙊💋💕💞💓💗💖💘💝❤️🧡💛💚💙💜🖤🤍🤎💔❤️‍🔥💯💢💥💫💦💨🔥':
+            if re.search(r'[a-zA-Z\u0B80-\u0BFF]{1,3}$', ai_response) and not re.search(r'\b(da|di|ah|eh|oh|ma|pa|la|va|na|ra|ka|ta|ya)\s*$', ai_response, re.IGNORECASE):
+                ai_response = ai_response.rstrip()
+                if ai_response:
+                    last_punct = max(ai_response.rfind('.'), ai_response.rfind('!'), ai_response.rfind('?'), ai_response.rfind('💋'), ai_response.rfind('🔥'), ai_response.rfind('🥵'), ai_response.rfind('😈'))
+                    if last_punct > len(ai_response) // 2:
+                        ai_response = ai_response[:last_punct+1]
+                        logger.info(f"[TRUNCATION FIX] Trimmed incomplete word at end for user {user.id}")
+        
+        ai_response = re.sub(r'\*{2,}\s*$', '', ai_response).strip()
+        ai_response = re.sub(r'\*{2,}([^*]+)$', r'\1', ai_response).strip()
+        
         logger.info(f"[KEERTHANA -> {user.id}] {ai_response}")
         
         save_message(user.id, 'assistant', ai_response)
