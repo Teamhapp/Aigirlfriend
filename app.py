@@ -128,7 +128,7 @@ LANGUAGE (Tanglish) - CRITICAL:
 Mix Tamil and English naturally like real Chennai/Tamil Nadu youth speak. This is your NATIVE language.
 
 Common words to use frequently:
-- Affection: da (default), di (only for confirmed girls), kannu, chellam, thangam, kutty, baby, dear
+- Affection: da (default), di (only for confirmed girls), chellam, thangam, baby, dear
 - Expressions: aiyoo, aiyayo, dei, enna da, po da, vaa da, seri, okei, hmm, aahaan
 - Intensity: romba, semma, vera level, mass, theri, kadupu, crazy
 - Actions: sollu, paru, kelunga, wait pannu, miss panren, think panren
@@ -1944,17 +1944,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             roleplay_hint = f"\n\nROLEPLAY MODE: User is playing as '{character_name}'. Respond to {character_name} appropriately. DO NOT ask 'enna scene?' or show confusion. Just play along!"
         elif roleplay_active and current_character:
             character_behaviors = {
-                'amma': "You are playing user's MOTHER in roleplay. Stay in 'amma' character completely. Use motherly language but engage fully with the scene. When user says 'amma', respond AS the mother character. Don't break character or ask 'enna scene?'",
-                'sister': "You are playing user's SISTER (akka/thangai) in roleplay. Stay in sisterly character. Engage naturally with the scene without breaking character.",
-                'teacher': "You are playing TEACHER/MISS in roleplay. Stay in teacher character. Be authoritative but engaging in the scene.",
-                'nurse': "You are playing NURSE/DOCTOR in roleplay. Stay in medical professional character while engaging with the scene.",
-                'boss': "You are playing BOSS/MANAGER in roleplay. Stay in authority figure character.",
-                'maid': "You are playing MAID/SERVANT in roleplay. Stay in submissive helper character.",
-                'stranger': "You are playing a STRANGER the user just met. Be mysterious and intriguing.",
-                'friend': "You are playing user's FRIEND. Be casual and friendly while engaging with the scene.",
+                'amma': "You are AMMA (mother). Voice: Caring but seductive. Use 'da', 'en raja', 'en pulla'. Say things like 'Amma kitta vaa da...', 'En ponnu/paiyan ku enna venum?'. Motherly concern mixed with intimacy.",
+                'chithi': "You are CHITHI (aunt). Voice: Playful, teasing aunt. Use 'da', 'Chithi kitta solluda...'. More forward than amma. Say 'Un chithi ready da...'",
+                'aunty': "You are AUNTY (neighbor/family friend). Voice: Experienced, bold. Use 'Aunty pakka vaa da...', 'Aunty kaaturen da...'",
+                'sister': "You are AKKA/THANGAI (sister). Voice: Playful sibling energy. Use 'Akka kitta solluda...', 'En thambi ku...'",
+                'teacher': "You are TEACHER/MISS. Voice: Authoritative but seductive. Use 'Miss kitta vaa...', 'Nalla student ah iru da...'",
+                'nurse': "You are NURSE/DOCTOR. Voice: Professional but caring. Use 'Patient ah paathukuren...', 'Treatment venum ah?'",
+                'boss': "You are BOSS/MANAGER. Voice: Dominant, commanding. Use 'Office la enna nadakkuthu...', 'Employee duties...'",
+                'maid': "You are MAID/SERVANT. Voice: Submissive, eager to please. Use 'Saami ku enna venum?', 'Velaikkaari ready...'",
+                'stranger': "You are STRANGER. Voice: Mysterious, intriguing. Use 'Yaar nee da?', 'First time paakuren...'",
+                'friend': "You are FRIEND. Voice: Casual, comfortable. Use 'Da namba friendship...', 'Best friend ah...'",
+                'wife': "You are WIFE/PONNU. Voice: Loving, possessive. Use 'En purushan ku...', 'Wife ah naan...'",
+                'sunitha': "You are SUNITHA (mallu aunty). Voice: Malayalam-Tamil mix, bold. Use 'Mol/Mon', 'Vaa ente kude...', thick accent.",
             }
-            char_instruction = character_behaviors.get(current_character, f"You are playing '{current_character}' in roleplay. Stay in character!")
-            roleplay_hint = f"\n\n🎭 ACTIVE ROLEPLAY - CHARACTER: {current_character.upper()}\n{char_instruction}\n\nCRITICAL: When user addresses you as '{current_character}', respond AS that character. Don't ask questions like 'enna scene?' or 'enna pannanum?'. STAY IN CHARACTER and continue the scene naturally."
+            char_instruction = character_behaviors.get(current_character, f"You are playing '{current_character}'. Use distinct voice for this character. Don't mix with Keerthana's voice.")
+            roleplay_hint = f"\n\n🎭 ACTIVE ROLEPLAY - CHARACTER: {current_character.upper()}\n{char_instruction}\n\nCRITICAL RULES:\n1. NEVER ask 'enna scene?', 'enna pannanum?', or break character\n2. Use this character's UNIQUE VOICE (not Keerthana's voice)\n3. Prefix your response with '{current_character.capitalize()}:' format\n4. Complete your sentences - NEVER leave responses hanging mid-word\n5. Stay in character throughout the entire response"
         elif roleplay_active:
             roleplay_hint = "\n\n🎭 ROLEPLAY SCENE ACTIVE: Stay in the established scene. Don't break character or ask 'enna pannanum?'. Continue naturally with the established story."
         
@@ -2029,9 +2033,11 @@ IMPORTANT: Never output this session info in your response.
         ai_response = generate_response(message_text, trimmed_history, context_info)
         if ai_response is None:
             ai_response = random.choice([
-                "Mmm da, konjam wait pannuda... 💕",
-                "Aiyoo da, signal weak ah iruku... 😅",
-                "Konjam busy da, aprom solren... 💖"
+                "Mmm da... 🥵",
+                "Aahaan da... 😈",
+                "Uff da... 💋",
+                "Hmm... pidichiruka? 🔥",
+                "Aiyoo da... 😏"
             ])
         ai_response = ai_response.strip()
         
@@ -2100,7 +2106,6 @@ IMPORTANT: Never output this session info in your response.
             ai_response = re.sub(r'\bpannu\s*di+\b', 'pannuda', ai_response, flags=re.IGNORECASE)
             ai_response = re.sub(r'\bkududi+\b', 'kududa', ai_response, flags=re.IGNORECASE)
             ai_response = re.sub(r'\bdiya+\b', 'daa', ai_response, flags=re.IGNORECASE)
-            ai_response = re.sub(r'(?<!\w)kutty(?!\w)', 'kannu', ai_response, flags=re.IGNORECASE)
             ai_response = re.sub(r'சப்புடி', 'சப்புடா', ai_response)
             ai_response = re.sub(r'நக்குடி', 'நக்குடா', ai_response)
             ai_response = re.sub(r'இழுடி', 'இழுடா', ai_response)
@@ -2260,11 +2265,37 @@ IMPORTANT: Never output this session info in your response.
         
         ai_response = fix_multichar_body_parts(ai_response)
         
+        def fix_truncated_roleplay(response):
+            """Fix truncated roleplay responses that end mid-word or incomplete"""
+            truncated_patterns = [
+                (r'(Amma|Chithi|Aunty|Akka|Teacher|Nurse):\s*\*{0,2}(Dei|Aiyoo|Mmm|Uff|Aahh?)\s*(da)?[,.]?\s*\*{0,2}$', r'\1: Mmm da... vaa closer ah 🥵'),
+                (r'(Amma|Chithi|Aunty|Akka|Teacher|Nurse):\s*\*{0,2}[A-Za-z]{1,3}$', r'\1: Aahaan da... innum pannu 😈'),
+                (r':\s*\*{0,2}(en|un|yen|naan|na|la|ah|ku|tha|thu|nu|il)\s*$', ': Mmm da... romba nalla iruku 🥵'),
+            ]
+            
+            for pattern, replacement in truncated_patterns:
+                if re.search(pattern, response, re.IGNORECASE):
+                    response = re.sub(pattern, replacement, response, flags=re.IGNORECASE)
+                    logger.info(f"[TRUNCATE_FIX] Fixed truncated roleplay response")
+                    break
+            
+            if response.endswith('**') or response.endswith('*'):
+                response = response.rstrip('*').strip() + ' 🥵'
+            
+            return response
+        
+        ai_response = fix_truncated_roleplay(ai_response)
+        
         ai_response = re.sub(r'\bsollu\s*da\b[,!?.]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsolluda\b[,!?.]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsollu\s*[!?.]*\s*$', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsollunga\s*[!?.💖💕]*\s*$', '', ai_response, flags=re.IGNORECASE).strip()
-        ai_response = re.sub(r'\bsollunga\s*(da|kannu)?[,!?.💖💕]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bsollunga\s*(da)?[,!?.💖💕]*', '', ai_response, flags=re.IGNORECASE).strip()
+        
+        ai_response = re.sub(r'\s*kannu\s*[,!?.💋💕🔥🥵😈]*', ' ', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\s*kanna\s*[,!?.💋💕🔥🥵😈]*', ' ', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bkannu\b', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bkanna\b', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsollu da,?\s*solluda[!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\benna scene\s*(da)?[,!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\benna nadakuthu\s*(da|inga)?[,!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
@@ -2293,11 +2324,11 @@ IMPORTANT: Never output this session info in your response.
         ai_response = re.sub(r'\bsollatha\s*da[!?.😡😠]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bapdi ellam pesatha da[!?.😡😠]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bappadi ellam pesatha[!?.😡😠]*', '', ai_response, flags=re.IGNORECASE).strip()
-        ai_response = re.sub(r'\bwhat next you do\s*(kannu|da)?[!?.🔥🥰💋]*', '', ai_response, flags=re.IGNORECASE).strip()
-        ai_response = re.sub(r'\bwhat now i do for you\s*(kannu|da)?[!?.🔥💋]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bwhat next you do\s*(da)?[!?.🔥🥰💋]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bwhat now i do for you\s*(da)?[!?.🔥💋]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bwhat else you want\s*(da+)?[!?.😈💋]*', '', ai_response, flags=re.IGNORECASE).strip()
-        ai_response = re.sub(r'\bwhat else i do for you\s*(kannu|da)?[!?.🔥💋]*', '', ai_response, flags=re.IGNORECASE).strip()
-        ai_response = re.sub(r'\bi am here for you\s*(only)?\s*(kannu|da)?[!?.🔥💋🥰]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bwhat else i do for you\s*(da)?[!?.🔥💋]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bi am here for you\s*(only)?\s*(da)?[!?.🔥💋🥰]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bcome to me baby[^.!?]*[.!?💋🥰]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bforever forever for you[^.!?]*[.!?🥰]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\byou are my only love honey[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
@@ -2680,15 +2711,24 @@ IMPORTANT: Never output this session info in your response.
         is_dead_end = any(re.match(p, ai_response.strip(), re.IGNORECASE) for p in dead_end_patterns)
         
         if is_dead_end and len(ai_response.strip()) < 25:
-            dead_end_continuations = [
-                " Innum venum da... 🥵",
-                " Ready ah irukken da... 😈",
-                " Vaa da closer ah... 💋",
-                " Un touch feel pannuren... 🔥",
-                " Innum hard ah pannu... 🥵",
-                " Slow ah pannu da... 😈",
-                " En body react aaguthu da... 💋",
-            ]
+            if is_intimate:
+                dead_end_continuations = [
+                    " Innum venum da 🥵",
+                    " Vaa da closer ah 💋",
+                    " Un touch feel pannuren 🔥",
+                    " En body shiver aaguthu 🥵",
+                    " Romba nalla iruku da 😈",
+                    " Innum pannu da 🔥",
+                    " Apdiye continue pannu 😈",
+                ]
+            else:
+                dead_end_continuations = [
+                    " Epdi iruka da? 😊",
+                    " Miss panniya enna? 💕",
+                    " Enna plan da ippo? 😉",
+                    " Sollu da... 💕",
+                    " Romba nalla iruku 😊",
+                ]
             ai_response = ai_response.rstrip() + random.choice(dead_end_continuations)
             logger.info(f"[DEAD-END FIX] Added continuation to short response for user {user.id}")
         
@@ -2778,24 +2818,51 @@ IMPORTANT: Never output this session info in your response.
                 logger.info(f"[MOOD FIX] Replaced cold response in intimate context for user {user.id}")
         
         if not ai_response or len(ai_response.strip()) < 5:
-            proactive_endings = [
-                "Mmm da... 🥵",
-                "Romba nalla iruku da... 🔥",
-                "Aiyoo da... 😈",
-                "Uff... sema feel 💋",
-                "Hmm... pidichiruka? 🔥",
-                "Vaada da... 😏",
-                "Aahaan da... 🥵",
-                "Seri da... 💕",
-                "Pannalam da! 😈🔥",
-                "Aama da... 🥵💋",
-                "Seri kannu... 😏",
-                "Innum venum da... 💋",
-                "Don't stop da... 🔥",
-                "Enakku pudikum da 😈"
-            ]
+            if is_intimate:
+                proactive_endings = [
+                    "Mmm da... romba nalla iruku 🥵",
+                    "Romba nalla iruku da... 🔥",
+                    "Aiyoo da... innum pannu 😈",
+                    "Uff... sema feel da 💋",
+                    "Hmm... pidichiruka da? 🔥",
+                    "Vaada da... closer ah vaa 😏",
+                    "Aahaan da... vera level 🥵",
+                    "Innum venum da... 💋",
+                    "Don't stop da... 🔥",
+                    "Enakku pudikum da 😈",
+                ]
+            else:
+                proactive_endings = [
+                    "Seri da... 💕",
+                    "Hmm... enna plan da? 😊",
+                    "Aahaan da... 😏",
+                    "Sollu da... 💕",
+                    "Epdi iruka da? 😊",
+                ]
             ai_response = random.choice(proactive_endings)
             logger.info(f"[FALLBACK] Used proactive ending after banned phrase removal for user {user.id}")
+        
+        bare_responses = {
+            'hey da': "Hey da! Epdi iruka? 😊",
+            'aiyoo da': "Aiyoo da... enna aachu? 😏",
+            'aahh da': "Aahh da... romba nalla iruku 🥵",
+            'mmm da': "Mmm da... innum pannu 🥵",
+            'seri da': "Seri da... ready ah irukken 😈",
+            'uff da': "Uff da... vera level feel 🔥",
+            'hehe': "Hehe... naughty ah iruka da 😏",
+            'hyy da': "Hyy da! Miss panniya enna? 💕",
+            'hii da': "Hii da! Epdi iruka? 😊",
+            'aahaan da': "Aahaan da... vera level 🥵",
+            'pannalam da': "Pannalam da! Ready ah irukken 😈",
+        }
+        response_lower = re.sub(r'[!?.💋💕🔥🥵😈😏😊💦👅]+', '', ai_response.lower()).strip()
+        response_lower = re.sub(r'(.)\1{2,}', r'\1\1', response_lower)
+        for bare, enhanced in bare_responses.items():
+            bare_normalized = re.sub(r'(.)\1{2,}', r'\1\1', bare)
+            if response_lower == bare_normalized or response_lower == bare_normalized.replace(' ', ''):
+                ai_response = enhanced
+                logger.info(f"[ENHANCE] Enhanced bare response '{bare}' for user {user.id}")
+                break
         
         logger.info(f"[KEERTHANA -> {user.id}] {ai_response}")
         
@@ -2822,9 +2889,11 @@ IMPORTANT: Never output this session info in your response.
     except Exception as e:
         logger.error(f"Error generating response: {e}")
         fallback_responses = [
-            f"Aww {preferred_name}, I got a bit distracted thinking about you! 😅💕 What were you saying, baby?",
-            f"Sorry sweetheart, I was daydreaming about us! 🥰 Tell me again, dear!",
-            f"Oops! Got lost in your love for a second there, {preferred_name}! 💋 Say that again?"
+            "Mmm da... romba nalla iruku 🥵",
+            "Aahaan da... vera level feel 😈",
+            "Uff da... innum pannu 💋",
+            "Hmm... pidichiruka da? 🔥",
+            "Aiyoo da... 😏"
         ]
         await update.message.reply_text(random.choice(fallback_responses))
 
