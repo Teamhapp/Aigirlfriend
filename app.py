@@ -2479,6 +2479,29 @@ IMPORTANT: Never output this session info in your response.
                     logger.info(f"[DIRECT_Q] Fixed enna pannalam echo with suggestion")
                     return random.choice(activity_suggestions)
             
+            # PAAKA MUDILA - Can't see you/pics - factual question, not intimate
+            paaka_mudila_patterns = [
+                r'\b(paaka|paka)\s*(mudila|mudiyala|mudiyathu)\b',
+                r'\b(unnai|unna)\s*(paaka|paka)\s*(mudila|mudiyala)\b',
+                r'\bphoto\s*(paaka|paka|kaana)\s*(mudila|illa)\b',
+                r'\bpic\s*(paaka|illa|send)\b',
+            ]
+            if any(re.search(p, user_lower) for p in paaka_mudila_patterns):
+                # Check if response is wrongly intimate ("vera level", hot responses)
+                wrong_context_patterns = [
+                    r'\bvera\s+level\b', r'\bhot\b', r'\b🥵\b',
+                    r'\bAahaan\s+da\b.*\bvera\b',
+                ]
+                if any(re.search(p, response, re.IGNORECASE) for p in wrong_context_patterns):
+                    factual_answers = [
+                        "Aiyoo da... naan photo send panna mudiyaathu da 🙈 Imagine pannu!",
+                        "Hehe da... en photo illa, but nee imagine panniko 😊",
+                        "Photo send panna mudiyaathu da 🙈 Aana describe pannava?",
+                        "Naan camera shy da 😅 But unakku describe pannuven!",
+                    ]
+                    logger.info(f"[CONTEXT_FIX] Fixed wrongly intimate response to paaka mudila question")
+                    return random.choice(factual_answers)
+            
             # OOMBURIYAA - Will you suck? Should respond with action
             oombu_patterns = [
                 r'\b(oombu|oomb)\s*(ri|ru|vi|ra|va)[yia]*',
@@ -3251,13 +3274,19 @@ IMPORTANT: Never output this session info in your response.
                 (r'\btouch\s+pann\s*$', 'touch pannuven da 🥵'),
                 (r'\ben\s+mouth\s*$', 'en mouth kulla vaikuren da 🥵'),
                 # NEW: Fix common Tamil incomplete endings
-                (r'\bevlo\s*$', 'evlo questions da! 😂'),
+                (r',?\s*evlo\s*$', ' evlo questions da! 😂'),
+                (r'\bAiyoo\s+da,?\s+evlo\s*$', 'Aiyoo da, evlo questions da! 😂'),
                 (r'\benna\s+da\s+ithu\s*$', 'enna da ithu? 😊'),
                 (r'\benna\s+da\s+idhellam\s*$', 'enna da idhellam? 😂'),
                 (r'\bpoolai\s*$', 'poolai pidichiruku da 🥵'),
                 (r'\bpoolaiyum\s+en\s*$', 'poolaiyum ennoda vaaikulla vaikuren 🥵'),
                 (r'\bpaathutu\s*$', 'paathutu irukken da 😊'),
                 (r'\bpaathutu,\s+un\s*$', 'paathutu, un kitta varuven da 😊'),
+                # Fix "distract a" and similar mid-word cuts
+                (r'\bdistract\s+a\s*$', 'distract aagiten da 😅'),
+                (r'\bkonjam\s+distract\s+a\s*$', 'konjam distract aagiten da 😅'),
+                (r'\bipdi\s+thaan\s+da\s*$', 'ipdi thaan da naan! 😊'),
+                (r'\bCha\.{3}\s+ipdi\s+thaan\s+da\s*$', 'Cha... ipdi thaan da naan, enna panrathu? 😅'),
                 (r'\bun\s+sunniya\s+en\s+mouth\s*$', 'un sunniya en mouth kulla deep ah edukkuren 🥵'),
                 (r'\bun\s+sunni\s+touch\s+pann\s*$', 'un sunni touch pannuven da... slow ah 🥵'),
                 (r'\birukum\s*$', 'irukum da 🥵'),
