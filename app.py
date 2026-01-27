@@ -2610,6 +2610,49 @@ IMPORTANT: Never output this session info in your response.
         
         ai_response = handle_roleplay_initiation(ai_response, message_text)
         
+        # ===== MULTI-CHARACTER ROLEPLAY HANDLER =====
+        def handle_multichar_roleplay(response, user_msg, history):
+            """Detect multi-character/threesome roleplay setup and ensure proper scene setup"""
+            user_lower = user_msg.lower().strip()
+            
+            # Detect threesome/multi-character setup patterns - explicit only
+            multichar_patterns = [
+                r'threesome\s*(pannalam|roleplay|scene|panrom)',
+                r'moonu\s*per(um)?\s*(threesome|sex|pannalam|roleplay|panrom)',
+                r'moonu\s*perum\s*(threesome|pannrom|pannalam)',
+            ]
+            
+            is_multichar_request = any(re.search(p, user_lower) for p in multichar_patterns)
+            
+            if is_multichar_request:
+                # Only fix if response has NO character dialogue (doesn't have "Character:" format)
+                has_character_dialogue = re.search(r'(amma|akka|chithi|priya|lakshmi)\s*:', response.lower())
+                
+                # Check if response is vague (no scene setup, just generic)
+                vague_patterns = [
+                    r'^(hmm|mmm|aahaan)\s*(da|di)?\.{0,3}\s*(pidichiruka|like|good)\s*[?🔥🥵]*\s*$',
+                    r'^(seri|ok|okie)\s*(da|di)?\.{0,3}\s*[🔥🥵😈]*\s*$',
+                ]
+                
+                is_vague = any(re.match(p, response.lower().strip(), re.IGNORECASE) for p in vague_patterns)
+                
+                if is_vague and not has_character_dialogue:
+                    logger.info(f"[MULTICHAR] Vague response for threesome setup, replacing with scene")
+                    
+                    # Detect which character was mentioned - use proper multi-char format
+                    if re.search(r'\b(amma|mom)\b', user_lower):
+                        return "Keerthana: Mmm da... naan un kitta close ah irukken 😈\nAmma Lakshmi: Enna da kanna, enna nadakuthu inga? Vaa closer ah...\nKeerthana: Amma kooda serthu da... un body touch pannurom 🔥"
+                    elif re.search(r'\b(akka|sister)\b', user_lower):
+                        return "Keerthana: Seri da... naan un pakkathula 😈\nAkka Priya: Enna da neenga rendum? Vaa da, naan kooda iruken...\nKeerthana: Akka un mela climb aaguranga da... naan un lips la kiss 🔥"
+                    elif re.search(r'\b(friend|girlfriend)\b', user_lower):
+                        return "Keerthana: Mmm da... naan un lap la 😈\nFriend Priya: Oho, intha scene ah? Naan kooda join panren...\nKeerthana: Priya un shirt remove pannuranga, naan kiss pannuren 🔥"
+                    else:
+                        return "Keerthana: Threesome ah da? Yaar kooda venum? En Amma, Akka, friend - sollu, scene start pannidurom 😈🔥"
+            
+            return response
+        
+        ai_response = handle_multichar_roleplay(ai_response, message_text, chat_history)
+        
         # ===== ANTI-REPETITION FILTER =====
         def prevent_repetition(response, history):
             """Prevent bot from repeating same phrases in consecutive messages"""
