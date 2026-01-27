@@ -2613,6 +2613,125 @@ IMPORTANT: Never output this session info in your response.
         
         ai_response = prevent_repetition(ai_response, chat_history)
         
+        # ===== ACTION REQUEST HANDLER =====
+        def handle_action_request(response, user_msg):
+            """When user asks for intimate actions, ensure bot describes action, not just feelings"""
+            user_lower = user_msg.lower().strip()
+            
+            # Detect action commands
+            action_patterns = {
+                'sappu': [
+                    r'\b(sappu|sappuru|sappuren|oombu|oomburu|oomburen)\b',
+                    r'\b(kunji|sunni)\s*(sappu|oombu)\b',
+                ],
+                'kiss': [
+                    r'\b(kiss|kiss kodu|kiss pannu|mutha kodu)\b',
+                ],
+                'touch': [
+                    r'\b(touch|touch pannu|thodra|thodu)\b',
+                    r'\b(mula|mulai|boobs?)\s*(kodu|touch|thodu)\b',
+                ],
+                'lick': [
+                    r'\b(nakku|nakkuru|nakkuren|lick)\b',
+                ],
+                'suck_me': [
+                    r'\b(ennoda|en)\s*(kunji|sunni)\s*(sappu|oombu)\b',
+                    r'\bsappu\s*(da|di)?\s*$',
+                ],
+            }
+            
+            detected_action = None
+            for action, patterns in action_patterns.items():
+                if any(re.search(p, user_lower) for p in patterns):
+                    detected_action = action
+                    break
+            
+            if detected_action:
+                # Check if response is just a feeling/generic, not describing action
+                feeling_only_patterns = [
+                    r'^(mmm|aahaan|aahh?|uff)\s*(da)?[.!?]*\s*[🥵🔥😈💋]*\s*(en\s*body|feel|shiver|vera\s*level)',
+                    r'^[🥵🔥😈💋]*\s*(vera\s*level|ennoda\s*feel)',
+                    r'^(mmm|aahaan)\s*(da)?[.!?🥵🔥😈💋]*\s*(romba\s*nalla)',
+                    r'en\s*body\s*shiver',
+                    r'un\s*touch\s*(ku\s*da|amazing|feel)',
+                    # Additional generic evasions
+                    r'^(mmm|aahaan|aahh?|uff|hmm)\s*(da)?[.!?,\s🥵🔥😈💋]*$',
+                    r'miss\s*panniya\s*enna',
+                    r'enna\s*plan\s*da',
+                    r'^(romba|super)\s*nalla\s*(iruku|irruku)',
+                    r'enakku\s*pudikum',
+                    r'innum\s*(pannu|pannuda|hard)',
+                ]
+                is_feeling_only = any(re.search(p, response.lower().strip()) for p in feeling_only_patterns)
+                
+                if is_feeling_only:
+                    logger.info(f"[ACTION FIX] User requested '{detected_action}' but got feeling-only response, replacing")
+                    action_responses = {
+                        'sappu': [
+                            "Mmm da... en lips un kunji mela touch pannuren, slow ah sappuren 🥵💋",
+                            "Aahh... slow ah sappuren da, un taste amazing da 💋",
+                            "Mmm... tongue use pannuren da, innum deep ah eduthukuren 🥵💦",
+                            "Sappuren da... aahh un kunji en vaila iruku 🥵💋",
+                        ],
+                        'kiss': [
+                            "Mmm da... en lips un lips mela press pannuren, soft kiss 💋",
+                            "Slow kiss koduren da, un lips romba soft ah iruku 💋",
+                            "Aahaan... deep kiss pannuren da, en tongue un vaila 💋🔥",
+                        ],
+                        'touch': [
+                            "Mmm... un kai en mela feel pannuren da, touch pannu innum 🥵",
+                            "Soft ah touch pannuren da, un skin smooth ah iruku 💋",
+                            "Aahh... en fingers un body mela move pannuren 🔥",
+                        ],
+                        'lick': [
+                            "Mmm... slow ah nakkuren da, un taste amazing 🥵💦",
+                            "Tongue use pannuren da, aahh enna feel 💋🔥",
+                            "Nakki nakki pannuren da, innum venum 🥵💦",
+                        ],
+                        'suck_me': [
+                            "Seri da... un kunji en vaila eduthukuren, sappuren 🥵💋",
+                            "Mmm... slow ah sappuren da, aahh un taste 🥵💦",
+                            "Lips touch pannuren, ippo sappuren da 💋🥵",
+                            "Vaa da... kneel pannitu un kunji sappuren 🥵💋",
+                        ],
+                    }
+                    return random.choice(action_responses.get(detected_action, [response]))
+            
+            return response
+        
+        ai_response = handle_action_request(ai_response, message_text)
+        
+        # ===== GENERIC PHRASE REPLACEMENT =====
+        def replace_generic_phrases(response):
+            """Replace overused generic phrases with varied alternatives"""
+            replacements = [
+                # vera level variations
+                (r'\bvera level\s*(feel|da|🥵|🔥)*', [
+                    'amazing feel da', 'ufff da', 'un touch ku shiver aaguthu', 
+                    'control ae poguthu da', 'innum venum da'
+                ]),
+                # romba nalla variations
+                (r'\bromba nalla\s*(iruku|irruku|irukku)?\s*(da)?', [
+                    'super ah iruku', 'amazing da', 'enna feel da ippo', 
+                    'innum pannuda', 'apdiye continue pannu'
+                ]),
+                # body shiver variations
+                (r'\ben\s*body\s*shiver\s*(aaguthu|aagudu)?', [
+                    'en body react aaguthu', 'goosebumps varuthu', 
+                    'un touch ku melt aaguven', 'control illa da enakku'
+                ]),
+            ]
+            
+            for pattern, alternatives in replacements:
+                if re.search(pattern, response.lower()):
+                    replacement = random.choice(alternatives)
+                    response = re.sub(pattern, replacement, response, count=1, flags=re.IGNORECASE)
+                    break
+            
+            return response
+        
+        ai_response = replace_generic_phrases(ai_response)
+        
         def fix_unanswered_question(response, user_msg):
             """Detect if user asked for ideas/suggestions but bot gave generic intimate reaction"""
             idea_patterns = [
