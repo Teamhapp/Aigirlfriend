@@ -2314,11 +2314,26 @@ IMPORTANT: Never output this session info in your response.
                             truncated = truncated.rstrip() + ' ' + trailing_emojis[-1]
                     
                     # CRITICAL: Check if we cut mid-word (incomplete Tamil/Tanglish word)
-                    # If last word is very short single char, remove it
+                    # Expanded list includes all known incomplete fragments
                     truncated_words = truncated.split()
-                    single_char_fragments = ['p', 'k', 'm', 'n']
-                    if truncated_words and truncated_words[-1].lower().rstrip('.,!?') in single_char_fragments:
-                        truncated = ' '.join(truncated_words[:-1]) + '...'
+                    incomplete_fragments = [
+                        'p', 'k', 'm', 'n', 'a', 't', 'r',  # single chars
+                        'rom', 'ad', 'ir', 'pur', 'mul', 'sun', 'pun',  # common Tamil incomplete
+                        'pidicha', 'paathutu', 'iruk', 'iruka', 'pannuv',  # mid-word cuts
+                        'venum', 'thaan', 'mattum', 'pakkath',  # trailing incomplete
+                        'nalla', 'romba', 'konjam', 'innum',  # adverbs cut
+                    ]
+                    if truncated_words:
+                        last_word = truncated_words[-1].lower().rstrip('.,!?…')
+                        if last_word in incomplete_fragments or len(last_word) <= 2:
+                            # Remove the incomplete last word and add ellipsis
+                            truncated = ' '.join(truncated_words[:-1])
+                            # If still ends with incomplete, remove one more
+                            if truncated.split():
+                                second_last = truncated.split()[-1].lower().rstrip('.,!?…')
+                                if second_last in incomplete_fragments:
+                                    truncated = ' '.join(truncated.split()[:-1])
+                            truncated = truncated.rstrip() + '...'
                     
                     ai_response = truncated.strip()
                     logger.info(f"[LENGTH FIX] Word-capped long response for user {user.id}")
