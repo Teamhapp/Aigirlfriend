@@ -1250,7 +1250,19 @@ def generate_response(prompt, history=None, context_info=None):
         return response.text
     except Exception as e:
         logger.error(f"Gemini API error: {e}")
-        return "Aiyoo da... konjam wait pannu 🥺 Naan yosichitu solren 💕"
+        # Varied fallback messages for rate limits - pick random one
+        import random
+        rate_limit_fallbacks = [
+            "Aiyoo da... konjam busy 😅 2 sec da!",
+            "Mmm wait da... naan think pannuren 🤔",
+            "Dei... konjam slow ah type panren 😊",
+            "Aah da... signal issue 📶 Try again!",
+            "Oho... konjam overload 😵 One sec!",
+            "Hehe wait pannuda... naan varren 💕",
+            "Dei hold on da 😏",
+            "Shh... yosikkuren da 🤫",
+        ]
+        return random.choice(rate_limit_fallbacks)
 
 def markdown_to_html(text):
     text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
