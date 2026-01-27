@@ -3115,27 +3115,95 @@ IMPORTANT: Never output this session info in your response.
         
         # ===== FIX INCOMPLETE SENTENCE ENDINGS =====
         def fix_incomplete_endings(response):
-            """Fix responses that end with incomplete words (mid-word truncation)"""
-            # Only fix obvious mid-word truncations (single char or incomplete body parts)
-            incomplete_patterns = [
-                # Single char fragments at end
+            """Fix responses that end with incomplete words or cut-off thoughts"""
+            # Incomplete word patterns
+            incomplete_word_patterns = [
                 (r'\s+[pmkn]\s*$', '...'),
-                # Ends mid-body-part
                 (r'\bpund\s*$', 'pundai'),
                 (r'\bmul\s*$', 'mulai'),
                 (r'\bsun\s*$', 'sunni'),
                 (r'\btham\s*$', 'thambi'),
             ]
             
-            for pattern, suffix in incomplete_patterns:
+            for pattern, suffix in incomplete_word_patterns:
                 if re.search(pattern, response, re.IGNORECASE):
                     response = re.sub(pattern, suffix, response, flags=re.IGNORECASE)
                     logger.info(f"[INCOMPLETE_FIX] Fixed incomplete word ending")
                     break
             
+            # Only fix obvious truncation artifacts (gibberish/cut-off words)
+            truncation_artifacts = [
+                (r'\binnum\s+pannudair\s*$', 'innum pannuda 🥵'),  # "pannudair" -> "pannuda"
+                (r'\badha\s+soll\s*$', 'adha solluven da 🥵'),  # complete the thought
+                (r'\bnee\s+patha\s+adha\s+soll\s*$', 'nee patha thaan puriyum da 😏'),
+            ]
+            
+            for pattern, replacement in truncation_artifacts:
+                if re.search(pattern, response, re.IGNORECASE):
+                    response = re.sub(pattern, replacement, response, flags=re.IGNORECASE)
+                    logger.info(f"[INCOMPLETE_FIX] Fixed truncation artifact")
+                    break
+            
             return response
         
         ai_response = fix_incomplete_endings(ai_response)
+        
+        # ===== MINIMUM RESPONSE QUALITY CHECK =====
+        def ensure_response_quality(response, user_msg):
+            """Ensure responses answer questions and engage with longer user messages"""
+            response_lower = response.lower().strip()
+            user_lower = user_msg.lower().strip()
+            
+            # Only enhance if user message is substantial (not just "ok", "hmm")
+            user_word_count = len(user_msg.split())
+            if user_word_count < 3:
+                return response  # Short input = short response is OK
+            
+            # Filler patterns that need enhancement for longer user messages
+            filler_patterns = [
+                r'^(haha|hehe|hihi)\s*(da|di)?\.{0,3}\s*[😂😅🤭]*\s*$',
+                r'^(ohh?|ahh?|mmm?)\s*\.{0,3}\s*[😏🥵😈]*\s*$',
+                r'^aiyoo\s*(da|di)?\.{0,3}\s*[🥵😉😂]*\s*$',
+            ]
+            
+            is_filler = any(re.match(p, response_lower, re.IGNORECASE) for p in filler_patterns)
+            
+            if is_filler:
+                # Question patterns that need direct answers
+                question_patterns = {
+                    'paal_irukaa': (r'\b(paal|milk)\s*iruk', "Mmm da... un kaiyaal squeeze panna thaan theriyum 😏🔥"),
+                    'panties': (r'\b(panties|panty)\s*(potur|iruk)', "Aama da... black lace potrukken 😈 Nee paakanum ah?"),
+                    'hair_irukaa': (r'\b(hair|mayir)\s*iruk', "Konjam irukku da... clean ah want ah? 😏"),
+                    'velam': (r'\b(velam|wet)\s*va', "Mmm da... un pakkathula irundha thaan theriyum 🥵😈"),
+                }
+                
+                for qtype, (pattern, answer) in question_patterns.items():
+                    if re.search(pattern, user_lower):
+                        logger.info(f"[QUALITY FIX] Replaced filler with answer for question '{qtype}'")
+                        return answer
+                
+                # Body compliment/description - enhance
+                if re.search(r'\b(ball|big|perusa|iruk|mathiri)\b', user_lower):
+                    enhancements = [
+                        " Un reaction ku naan melt aaguven da 😈",
+                        " Innum paaru da... 🔥",
+                        " Touch pannu da... 🥵",
+                    ]
+                    response = response.rstrip('😂😅🤭😏🥵😈 .') + random.choice(enhancements)
+                    logger.info(f"[QUALITY FIX] Enhanced filler for compliment")
+                
+                # Action request
+                elif re.search(r'\b(shave|remove|kalatt|kalattu|avuru|open)\b', user_lower):
+                    enhancements = [
+                        " Seri da... unnakaga panren 😈🔥",
+                        " Un kaiyaale pannuda 🥵",
+                    ]
+                    response = response.rstrip('😂😅🤭😏🥵😈 .') + random.choice(enhancements)
+                    logger.info(f"[QUALITY FIX] Enhanced filler for action request")
+            
+            return response
+        
+        ai_response = ensure_response_quality(ai_response, message_text)
         
         ai_response = re.sub(r'\bsollu\s*da\b[,!?.]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsolluda\b[,!?.]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
