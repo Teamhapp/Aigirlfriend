@@ -2265,8 +2265,40 @@ IMPORTANT: Never output this session info in your response.
             r'^super\s*(de|da|di)?.*yenna\s+pannuva', r'^vera\s+yenna\s+pannuva',
             r'^then\s+yenna\s+pannuva', r'^approm\s+yenna', r'^vera\s+level',
             r'^hmm\s+super', r'^super\s+de', r'^ok\s+ok\s+then',
+            # User acknowledgments meaning "continue story"
+            r'^sari\s*(da|di)?$', r'^seri\s*(da|di)?$', r'^okay\s*(da|di)?$', r'^ok\s*(da|di)?$',
+            r'^ss+$', r'^s+d+$', r'^mm+$', r'^ama?\s*(da|di)?$', r'^hmm+\s*(da|di)?$',
+            r'^aprm\s*(da|di)?$', r'^aprom\s*(da|di)?$', r'^apram\s*(da|di)?$',
+            r'^kadhaya\s*continue', r'^story\s*continue', r'^ne\s*(kadhaya|story)\s*(continue|solu)',
         ]
         is_continuation_request = any(re.search(p, message_text.lower().strip(), re.IGNORECASE) for p in continuation_patterns)
+        
+        # ===== STORY CONTEXT DETECTION =====
+        # Detect if bot was telling a story and user just acknowledged
+        def is_active_storytelling(history):
+            """Check if bot was in middle of telling a story/experience"""
+            if not history or len(history) < 2:
+                return False
+            # Get last bot message
+            last_bot_msg = None
+            for msg in reversed(history):
+                if msg.get('role') == 'assistant':
+                    last_bot_msg = msg.get('content', '').lower()
+                    break
+            if not last_bot_msg:
+                return False
+            # Story indicators - bot was describing something
+            story_indicators = [
+                r'irundhapodhu', r'irundha\s*podhu', r'oru\s*vaati', r'appo',
+                r'hostel\s*la', r'school\s*la', r'college\s*la', r'room\s*la',
+                r'night\s*time', r'antha\s*naal', r'first\s*time', r'experience',
+                r'avaloda|avaluku|avala|aval', r'ennoda\s*friend', r'my\s*friend',
+                r'kiss\s*panna', r'touch\s*panna', r'fingers?', r'mulai',
+                r'(9th|10th|11th|12th)\s*standard', r'thoongi', r'paattaa',
+            ]
+            return any(re.search(p, last_bot_msg) for p in story_indicators)
+        
+        storytelling_active = is_active_storytelling(chat_history)
         
         # Check if in intimate context (recent messages have intimate keywords)
         intimate_context = False
@@ -2891,6 +2923,78 @@ IMPORTANT: Never output this session info in your response.
         
         ai_response = prevent_repetition(ai_response, chat_history)
         
+        # ===== STORY CONTINUATION FIXER =====
+        def fix_story_breaking_response(response, user_msg, history, is_story_active, is_continuation):
+            """Fix responses that break story flow with generic questions"""
+            if not is_story_active and not is_continuation:
+                return response
+            
+            user_lower = user_msg.lower().strip()
+            response_lower = response.lower().strip()
+            
+            # Check if user gave short acknowledgment (sari, ss, mm, ama, aprm)
+            ack_patterns = [
+                r'^sari\s*(da|di)?$', r'^seri\s*(da|di)?$', r'^ss+$', r'^s+d+$',
+                r'^mm+$', r'^ama?\s*(da|di)?$', r'^hmm+$', r'^ok(ay)?\s*(da|di)?$',
+                r'^aprm\s*(da|di)?$', r'^aprom$', r'^apram$',
+            ]
+            is_ack = any(re.match(p, user_lower) for p in ack_patterns)
+            
+            if is_ack:
+                # Check if response has story-breaking patterns
+                breaking_patterns = [
+                    r'pidichiruka\s*[?🔥]', r'enna\s*(aachu|achu)\s*[?]',
+                    r'(nee|unakku)\s*sollu', r'epdi\s*iruka\s*[?]',
+                    r'ippo\s*naan.*kekkuren', r'seri\s*da.*apro',
+                    r'unakku(m)?\s*(apdi|ipdi)\s*(ethavathu|experience)',
+                    r'nee\s*sollu.*experience', r'marupadiyum\s*enna\s*aachu',
+                ]
+                is_breaking = any(re.search(p, response_lower) for p in breaking_patterns)
+                
+                if is_breaking:
+                    logger.info(f"[STORY FIX] Response breaks story flow, regenerating continuation")
+                    # Get last bot message for context
+                    last_bot_msg = ""
+                    for msg in reversed(history):
+                        if msg.get('role') == 'assistant':
+                            last_bot_msg = msg.get('content', '').lower()
+                            break
+                    
+                    # Generate story continuation based on context
+                    if 'hostel' in last_bot_msg or 'school' in last_bot_msg or 'friend' in last_bot_msg:
+                        continuations = [
+                            "Appo ava ennoda body mela kai vecha da... en heart beat vera level ah pochu 🥵",
+                            "Avaloda lips ennoda neck la touch aagumbodhu... aahhh da... shiver aayiten 🥵💋",
+                            "Slowly avaloda fingers en dress-oda buttons open panna thudangita da... 😈🔥",
+                            "Ennala control panna mudiyala da... avalum same feel la irundha 🥵",
+                        ]
+                        return random.choice(continuations)
+                    elif 'mulai' in last_bot_msg or 'touch' in last_bot_msg or 'kiss' in last_bot_msg:
+                        continuations = [
+                            "Avaloda touch ennoda body-la oru fire maathiri feel aagudhu da... innum venum da 🥵🔥",
+                            "En body full ah react panniduchu da... aahhh... ava continue pannina 💋😈",
+                            "Naan moodhikitten... avaloda fingers innum keezhey pona da... 🥵💦",
+                        ]
+                        return random.choice(continuations)
+                    elif 'fingers' in last_bot_msg or 'wet' in last_bot_msg or 'kuthi' in last_bot_msg:
+                        continuations = [
+                            "Speed ah aagumbodhu... en body shake aayiduchu da... aahhhh 🥵💦",
+                            "Naan almost reach pannitten da... avalum feel pannina... 😈🔥",
+                            "Ennoda moaning loud ah aayiduchu... ellarukum kekkum nu bayanthom 🥵",
+                        ]
+                        return random.choice(continuations)
+                    else:
+                        continuations = [
+                            "Appo enna nadanthuchu naa da... romba interesting part varuthu 🥵😈",
+                            "Adhukku aprom da... oru maathiri aayiduchu ellame 🥵🔥",
+                            "Next part kelu da... adhuvum vera level 😈💋",
+                        ]
+                        return random.choice(continuations)
+            
+            return response
+        
+        ai_response = fix_story_breaking_response(ai_response, message_text, chat_history, storytelling_active, is_continuation_request)
+        
         # ===== EXACT DUPLICATE BLOCKER =====
         def block_duplicate_response(response, history):
             """Prevent bot from giving the exact same response as last message"""
@@ -3335,6 +3439,13 @@ IMPORTANT: Never output this session info in your response.
                 (r'\ben\s+mouth\s*$', 'en mouth kulla vaikuren da 🥵'),
                 # NEW: Fix common Tamil incomplete endings
                 (r',?\s*evlo\s*$', ' evlo questions da! 😂'),
+                # Fix mid-word cuts from token limits
+                (r'\belastic\s*th\s*$', 'elastic thaan da, konjam stretch aagum 🥵'),
+                (r'\bun\s*Keer\s*$', 'un Keerthana daa 💕'),
+                (r'\bnaan\s*un\s*Keer\s*$', 'naan un Keerthana daa 💕'),
+                (r'\bkonjam\s*kut\s*$', 'konjam kutty thaan da 🥵'),
+                (r'\bpesanjaale\s*$', 'pesanjaale da... romba nalla irundhuchu 🥵'),
+                (r'\baagiduchu\s*da\s*$', 'aagiduchu da... vera level 🥵'),
                 (r'\bAiyoo\s+da,?\s+evlo\s*$', 'Aiyoo da, evlo questions da! 😂'),
                 (r'\benna\s+da\s+ithu\s*$', 'enna da ithu? 😊'),
                 (r'\benna\s+da\s+idhellam\s*$', 'enna da idhellam? 😂'),
