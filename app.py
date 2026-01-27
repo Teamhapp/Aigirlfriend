@@ -3200,6 +3200,10 @@ IMPORTANT: Never output this session info in your response.
                 (r'\bun\s+pai\s*$', 'un pakkathula iruken da 💕'),
                 (r'\bennathaan\s*$', 'ennathaan da? 😏'),
                 (r'\beppadi\s+pa\s*$', 'eppadi da? 😊'),
+                (r'\binnum\s+kek\s*$', 'innum kekka venum da 😏'),
+                (r'\binnum\s+ke\s*$', 'innum kekka venum da 😏'),
+                (r'\bun\s+sun\s*$', 'un sunni 🥵'),
+                (r'\ben\s+pun\s*$', 'en pundai 🥵'),
             ]
             
             for pattern, suffix in incomplete_word_patterns:
