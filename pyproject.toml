@@ -13,5 +13,4 @@ dependencies = [
     "python-telegram-bot>=22.5",
     "requests>=2.32.5",
     "sift-stack-py>=0.9.6",
-    "telegram>=0.0.1",
 ]

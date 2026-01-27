@@ -1059,7 +1059,6 @@ dependencies = [
     { name = "python-telegram-bot" },
     { name = "requests" },
     { name = "sift-stack-py" },
-    { name = "telegram" },
 ]
 
 [package.metadata]
@@ -1073,7 +1072,6 @@ requires-dist = [
     { name = "python-telegram-bot", specifier = ">=22.5" },
     { name = "requests", specifier = ">=2.32.5" },
     { name = "sift-stack-py", specifier = ">=0.9.6" },
-    { name = "telegram", specifier = ">=0.0.1" },
 ]
 
 [[package]]
@@ -1158,12 +1156,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/a2/87/a6771e1546d97e7e0
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e9/44/75a9c9421471a6c4805dbf2356f7c181a29c1879239abab1ea2cc8f38b40/sniffio-1.3.1-py3-none-any.whl", hash = "sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2", size = 10235, upload-time = "2024-02-25T23:20:01.196Z" },
 ]
-
-[[package]]
-name = "telegram"
-version = "0.0.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/9d/ca/8bdf2deb93b9f6971dabf2ddc827c2a98ce23e13582a15b37e9bc169f226/telegram-0.0.1.tar.gz", hash = "sha256:d405a0af4c868a8dbeae6d03e297e21c7ee6269e11e2ed3810e15544aba02591", size = 879, upload-time = "2015-09-29T07:32:18.348Z" }
 
 [[package]]
 name = "tenacity"
