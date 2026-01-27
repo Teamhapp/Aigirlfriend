@@ -3342,6 +3342,15 @@ IMPORTANT: Never output this session info in your response.
                 (r'\benna\s+ir\s*$', 'enna irukku da? 😊'),
                 (r'\b(ah|a)\s+ir\s*$', 'ah irukku da 💕'),
                 (r'\bir\s*$', 'irukken da 💕'),
+                # Fix "rom" incomplete - likely romba
+                (r'\bmulai\s+rom\s*$', 'mulai romba soft da 🥵'),
+                (r'\brom\s*$', 'romba nalla iruku da 🥵'),
+                # Fix "ad" incomplete - likely adapt/adjust/aagum
+                (r'\bkai\s+la\s+ad\s*$', 'kai la aagum da 🥵'),
+                (r'\bad\s*$', 'aagum da 💕'),
+                # Fix "pidicha" incomplete ending
+                (r'\bkai\s+la\s+pidicha\s*$', 'kai la pidicha romba soft ah irukum da 🥵'),
+                (r'\bpidicha\s*$', 'pidicha romba nalla irukum da 🥵'),
                 (r'\bpaathutu\s*$', 'paathutu irukken da 😊'),
                 (r'\bpaathutu,\s+un\s*$', 'paathutu, un kitta varuven da 😊'),
                 # Fix "distract a" and similar mid-word cuts
