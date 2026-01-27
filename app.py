@@ -2240,7 +2240,15 @@ IMPORTANT: Never output this session info in your response.
                 sentence_matches = re.findall(r'[^.!?।]+[.!?।]+', ai_response)
                 if sentence_matches and len(sentence_matches) > 1:
                     first_sentence = sentence_matches[0].strip()
-                    if len(first_sentence) >= 5:
+                    # Check if first sentence is incomplete (ends with common Tamil incomplete patterns)
+                    incomplete_endings = [
+                        r'\bevlo\s*[.!?।]*$', r'\bithu\s*[.!?।]*$', r'\bidhellam\s*[.!?।]*$',
+                        r'\benna\s+da\s*[.!?।]*$', r'\bun\s*[.!?।]*$', r'\ben\s*[.!?।]*$',
+                        r'\bpaathutu\s*[,]?\s*$', r'\bpoolaiyum\s*$',
+                    ]
+                    is_incomplete = any(re.search(p, first_sentence, re.IGNORECASE) for p in incomplete_endings)
+                    
+                    if len(first_sentence) >= 5 and not is_incomplete:
                         trailing_emojis = re.findall(r'[\U0001F300-\U0001F9FF]+\s*$', ai_response)
                         emoji_suffix = trailing_emojis[0].strip() if trailing_emojis else ''
                         if not re.search(r'[\U0001F300-\U0001F9FF]', first_sentence):
@@ -2249,6 +2257,9 @@ IMPORTANT: Never output this session info in your response.
                             ai_response = first_sentence
                         ai_response = ai_response.strip()
                         logger.info(f"[LENGTH FIX] Trimmed response for short input from user {user.id}")
+                    elif is_incomplete:
+                        # Don't trim - sentence is incomplete
+                        logger.info(f"[LENGTH FIX] Skipped trim - first sentence incomplete for user {user.id}")
                 else:
                     # Single long sentence or no punctuation - word cap at 12 words
                     truncated = ' '.join(words[:12])
@@ -3239,6 +3250,14 @@ IMPORTANT: Never output this session info in your response.
                 (r'\bun\s+kitta\s*$', 'un kitta iruken da 💕'),
                 (r'\btouch\s+pann\s*$', 'touch pannuven da 🥵'),
                 (r'\ben\s+mouth\s*$', 'en mouth kulla vaikuren da 🥵'),
+                # NEW: Fix common Tamil incomplete endings
+                (r'\bevlo\s*$', 'evlo questions da! 😂'),
+                (r'\benna\s+da\s+ithu\s*$', 'enna da ithu? 😊'),
+                (r'\benna\s+da\s+idhellam\s*$', 'enna da idhellam? 😂'),
+                (r'\bpoolai\s*$', 'poolai pidichiruku da 🥵'),
+                (r'\bpoolaiyum\s+en\s*$', 'poolaiyum ennoda vaaikulla vaikuren 🥵'),
+                (r'\bpaathutu\s*$', 'paathutu irukken da 😊'),
+                (r'\bpaathutu,\s+un\s*$', 'paathutu, un kitta varuven da 😊'),
                 (r'\bun\s+sunniya\s+en\s+mouth\s*$', 'un sunniya en mouth kulla deep ah edukkuren 🥵'),
                 (r'\bun\s+sunni\s+touch\s+pann\s*$', 'un sunni touch pannuven da... slow ah 🥵'),
                 (r'\birukum\s*$', 'irukum da 🥵'),
@@ -3422,6 +3441,21 @@ IMPORTANT: Never output this session info in your response.
         ]
         for pattern, replacement in asterisk_conversions:
             ai_response = re.sub(pattern, replacement, ai_response, flags=re.IGNORECASE).strip()
+        
+        # ===== FIX PARENTHESIS ACTION CUTS =====
+        # If response starts with ( and doesn't have closing ), it was cut
+        if ai_response.startswith('(') and ')' not in ai_response:
+            # Extract what action was being described and complete it
+            paren_fixes = [
+                (r'^\(WhatsApp message-a paathutu', 'WhatsApp message paathen da 😊'),
+                (r'^\(Un kitta nerathula vanthu', 'Un kitta vanthen da 💕'),
+                (r'^\([^)]{0,30}$', 'Hmm da... 😊'),  # Generic incomplete parenthesis
+            ]
+            for pattern, replacement in paren_fixes:
+                if re.match(pattern, ai_response, re.IGNORECASE):
+                    ai_response = replacement
+                    logger.info(f"[PAREN FIX] Fixed incomplete parenthesis action")
+                    break
         
         ai_response = re.sub(r'\bsollu\s*da\b[,!?.💕]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsolluda\b[,!?.💕]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
