@@ -1226,7 +1226,7 @@ def generate_response(prompt, history=None, context_info=None):
                 system_instruction=full_system_prompt,
                 temperature=0.95,
                 top_p=0.98,
-                max_output_tokens=800,
+                max_output_tokens=1200,
                 safety_settings=[
                     types.SafetySetting(
                         category='HARM_CATEGORY_HATE_SPEECH',
@@ -4306,6 +4306,62 @@ IMPORTANT: Never output this session info in your response.
                 ]
             ai_response = random.choice(proactive_endings)
             logger.info(f"[FALLBACK] Used proactive ending after banned phrase removal for user {user.id}")
+        
+        # ===== STORY-LISTENING MODE =====
+        # When user is telling their story, bot should REACT not ask "enna aachu/apparam enna aachu"
+        def fix_story_listening_questions(response, user_msg):
+            """Replace generic questions with reactions when user is telling their story"""
+            user_lower = user_msg.lower().strip()
+            response_lower = response.lower()
+            
+            # Check if user is telling a story (describing what happened)
+            story_telling_indicators = [
+                r'\b(paathen|paathanga|paathom)\b',  # saw
+                r'\b(sonnen|sonnanga|sonnanga)\b',  # said
+                r'\b(pannen|pannanga|panninom)\b',  # did
+                r'\b(ponen|ponanga|ponom)\b',  # went
+                r'\b(vanth[ae]n|vanthanga)\b',  # came
+                r'\b(irundh[ae]n|irundhanga)\b',  # was
+                r'\b(ketten|kettanga)\b',  # asked
+                r'\b(kuduth[ae]n|kuduthanga)\b',  # gave
+                r'\b(edutt[ae]n|eduthanga)\b',  # took
+                r'\b(touch\s*pann[ei]n|pidichu)\b',  # touched
+                r'\b(mulai|pundai|sunni|nipple)\b.*\b(irundh|paath)\b',  # intimate story
+            ]
+            user_telling_story = any(re.search(p, user_lower) for p in story_telling_indicators)
+            
+            if user_telling_story:
+                # Check for generic question responses that break story flow
+                question_patterns = [
+                    r'(apparam|aprom|aprm)\s*enna\s*aachu\s*[?🔥💋]*',
+                    r'enna\s*(da\s*)?(aachu|achu)\s*[?🔥]*',
+                    r'adhukku\s*enna\s*(panninaanga|aachu)\s*[?🔥]*',
+                    r'nee\s*enna\s*sonna\s*[?]*',
+                    r'avanga\s*enna\s*sonnanga\s*[?]*',
+                ]
+                
+                for pattern in question_patterns:
+                    if re.search(pattern, response_lower):
+                        # Replace with excited reaction
+                        reactions = [
+                            "Aiyoo da... 🥵 Innum sollu!",
+                            "Uff da... vera level! 🔥 Aprom?",
+                            "Mmm da... romba hot ah iruku! 🥵",
+                            "Aahaan da... 😈 Continue pannu!",
+                            "Sema da! 🔥 Innum kelu!",
+                            "Uff... enakku kooda feel aagudhu! 🥵",
+                        ]
+                        replacement = random.choice(reactions)
+                        logger.info(f"[STORY LISTEN] Replaced question with reaction for user {user.id}")
+                        return replacement
+            
+            return response
+        
+        ai_response = fix_story_listening_questions(ai_response, message_text)
+        
+        # ===== DOUBLE-SPACE CLEANUP =====
+        # Fix double/triple spaces left after phrase stripping
+        ai_response = re.sub(r'\s{2,}', ' ', ai_response).strip()
         
         bare_responses = {
             'hey da': "Hey da! Epdi iruka? 😊",
