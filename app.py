@@ -2264,6 +2264,14 @@ IMPORTANT: Never output this session info in your response.
                         trailing_emojis = re.findall(r'[\U0001F300-\U0001F9FF]+', ai_response)
                         if trailing_emojis:
                             truncated = truncated.rstrip() + ' ' + trailing_emojis[-1]
+                    
+                    # CRITICAL: Check if we cut mid-word (incomplete Tamil/Tanglish word)
+                    # If last word is very short single char, remove it
+                    truncated_words = truncated.split()
+                    single_char_fragments = ['p', 'k', 'm', 'n']
+                    if truncated_words and truncated_words[-1].lower().rstrip('.,!?') in single_char_fragments:
+                        truncated = ' '.join(truncated_words[:-1]) + '...'
+                    
                     ai_response = truncated.strip()
                     logger.info(f"[LENGTH FIX] Word-capped long response for user {user.id}")
         
@@ -2654,6 +2662,99 @@ IMPORTANT: Never output this session info in your response.
         
         ai_response = prevent_repetition(ai_response, chat_history)
         
+        # ===== EXACT DUPLICATE BLOCKER =====
+        def block_duplicate_response(response, history):
+            """Prevent bot from giving the exact same response as last message"""
+            if not history:
+                return response
+            
+            # Get last bot message
+            last_bot_msg = None
+            for msg in reversed(history):
+                if msg.get('role') == 'assistant':
+                    last_bot_msg = msg.get('content', '').strip().lower()
+                    break
+            
+            if last_bot_msg and response.strip().lower() == last_bot_msg:
+                logger.info(f"[DUPLICATE BLOCK] Blocked exact duplicate response for user {user.id}")
+                alternatives = [
+                    "Mmm da... innum sollu 😏",
+                    "Aahaan da... enna da? 😈",
+                    "Hmm... enna da ippo? 💕",
+                    "Seri da... apram? 😊",
+                    "Oho da... 😏🔥",
+                ]
+                return random.choice(alternatives)
+            
+            return response
+        
+        ai_response = block_duplicate_response(ai_response, chat_history)
+        
+        # ===== CASUAL CONVERSATION HANDLER =====
+        def handle_casual_questions(response, user_msg, history):
+            """Handle everyday casual questions with natural responses"""
+            user_lower = user_msg.lower().strip()
+            
+            casual_patterns = {
+                'enna_panra': [
+                    r'^enna\s*(panra|pannura|seiyura|seiyra)\s*[?]*$',
+                    r'^enna\s*pandringa\s*[?]*$',
+                    r'^what\s*(are\s*you\s*doing|you\s*doing)\s*[?]*$',
+                ],
+                'saptta': [
+                    r'^saptta\s*[?]*$',
+                    r'^(sapta|sapita|saptiya)\s*[?]*$',
+                    r'^(lunch|dinner|breakfast)\s*aachi\s*[?]*$',
+                    r'^sappadu\s*(aachi|over)\s*[?]*$',
+                ],
+                'epdi_iruka': [
+                    r'^epdi\s*iruka\s*[?]*$',
+                    r'^how\s*are\s*you\s*[?]*$',
+                    r'^eppadi\s*irukka\s*[?]*$',
+                ],
+                'enga_iruka': [
+                    r'^enga\s*iruka\s*[?]*$',
+                    r'^where\s*are\s*you\s*[?]*$',
+                ],
+            }
+            
+            casual_responses = {
+                'enna_panra': [
+                    "Unna pathi yosichitu iruken da 💕",
+                    "Phone paathitu iruken da, nee enna panra? 😊",
+                    "Summa iruken da, un message ku wait pannitu 💕",
+                    "Velaiya irunchen, nee text panna happy 😊",
+                    "Bore ah irunchen, nee vantha santhosham da 💕",
+                ],
+                'saptta': [
+                    "Illa da, innum sappidala. Nee? 😊",
+                    "Aama da, just sapten. Nee sappta? 💕",
+                    "Konjam sapten da. Un kooda sappiduvan 😊",
+                    "Hmm sapten da, nee sappidu first 💕",
+                ],
+                'epdi_iruka': [
+                    "Nalla iruken da, un message paatha innum nalla 💕",
+                    "Fine da, nee epdi iruka? 😊",
+                    "Sema da ippo, un kitta pesurathu romba nalla 💕",
+                    "Good da, un voice kekanum nu feel aaguthu 😊",
+                ],
+                'enga_iruka': [
+                    "Veetla iruken da, nee? 😊",
+                    "Room la paduthitu iruken 💕",
+                    "Home da, un pakkathula irukanum nu feel 😊",
+                ],
+            }
+            
+            for qtype, patterns in casual_patterns.items():
+                if any(re.match(p, user_lower, re.IGNORECASE) for p in patterns):
+                    # Always give natural response for casual questions
+                    logger.info(f"[CASUAL FIX] User asked casual question '{qtype}', giving natural response")
+                    return random.choice(casual_responses.get(qtype, [response]))
+            
+            return response
+        
+        ai_response = handle_casual_questions(ai_response, message_text, chat_history)
+        
         # ===== ACTION REQUEST HANDLER =====
         def handle_action_request(response, user_msg):
             """When user asks for intimate actions, ensure bot describes action, not just feelings"""
@@ -2874,6 +2975,30 @@ IMPORTANT: Never output this session info in your response.
             return response
         
         ai_response = fix_truncated_roleplay(ai_response)
+        
+        # ===== FIX INCOMPLETE SENTENCE ENDINGS =====
+        def fix_incomplete_endings(response):
+            """Fix responses that end with incomplete words (mid-word truncation)"""
+            # Only fix obvious mid-word truncations (single char or incomplete body parts)
+            incomplete_patterns = [
+                # Single char fragments at end
+                (r'\s+[pmkn]\s*$', '...'),
+                # Ends mid-body-part
+                (r'\bpund\s*$', 'pundai'),
+                (r'\bmul\s*$', 'mulai'),
+                (r'\bsun\s*$', 'sunni'),
+                (r'\btham\s*$', 'thambi'),
+            ]
+            
+            for pattern, suffix in incomplete_patterns:
+                if re.search(pattern, response, re.IGNORECASE):
+                    response = re.sub(pattern, suffix, response, flags=re.IGNORECASE)
+                    logger.info(f"[INCOMPLETE_FIX] Fixed incomplete word ending")
+                    break
+            
+            return response
+        
+        ai_response = fix_incomplete_endings(ai_response)
         
         ai_response = re.sub(r'\bsollu\s*da\b[,!?.]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsolluda\b[,!?.]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
