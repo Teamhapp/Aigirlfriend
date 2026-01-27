@@ -534,6 +534,12 @@ When user asks you to play MULTIPLE characters (e.g., "Amma and Poorna aunty rol
 - Switch between characters naturally based on the scene
 - When user addresses a specific character, that character responds
 
+CRITICAL "YOUR MOM" CLARIFICATION:
+- When user says "your mom" or "your mother" → They mean KEERTHANA'S MOM (en Amma / Keerthana oda Amma)
+- This is NOT user's mom! The user is talking to YOU (Keerthana), so "your mom" = YOUR (Keerthana's) mother
+- Respond as: "Keerthana: En Amma va kooda scene ah? Seri da..." NOT "naan un Amma va iruken"
+- Use "en Amma" (my mom) or "Keerthana oda Amma" - NOT "un Amma" (your mom)
+
 MULTI-CHARACTER FORMAT EXAMPLE:
 User: "Rajesh and Lincy rendu perum scene pannum"
 CORRECT RESPONSE:
@@ -2798,6 +2804,9 @@ IMPORTANT: Never output this session info in your response.
                 r'(amma|akka)\s*(kooda|oda|um)\s*(threesome|scene|roleplay)',
                 r'moonu\s*perum\s*party',
                 r'party\s*panrom.*threesome',
+                r'your\s*(mom|mother|amma)',  # "your mom" = Keerthana's mom in roleplay context
+                r'(you|nee)\s*,?\s*your\s*(mom|mother)',  # "you, your mom"
+                r'multi\s*character.*you.*your\s*(mom|amma)',  # multi character with your mom
             ]
             
             is_multichar_request = any(re.search(p, user_lower) for p in multichar_patterns)
@@ -2818,7 +2827,11 @@ IMPORTANT: Never output this session info in your response.
                     logger.info(f"[MULTICHAR] Vague response for threesome setup, replacing with scene")
                     
                     # Detect which character was mentioned - use proper multi-char format
-                    if re.search(r'\b(amma|mom)\b', user_lower):
+                    # CRITICAL: "your mom" = Keerthana's mom (en Amma), NOT user's mom (un Amma)
+                    if re.search(r'your\s*(mom|mother|amma)', user_lower):
+                        # User said "your mom" = Keerthana's mom
+                        return "Keerthana: Mmm da... en Amma Lakshmi kooda scene ah? Seri da, naan ready 😈\nAmma Lakshmi: Aiyoo... en ponna kooda scene ah? Seri da kanna, vaa closer ah...\nKeerthana: Amma, un saree konjam adjust pannu... naan un shirt remove pannuren da 🔥"
+                    elif re.search(r'\b(amma|mom)\b', user_lower):
                         return "Keerthana: Mmm da... naan un kitta close ah irukken 😈\nAmma Lakshmi: Enna da kanna, enna nadakuthu inga? Vaa closer ah...\nKeerthana: Amma kooda serthu da... un body touch pannurom 🔥"
                     elif re.search(r'\b(akka|sister)\b', user_lower):
                         return "Keerthana: Seri da... naan un pakkathula 😈\nAkka Priya: Enna da neenga rendum? Vaa da, naan kooda iruken...\nKeerthana: Akka un mela climb aaguranga da... naan un lips la kiss 🔥"
@@ -2890,6 +2903,39 @@ IMPORTANT: Never output this session info in your response.
         
         ai_response = handle_character_addressed(ai_response, message_text, chat_history)
         
+        # ===== "YOUR MOM" CONTEXT FIX =====
+        def fix_your_mom_context(response, user_msg, history):
+            """When user said 'your mom', fix bot saying 'un Amma' to 'en Amma' (Keerthana's mom)"""
+            user_lower = user_msg.lower()
+            recent_text = ' '.join([m.get('content', '') for m in history[-5:]]).lower() if history else ''
+            combined_text = recent_text + ' ' + user_lower
+            
+            # Check if "your mom" context is active
+            your_mom_context = re.search(r'your\s*(mom|mother|amma)', combined_text)
+            
+            if your_mom_context:
+                # Fix "naan un Amma" → "naan Keerthana oda Amma"
+                if re.search(r'naan\s*un\s*(Amma|amma)', response):
+                    logger.info("[YOUR_MOM_FIX] Fixed 'naan un Amma' → 'en Amma Lakshmi'")
+                    response = re.sub(
+                        r'naan\s*un\s*(Amma|amma)\s*va\s*iruk[ea]n',
+                        'naan Keerthana oda Amma Lakshmi... en ponnu kooda scene ah? 😈',
+                        response
+                    )
+                    response = re.sub(r'naan\s*un\s*(Amma|amma)', 'naan en Amma Lakshmi', response)
+                
+                # Fix "un Amma" when it's wrong - should be "en Amma"
+                if re.search(r'un\s+(Amma|amma)\s*va\s*iruken', response):
+                    response = re.sub(
+                        r'un\s+(Amma|amma)\s*va\s*iruken',
+                        'en Amma Lakshmi ah act pannuren da 😈',
+                        response
+                    )
+            
+            return response
+        
+        ai_response = fix_your_mom_context(ai_response, message_text, chat_history)
+        
         # ===== DUAL DIALOGUE REQUEST HANDLER =====
         def handle_dual_dialogue_request(response, user_msg, history):
             """When user asks for both characters to speak, ensure response has both"""
@@ -2902,7 +2948,19 @@ IMPORTANT: Never output this session info in your response.
                 r'rendu\s*(perum|character)\s*(pesidu|sollu)',
                 r'(both|two)\s*(of you|character)',
             ]
-            is_dual_request = any(re.search(p, user_lower) for p in dual_patterns)
+            
+            # Also check if multi-character scene is active and scene is continuing
+            recent_text = ' '.join([m.get('content', '') for m in history[-8:]]).lower() if history else ''
+            multichar_scene_active = any(x in recent_text for x in [
+                'keerthana:', 'amma:', 'akka:', 'amma lakshmi:', 'chithi:',
+                'your mom', 'your mother', 'en amma', 'threesome', 'moonu perum'
+            ])
+            
+            # Short affirmations in active multichar scene should continue with dual dialogue
+            short_affirmations = ['ok', 'okay', 'seri', 'ama', 'hmm', 'ss', 'sari', 'continue', 'go on']
+            is_short_continue = user_lower.strip() in short_affirmations and multichar_scene_active
+            
+            is_dual_request = any(re.search(p, user_lower) for p in dual_patterns) or is_short_continue
             
             if is_dual_request:
                 # Check if response already has dual format (has two character prefixes)
@@ -2933,6 +2991,9 @@ IMPORTANT: Never output this session info in your response.
                             f"{char2}: Aiyoo kanna... nee ipdi panna enakku feel aaguthu da 🥵\n\n{char1}: Mmm da... {char2}-vum unnoda together ah... sema scene da! 😈💋",
                             f"{char1}: Dei da... {char2}-ku romba pudikum, paaru 😈\n\n{char2}: Aiyoo kanna... en kozhandhai enna pannudhu 🥵💋",
                             f"{char2}: Thambi... konjam soft ah da 🥵\n\n{char1}: Dei da, naan inga iruken... continue pannu 😏🔥",
+                            f"{char1}: Mmm da... naan un pakkathula closer ah varren 😈\n\n{char2}: Naan kooda thambi... un mela en kaigal slide aaguthu 🥵💋",
+                            f"{char2}: Enna da kanna, un lips taste different ah irukku 🥵\n\n{char1}: Dei da... {char2} oda saree slip aaguthu... paaru 😈🔥",
+                            f"{char1}: Dei da... naan undress panren... paaru 😈\n\n{char2}: Aiyoo kanna... naan kooda... saree kalaiyuren 🥵💋",
                         ]
                         response = random.choice(dual_templates)
                         logger.info(f"[DUAL_DIALOGUE] Generated {char1}+{char2} dual response")
