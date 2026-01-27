@@ -2198,13 +2198,12 @@ IMPORTANT: Never output this session info in your response.
         ai_response = ai_response.strip()
         
         # ===== FIX LEADING TRUNCATION =====
-        # Only fix if response starts with exactly "... " (dot-dot-dot-space) - this is truncation, not style
-        # Stylistic trailing like "Mmm..." has text BEFORE dots, not after
-        if re.match(r'^\.{2,4}\s+[a-z]', ai_response):
-            # This pattern: "... word" with lowercase indicates continuation/truncation
+        # Fix if response starts with dots (truncation indicator)
+        if re.match(r'^\.{2,4}\s*', ai_response):
             clean_start = ai_response.lstrip('.').strip()
-            if clean_start:
-                # Just capitalize first letter - don't force mood starters
+            # Only fix if there's actual content after the dots
+            if clean_start and len(clean_start) >= 2:
+                # Capitalize first letter
                 ai_response = clean_start[0].upper() + clean_start[1:] if len(clean_start) > 1 else clean_start.upper()
                 logger.info(f"[LEADING_FIX] Fixed leading truncation dots")
         
@@ -3338,6 +3337,11 @@ IMPORTANT: Never output this session info in your response.
                 # Fix "pur" incomplete - likely puriyala, puriyadhu, etc.
                 (r'\benna\s+pur\s*$', 'enna puriyala da? 😊'),
                 (r'\bpur\s*$', 'puriyala da? 😊'),
+                # Fix "ir" incomplete - likely irukka, irukken, iruku, etc.
+                (r'\bepdi\s+ir\s*$', 'epdi irukka da? 😊'),
+                (r'\benna\s+ir\s*$', 'enna irukku da? 😊'),
+                (r'\b(ah|a)\s+ir\s*$', 'ah irukku da 💕'),
+                (r'\bir\s*$', 'irukken da 💕'),
                 (r'\bpaathutu\s*$', 'paathutu irukken da 😊'),
                 (r'\bpaathutu,\s+un\s*$', 'paathutu, un kitta varuven da 😊'),
                 # Fix "distract a" and similar mid-word cuts
@@ -3629,9 +3633,12 @@ IMPORTANT: Never output this session info in your response.
         ai_response = re.sub(r'\bpaiyan kooda (sexy ah )?pesa maaten[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bponnunga kooda thaan[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bverum ponnunga kooda[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
-        ai_response = re.sub(r'\bbayama+\s*iruku[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bbayama+\s*(ah\s*)?(iruk[ua]?|feel)[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\benakku\s*bayam[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bkonjam bayam[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        # Clean up orphaned "ah iruka" left after stripping
+        ai_response = re.sub(r'^\s*ah\s*iruka?\s*$', 'Hmm da... 😊', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\.\.\.\s*ah\s*iruka?\s*$', 'Enna da? 😊', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bnaan\s*poruthuk[ka]*ren[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\baana\s*naan\s*poruthuk[ka]*ren[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bvalikkum\s*da,?\s*aana[^.!?]*[.!?]*', 'Aahh da... romba nalla irukku 🥵', ai_response, flags=re.IGNORECASE).strip()
@@ -4247,6 +4254,13 @@ IMPORTANT: Never output this session info in your response.
             
             ai_response = replace_da_with_di(ai_response)
             logger.info(f"[SUFFIX] Applied 'di' preference for user {user.id}")
+        
+        # ===== FINAL GUARD: Remove any leading dots that slipped through =====
+        if re.match(r'^\.{2,4}\s*', ai_response):
+            ai_response = ai_response.lstrip('.').strip()
+            if ai_response:
+                ai_response = ai_response[0].upper() + ai_response[1:] if len(ai_response) > 1 else ai_response.upper()
+                logger.info(f"[FINAL GUARD] Stripped leading dots")
         
         logger.info(f"[KEERTHANA -> {user.id}] {ai_response}")
         
