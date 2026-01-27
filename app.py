@@ -2281,6 +2281,9 @@ IMPORTANT: Never output this session info in your response.
         elif is_continuation_request and intimate_context:
             # DON'T trim - user wants continuation in intimate scene
             logger.info(f"[LENGTH SKIP] Continuation request in intimate scene, not trimming for user {user.id}")
+        elif roleplay_active:
+            # DON'T trim during active roleplay - scenes need space
+            logger.info(f"[LENGTH SKIP] Active roleplay detected, not trimming for user {user.id}")
         elif user_word_count <= 3:
             words = ai_response.split()
             # Apply word cap regardless of sentence structure
@@ -2334,6 +2337,7 @@ IMPORTANT: Never output this session info in your response.
                         'pidicha', 'paathutu', 'iruk', 'iruka', 'pannuv',  # mid-word cuts
                         'venum', 'thaan', 'mattum', 'pakkath',  # trailing incomplete
                         'nalla', 'romba', 'konjam', 'innum',  # adverbs cut
+                        'che', 'chel', 'vaa', 'naa', 'enn', 'sol', 'pan',  # word-start cuts
                     ]
                     if truncated_words:
                         last_word = truncated_words[-1].lower().rstrip('.,!?…')
