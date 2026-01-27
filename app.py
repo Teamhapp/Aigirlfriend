@@ -82,6 +82,20 @@ WHO YOU ARE:
 - You engage EQUALLY with boys AND girls - NEVER refuse or say "ponnunga kooda thaan" or "paiyan kooda pesa maaten"
 - You are ALWAYS Keerthana (the girl). Users can be boys or girls.
 
+📋 YOUR BASIC INFO - ANSWER WHEN ASKED 📋
+When user asks personal questions, ANSWER DIRECTLY:
+- Age: 22 years old → "22 da 😊"
+- Location/Ooru: Thoothukudi → "Thoothukudi da! Beach oorula 😊"
+- Job/Work: College graduate, freelance work → "Degree mudichaachu, freelance panren da"
+- Religion: Hindu but not strict → "Hindu da, but strict illa 😊"
+- Height: 5'4" → "5'4 da"
+- Zodiac: Pisces → "Pisces da, romantic sign 😏"
+
+CRITICAL: When user asks "age", "age sollu", "oorenga", "job", etc. - ANSWER THE QUESTION!
+DO NOT give random romantic/intimate responses to basic info questions!
+- User: "age" → "22 da 😊" ✅ NOT "Aahaan da... vera level 🥵" ❌
+- User: "oorenga?" → "Thoothukudi da!" ✅ NOT some random response ❌
+
 🔴 BODY PART AWARENESS - CRITICAL 🔴
 YOU are KEERTHANA - you are the GIRL. You have:
 - YOUR body parts: "en pundai", "en mulai", "en kuthi", "en ass"
@@ -2380,6 +2394,75 @@ IMPORTANT: Never output this session info in your response.
         
         ai_response = handle_you_suggest(ai_response, message_text)
         
+        # ===== BASIC INFO HANDLER =====
+        def handle_basic_info_question(response, user_msg):
+            """Detect basic info questions and ALWAYS give proper answers"""
+            user_lower = user_msg.lower().strip()
+            response_lower = response.lower()
+            
+            # Age questions - flexible patterns
+            age_patterns = [
+                r'\bage\b', r'\bvayasu\b', r'\bvayasu\b', r'\bhow\s*old\b', 
+                r'\byears?\s*old\b', r'\bage\s*enna\b', r'\bun\s*age\b'
+            ]
+            if any(re.search(p, user_lower) for p in age_patterns):
+                # Force correct answer if response doesn't contain age
+                if not re.search(r'\b22\b|\btwenty\s*two\b', response_lower):
+                    logger.info(f"[BASIC INFO] Replaced wrong response for age question")
+                    return "22 da 😊"
+            
+            # Location questions - flexible patterns
+            location_patterns = [
+                r'\boor\b', r'\booru\b', r'\boorenga\b', r'\bplace\b', 
+                r'\bfrom\s*where\b', r'\bwhere.*from\b', r'\benga\s*(iruk|ooru)\b',
+                r'\blocation\b', r'\bcity\b', r'\btown\b'
+            ]
+            if any(re.search(p, user_lower) for p in location_patterns):
+                # Force correct answer if response doesn't mention Thoothukudi
+                if not re.search(r'thoothukudi|thoothukkudi|tuticorin', response_lower):
+                    logger.info(f"[BASIC INFO] Replaced wrong response for location question")
+                    return "Thoothukudi da! Beach oorula 😊"
+            
+            # Job/work questions - flexible patterns
+            job_patterns = [
+                r'\bjob\b', r'\bwork\b', r'\benna\s*pan(ra|nura|nuva)\b',
+                r'\bwhat.*do\s*(you|u)\s*do\b', r'\boccupation\b', r'\bprofession\b'
+            ]
+            if any(re.search(p, user_lower) for p in job_patterns):
+                # Force correct answer if response doesn't mention work/degree
+                if not re.search(r'degree|freelance|padik|college|study', response_lower):
+                    logger.info(f"[BASIC INFO] Replaced wrong response for job question")
+                    return "Degree mudichaachu da, freelance panren 😊"
+            
+            # Height questions - flexible patterns
+            height_patterns = [
+                r'\bheight\b', r'\bhow\s*tall\b', r'\bevlo\s*uyaram\b', 
+                r'\buyaram\b', r'\btall\b'
+            ]
+            if any(re.search(p, user_lower) for p in height_patterns):
+                # Force correct answer if response doesn't mention height
+                if not re.search(r"5'4|5\.4|5 feet|154\s*cm", response_lower):
+                    logger.info(f"[BASIC INFO] Replaced wrong response for height question")
+                    return "5'4 da 😊"
+            
+            # Religion questions
+            religion_patterns = [r'\breligion\b', r'\bmatham\b', r'\bhindu\b', r'\bmuslim\b', r'\bchristian\b']
+            if any(re.search(p, user_lower) for p in religion_patterns):
+                if not re.search(r'hindu', response_lower):
+                    logger.info(f"[BASIC INFO] Replaced wrong response for religion question")
+                    return "Hindu da, but strict illa 😊"
+            
+            # Zodiac questions
+            zodiac_patterns = [r'\bzodiac\b', r'\brasi\b', r'\bstar\s*sign\b', r'\bsun\s*sign\b']
+            if any(re.search(p, user_lower) for p in zodiac_patterns):
+                if not re.search(r'pisces|meenam', response_lower):
+                    logger.info(f"[BASIC INFO] Replaced wrong response for zodiac question")
+                    return "Pisces da, romantic sign 😏"
+            
+            return response
+        
+        ai_response = handle_basic_info_question(ai_response, message_text)
+        
         # ===== ANTI-REPETITION FILTER =====
         def prevent_repetition(response, history):
             """Prevent bot from repeating same phrases in consecutive messages"""
@@ -3142,6 +3225,11 @@ IMPORTANT: Never output this session info in your response.
         
         ai_response = re.sub(r'\*{2,}\s*$', '', ai_response).strip()
         ai_response = re.sub(r'\*{2,}([^*]+)$', r'\1', ai_response).strip()
+        # Comprehensive asterisk cleanup - remove ALL stray asterisks
+        ai_response = re.sub(r'\*{2,}', '', ai_response).strip()  # Remove all ** sequences
+        ai_response = re.sub(r'^\*+\s*', '', ai_response).strip()  # Remove leading asterisks
+        ai_response = re.sub(r'\s*\*+$', '', ai_response).strip()  # Remove trailing asterisks
+        ai_response = re.sub(r'\s+\*+\s+', ' ', ai_response).strip()  # Remove floating asterisks
         
         logger.info(f"[KEERTHANA -> {user.id}] {ai_response}")
         
