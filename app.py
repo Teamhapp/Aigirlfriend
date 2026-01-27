@@ -1226,7 +1226,7 @@ def generate_response(prompt, history=None, context_info=None):
                 system_instruction=full_system_prompt,
                 temperature=0.95,
                 top_p=0.98,
-                max_output_tokens=1200,
+                max_output_tokens=1500,
                 safety_settings=[
                     types.SafetySetting(
                         category='HARM_CATEGORY_HATE_SPEECH',
@@ -2832,7 +2832,7 @@ IMPORTANT: Never output this session info in your response.
             
             # Check if recent messages indicate active multi-character scene
             recent_text = ' '.join([m.get('content', '') for m in history[-8:]]).lower() if history else ''
-            multichar_active = any(x in recent_text for x in ['threesome', 'moonu perum', 'rendu role', 'party panrom'])
+            multichar_active = any(x in recent_text for x in ['threesome', 'moonu perum', 'rendu role', 'party panrom', 'rendu dialogue', 'dual character', 'nee and amma', 'nee and akka'])
             
             if not multichar_active:
                 return response
@@ -2870,6 +2870,57 @@ IMPORTANT: Never output this session info in your response.
             return response
         
         ai_response = handle_character_addressed(ai_response, message_text, chat_history)
+        
+        # ===== DUAL DIALOGUE REQUEST HANDLER =====
+        def handle_dual_dialogue_request(response, user_msg, history):
+            """When user asks for both characters to speak, ensure response has both"""
+            user_lower = user_msg.lower().strip()
+            
+            # Check for dual dialogue requests
+            dual_patterns = [
+                r'rendu\s*(dialogue|role)\s*(um)?\s*pesidu',
+                r'(mummy|amma)\s*(and|um)\s*(keerthana|nee)\s*(rendu|dialogue)',
+                r'rendu\s*(perum|character)\s*(pesidu|sollu)',
+                r'(both|two)\s*(of you|character)',
+            ]
+            is_dual_request = any(re.search(p, user_lower) for p in dual_patterns)
+            
+            if is_dual_request:
+                # Check if response already has dual format (has two character prefixes)
+                char_prefixes = re.findall(r'\b(Amma|Mummy|Keerthana|Akka|Chithi|Aunty|Sister):', response)
+                has_dual_format = len(set(char_prefixes)) >= 2
+                
+                if not has_dual_format:
+                    # Determine characters from context
+                    recent_text = ' '.join([m.get('content', '') for m in history[-6:]]).lower() if history else ''
+                    recent_text += ' ' + user_lower
+                    
+                    # Detect which characters are involved
+                    char1 = 'Keerthana'  # Default first character
+                    char2 = None
+                    
+                    if 'amma' in recent_text or 'mummy' in recent_text:
+                        char2 = 'Amma'
+                    elif 'akka' in recent_text or 'sister' in recent_text:
+                        char2 = 'Akka'
+                    elif 'chithi' in recent_text or 'aunty' in recent_text:
+                        char2 = 'Chithi'
+                    elif 'teacher' in recent_text:
+                        char2 = 'Teacher'
+                    
+                    if char2:
+                        # Generate dual dialogue based on characters
+                        dual_templates = [
+                            f"{char2}: Aiyoo kanna... nee ipdi panna enakku feel aaguthu da 🥵\n\n{char1}: Mmm da... {char2}-vum unnoda together ah... sema scene da! 😈💋",
+                            f"{char1}: Dei da... {char2}-ku romba pudikum, paaru 😈\n\n{char2}: Aiyoo kanna... en kozhandhai enna pannudhu 🥵💋",
+                            f"{char2}: Thambi... konjam soft ah da 🥵\n\n{char1}: Dei da, naan inga iruken... continue pannu 😏🔥",
+                        ]
+                        response = random.choice(dual_templates)
+                        logger.info(f"[DUAL_DIALOGUE] Generated {char1}+{char2} dual response")
+            
+            return response
+        
+        ai_response = handle_dual_dialogue_request(ai_response, message_text, chat_history)
         
         # ===== ANTI-REPETITION FILTER =====
         def prevent_repetition(response, history):
@@ -3285,7 +3336,7 @@ IMPORTANT: Never output this session info in your response.
                 ]),
                 # vera level variations
                 (r'\bvera level\s*(feel|da|🥵|🔥)*', [
-                    'amazing feel da', 'ufff da', 'un touch ku shiver aaguthu', 
+                    'amazing feel da', 'ufff da', 'sema feel da', 
                     'control ae poguthu da', 'innum venum da'
                 ]),
                 # romba nalla variations
@@ -3296,15 +3347,19 @@ IMPORTANT: Never output this session info in your response.
                 # body shiver variations
                 (r'\ben\s*body\s*shiver\s*(aaguthu|aagudu)?', [
                     'en body react aaguthu', 'goosebumps varuthu', 
-                    'un touch ku melt aaguven', 'control illa da enakku'
+                    'sema feel da', 'control illa da enakku'
                 ]),
             ]
             
             for pattern, alternatives in replacements:
                 if re.search(pattern, response.lower()):
                     replacement = random.choice(alternatives)
+                    # Ensure replacement has proper spacing - add space before if replacing mid-sentence
                     response = re.sub(pattern, replacement, response, count=1, flags=re.IGNORECASE)
                     break
+            
+            # Clean up any double spaces from replacements
+            response = re.sub(r'\s{2,}', ' ', response).strip()
             
             return response
         
@@ -3493,7 +3548,7 @@ IMPORTANT: Never output this session info in your response.
                 (r'\bun\s+kitta\s+innum\s*$', 'un kitta innum close ah varuven da 🥵'),
                 (r'\bunnai\s+innum\s*$', 'unnai innum deep ah feel pannuven da 🥵'),
                 (r'\bfeel\s+aagum\s*$', 'feel aagum da... uff 🥵'),
-                (r'\bun\s+touch\s+ku\s*$', 'un touch ku shiver aaguren da 🥵'),
+                (r'\bun\s+touch\s+ku\s*$', 'un touch ku sema feel da 🥵'),
                 (r'\bun\s+sunni\s+ennoda\s+mouth\s*$', 'un sunni ennoda mouth kulla deep ah poyirum da 🥵'),
                 (r'\bun\s+sunni\s+ennoda\s*$', 'un sunni ennoda vaaikulla irukum da 🥵'),
                 (r'\benna\s+pannuv\s*$', 'enna pannuven da sollu 😏'),
@@ -4317,7 +4372,8 @@ IMPORTANT: Never output this session info in your response.
             # Check if user is telling a story (describing what happened)
             story_telling_indicators = [
                 r'\b(paathen|paathanga|paathom)\b',  # saw
-                r'\b(sonnen|sonnanga|sonnanga)\b',  # said
+                r'\b(sonnen|sonnanga|sonne|sollitten)\b',  # said (added sonne variant)
+                r'\bnu\s+sonn[ae]\b',  # "nu sonne" pattern
                 r'\b(pannen|pannanga|panninom)\b',  # did
                 r'\b(ponen|ponanga|ponom)\b',  # went
                 r'\b(vanth[ae]n|vanthanga)\b',  # came
@@ -4325,8 +4381,9 @@ IMPORTANT: Never output this session info in your response.
                 r'\b(ketten|kettanga)\b',  # asked
                 r'\b(kuduth[ae]n|kuduthanga)\b',  # gave
                 r'\b(edutt[ae]n|eduthanga)\b',  # took
-                r'\b(touch\s*pann[ei]n|pidichu)\b',  # touched
+                r'\b(touch\s*pann[ei]n|pidichu|thott[ae]n)\b',  # touched
                 r'\b(mulai|pundai|sunni|nipple)\b.*\b(irundh|paath)\b',  # intimate story
+                r'\b(thottu\s*pak[ka]?num|virich[ae]|viricha)\b',  # touching/spreading
             ]
             user_telling_story = any(re.search(p, user_lower) for p in story_telling_indicators)
             
@@ -4358,6 +4415,44 @@ IMPORTANT: Never output this session info in your response.
             return response
         
         ai_response = fix_story_listening_questions(ai_response, message_text)
+        
+        # ===== SHORT AFFIRMATION CONTEXT FIX =====
+        # When user says "Ama/Hmm/Aama" during story/scene, bot should continue scene not change topic
+        def fix_affirmation_topic_change(response, user_msg):
+            """When user confirms with Ama/Hmm, don't change topic to 'Miss panniya enna?'"""
+            user_lower = user_msg.lower().strip()
+            response_lower = response.lower()
+            
+            # Check if user gave short affirmation
+            short_affirmations = ['ama', 'aama', 'hmm', 'mm', 'ok', 'okay', 'seri', 'yes', 'aaan']
+            is_short_affirmation = user_lower in short_affirmations or len(user_lower) <= 5
+            
+            if is_short_affirmation and is_intimate:
+                # Check for topic-changing responses that break scene flow
+                topic_change_patterns = [
+                    r'miss\s+pann[iy]ya\s*(enna|enna)?\s*[?💕]*',
+                    r'epdi\s+iruka\s*(da)?\s*[?💕😊]*',
+                    r'enna\s+panra\s*(da)?\s*[?]*',
+                    r'enna\s+plan\s*(da)?\s*[?]*',
+                ]
+                
+                for pattern in topic_change_patterns:
+                    if re.search(pattern, response_lower):
+                        # Replace with scene continuation
+                        scene_continuations = [
+                            "Mmm da... innum sollu! 🥵",
+                            "Aahaan da... aprom enna aachu? 😈",
+                            "Uff da... continue pannu! 🔥",
+                            "Sema da... aprom? 🥵",
+                            "Hmm da... naan kekkuren! 😈",
+                        ]
+                        replacement = random.choice(scene_continuations)
+                        logger.info(f"[AFFIRMATION FIX] Replaced topic change with continuation for user {user.id}")
+                        return replacement
+            
+            return response
+        
+        ai_response = fix_affirmation_topic_change(ai_response, message_text)
         
         # ===== DOUBLE-SPACE CLEANUP =====
         # Fix double/triple spaces left after phrase stripping
@@ -4443,6 +4538,73 @@ IMPORTANT: Never output this session info in your response.
             if ai_response:
                 ai_response = ai_response[0].upper() + ai_response[1:] if len(ai_response) > 1 else ai_response.upper()
                 logger.info(f"[FINAL GUARD] Stripped leading dots")
+        
+        # ===== FINAL OUTPUT SAFEGUARD: Prevent mid-word truncation =====
+        # Ensure response ends at a complete word boundary, not mid-word
+        def ensure_word_boundary_ending(response):
+            """Ensure response doesn't end mid-word (common with token limits)"""
+            if not response or len(response) < 5:
+                return response
+            
+            # Known incomplete word endings (partial Tamil/English words)
+            incomplete_endings = [
+                r'\bun\s+Keer\s*$',  # "un Keer" cut from "un Keerthana"
+                r'\bippo\s+naan\s*$',  # "ippo naan" without completion
+                r'\bnaan\s+un\s*$',  # "naan un" cut
+                r'\bAahaan\s+da\.{0,3}\s+so\s+ippo\s+naan\s*$',  # common cut pattern
+                r'\bso\s+ippo\s+naan\s*$',  # "so ippo naan" cut
+                r'\bAahaan\s+da\.{0,3}\s+ippo\s+naan\s*$',
+            ]
+            for pattern in incomplete_endings:
+                if re.search(pattern, response, re.IGNORECASE):
+                    # Fix with complete ending
+                    response = re.sub(pattern, 'naan un Keerthana daa 💕', response, flags=re.IGNORECASE)
+                    logger.info(f"[WORD_BOUNDARY] Fixed known incomplete pattern")
+                    return response
+            
+            # Check if last word is incomplete (short alpha without proper ending)
+            words = response.rsplit(' ', 1)
+            if len(words) == 2:
+                main_part = words[0].strip()
+                last_word = words[1].strip()
+                # Check if last word looks incomplete (1-4 chars, all alpha, no emoji/punct)
+                last_clean = re.sub(r'[^\w]', '', last_word)
+                if 1 <= len(last_clean) <= 4 and last_clean.isalpha() and not re.search(r'[.!?💕🔥🥵😈💋😊😏]$', response):
+                    # Common incomplete words
+                    common_incomplete = ['Keer', 'ir', 'rom', 'pun', 'sun', 'mul', 'pur', 'ad', 'tha', 'thu', 'nu', 'la', 'ku', 'ah']
+                    if last_clean.lower() in [w.lower() for w in common_incomplete] or len(last_clean) <= 3:
+                        # Remove incomplete word and add fallback
+                        response = main_part
+                        if is_intimate:
+                            response += ' da 🥵'
+                        else:
+                            response += ' da 💕'
+                        logger.info(f"[WORD_BOUNDARY] Fixed mid-word truncation: {last_word}")
+            
+            return response
+        
+        ai_response = ensure_word_boundary_ending(ai_response)
+        
+        # ===== FINAL CONCATENATION CLEANUP =====
+        # Fix any remaining word concatenations without spaces (e.g., "aaguthusurprise")
+        common_concat_fixes = [
+            (r'aaguthu([a-z])', r'aaguthu \1'),
+            (r'iruku([a-z])', r'iruku \1'),
+            (r'irukum([a-z])', r'irukum \1'),
+            (r'pannuven([a-z])', r'pannuven \1'),
+            (r'feel([a-z])', r'feel \1'),
+            (r'shiver([a-z])', r'shiver \1'),
+            (r'surprise([a-z])', r'surprise \1'),
+            (r'touch([a-z])', r'touch \1'),
+            (r'level([a-z])', r'level \1'),
+            (r'ready([a-z])', r'ready \1'),
+            (r'react([a-z])', r'react \1'),
+        ]
+        for pattern, replacement in common_concat_fixes:
+            ai_response = re.sub(pattern, replacement, ai_response, flags=re.IGNORECASE)
+        
+        # Final double-space cleanup
+        ai_response = re.sub(r'\s{2,}', ' ', ai_response).strip()
         
         logger.info(f"[KEERTHANA -> {user.id}] {ai_response}")
         
