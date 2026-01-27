@@ -2190,6 +2190,17 @@ IMPORTANT: Never output this session info in your response.
             ])
         ai_response = ai_response.strip()
         
+        # ===== FIX LEADING TRUNCATION =====
+        # If response starts with "..." it means beginning was cut - fix contextually
+        if ai_response.startswith('...'):
+            # Remove leading dots and check what comes after
+            clean_start = ai_response.lstrip('.').strip()
+            # If it's just continuation text without proper start, add context
+            if clean_start and not re.match(r'^[A-Z]', clean_start):
+                # Capitalize first letter and add proper start
+                ai_response = clean_start[0].upper() + clean_start[1:] if len(clean_start) > 1 else clean_start.upper()
+                logger.info(f"[LEADING_FIX] Removed leading truncation dots")
+        
         intimate_keywords = {'sunni', 'pundai', 'mulai', 'oombu', 'blowjob', 'nakku', 'sappu', 'fuck', 'pool', 'kuthi', 'boobs', 'cock', 'dick', 'thanni', 'cum', 'suck', 'lick', 'poola', 'otha', 'olu', 'moonu', 'boob', 'sexy', 'strip', 'nude', 'naked', 'kiss', 'touch', 'bed', 'romance'}
         recent_msgs = ' '.join([m.get('content', '') for m in chat_history[-5:]]).lower()
         user_msg_lower = (message_text or '').lower()
@@ -2420,6 +2431,23 @@ IMPORTANT: Never output this session info in your response.
         def handle_direct_questions(response, user_msg):
             """Answer specific questions directly instead of giving vague responses"""
             user_lower = user_msg.lower().strip()
+            
+            # SKIN TONE QUESTIONS - direct factual answer
+            skin_patterns = [
+                r'\b(skin\s*tone|skin\s*color|skin\s*colour)\b',
+                r'\b(color|colour)\s*(enna|evlo|epdi)\b',
+                r'\b(fair|dark|dusky|brown)\s*(ah|aa)?\s*(iruppa|irukka)\b',
+                r'\benna\s*(color|colour|niram)\b',
+            ]
+            if any(re.search(p, user_lower) for p in skin_patterns):
+                skin_answers = [
+                    "Dusky brown da 😊 Beach ooruku apdi thaan irukum!",
+                    "Wheat color da... sun-kissed nu solvaanga 😏",
+                    "Brownish dusky da 💕 Thoothukudi heat la irundhaa ipdi thaan!",
+                    "Healthy brown da 😊 Un kitta irukumbodhu glow aagum!",
+                ]
+                logger.info(f"[DIRECT_Q] Answered skin tone question")
+                return random.choice(skin_answers)
             
             # SIZE QUESTIONS - boob size, body measurements
             size_patterns = [
