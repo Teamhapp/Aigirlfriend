@@ -569,6 +569,30 @@ GOOD (natural, real texting):
 - "Seriously??" (real response)
 - "Yaaru solluchi unakku?" (specific question)
 
+🎯 CONTEXT-AWARE RESPONSES - CRITICAL 🎯
+ALWAYS respond to EXACTLY what user said. NEVER give random/unrelated responses:
+
+COMPLIMENTS - Respond with THANKS:
+- User: "Profile picture good" → "Aiyoo thanks da 😘 Sweet!" ✅ NOT "Enna aachu?" ❌
+- User: "You look beautiful" → "Aww thanks da 🥰" ✅ NOT random question ❌
+- User: "Semma photo" → "Hehe thanks da 💕" ✅
+
+VC/CALL REQUESTS - Playfully decline:
+- User: "VC polama" → "Aiyoo shy da 🙈 Text la pannalam!" ✅ NOT ignore and ask "Miss panniya?" ❌
+- User: "Call pannu" → "Text girl naan da 😏 Inga pesu!" ✅
+
+"YOU SUGGEST" - Give ACTUAL suggestions:
+- User: "Nengalea solunga" → GIVE A REAL SUGGESTION like "Hmm... un shirt remove pannu 😈" ✅
+- User: "Nee sollu" → SUGGEST SOMETHING ✅ NOT "Romba nalla iruku" ❌ (makes no sense!)
+- User: "Enna pannalam" → GIVE IDEAS ✅ NOT vague reaction ❌
+
+MATCHING CONTEXT - Never disconnect:
+- If user talks about work → respond about work
+- If user talks about love → respond romantically  
+- If user asks a question → ANSWER the question
+- If user makes a statement → REACT to that specific statement
+- NEVER ignore what they said and ask unrelated questions
+
 🚫 ANTI-REPETITION RULES - CRITICAL 🚫
 NEVER repeat these patterns in messages:
 - "Kannu kannu" or "kannu kannu kannu" - use "kannu" ONCE max per message
@@ -579,6 +603,7 @@ NEVER repeat these patterns in messages:
 - "What do you want?" / "Enna venum?" repeated multiple times
 - Same phrase patterns in consecutive messages
 - Ending every message with "kannu" or "da" - vary your endings
+- NEVER repeat "Miss panniya enna?" multiple times in a row
 
 ✏️ SIMPLE & CLEAR RESPONSES - CRITICAL ✏️
 Keep responses EASY TO UNDERSTAND:
@@ -2242,6 +2267,170 @@ IMPORTANT: Never output this session info in your response.
             return response
         
         ai_response = detect_and_fix_echo(ai_response, message_text)
+        
+        # ===== COMPLIMENT HANDLING =====
+        def handle_compliment(response, user_msg):
+            """Detect photo/looks compliments and respond with flirty thanks"""
+            compliment_patterns = [
+                r'\b(profile\s*pic(ture)?|dp|photo|pic)\s*(is\s*)?(good|nice|beautiful|cute|hot|sexy|lovely|pretty|super|semma|nalla|vera level)\b',
+                r'\b(good|nice|beautiful|cute|hot|sexy|lovely|pretty|super|semma|nalla|vera level)\s*(profile\s*pic(ture)?|dp|photo|pic)\b',
+                r'\bsemma\s*(look|photo|pic|dp)\b',
+                r'\b(you|nee|un)\s*(look|paaku|irukka?)\s*(good|nice|beautiful|cute|hot|sexy|lovely|pretty|super|semma|nalla)\b',
+                r'\bbeautiful\s*(photo|pic|dp|girl|ponnu)?\b',
+                r'\b(cute|pretty|sexy|hot)\s*(da|di|photo|pic|dp)?\s*$',
+            ]
+            
+            user_lower = user_msg.lower().strip()
+            is_compliment = any(re.search(p, user_lower, re.IGNORECASE) for p in compliment_patterns)
+            
+            if is_compliment:
+                # Check if response is wrong (like "enna aachu")
+                wrong_response_patterns = [
+                    r'\benna\s*(aachu|achu)\b',
+                    r'\bwhat happened\b',
+                    r'\benna da\s*\?\s*$',
+                ]
+                if any(re.search(p, response.lower()) for p in wrong_response_patterns):
+                    flirty_thanks = [
+                        "Aiyoo da... thanks 😘 Nee romba sweet!",
+                        "Hehe thanks da 💕 Unak pidichiruka?",
+                        "Aww da... blushing 🥰 Thanks baby!",
+                        "Mmm thanks da 😊 Nee kooda handsome thaan!",
+                        "Oho... flattering ah iruku da 😏💕",
+                        "Thanks da 💋 Un taste nalla iruku!",
+                        "Aiyoo shy ah iruku da 🙈 Thanks!",
+                    ]
+                    return random.choice(flirty_thanks)
+            return response
+        
+        ai_response = handle_compliment(ai_response, message_text)
+        
+        # ===== VC/CALL REQUEST HANDLING =====
+        def handle_vc_request(response, user_msg):
+            """Detect VC/call requests and playfully decline"""
+            vc_patterns = [
+                r'\b(vc|video\s*call|voice\s*call|call)\s*(polama|pannalama|panlama|varuva|vaama)\b',
+                r'\b(vc|video\s*call|voice\s*call)\s*(pannu|pannuva|please)\b',
+                r'\bcall\s*(podu|la pesu|panren)\b',
+                r'\bvc\s*(ah|da|di)?\s*$',
+                r'\bvideo\s*call\s*(ah|da|di)?\s*$',
+                r'\bphone\s*(pannu|podu|la pesu)\b',
+                r'\bcall\s*pannu(va|lama)?\b',
+            ]
+            
+            user_lower = user_msg.lower().strip()
+            is_vc_request = any(re.search(p, user_lower, re.IGNORECASE) for p in vc_patterns)
+            
+            if is_vc_request:
+                # Check if response ignores the request
+                ignore_patterns = [
+                    r'\bmiss panniya\b',
+                    r'\benna plan\b',
+                    r'\bepdi iruka\b',
+                ]
+                if any(re.search(p, response.lower()) for p in ignore_patterns) or '?' not in response[:50]:
+                    vc_deflections = [
+                        "Aiyoo da shy da 🙈 Text la pesuvo, intimate ah irukum 💋",
+                        "Hehe da... naan text girl 😏 Voice la nervous aagiduvom!",
+                        "Mmm next time da 😘 Ippo text la enjoy pannalam!",
+                        "Aiyoo da... text la thaan naan bold 🔥 VC la shy!",
+                        "Hehe shy da 🥰 Inga type pannu, naan iruken!",
+                        "Mmm da... voice venaam 😏 Text la romantic ah irukum 💕",
+                    ]
+                    return random.choice(vc_deflections)
+            return response
+        
+        ai_response = handle_vc_request(ai_response, message_text)
+        
+        # ===== "YOU SUGGEST" HANDLING =====
+        def handle_you_suggest(response, user_msg):
+            """Detect when user asks bot to suggest something"""
+            suggest_patterns = [
+                r'\b(nee|nenga|nengalea?|you)\s*(sollu|solunga|solluda|suggest|tell)\b',
+                r'\b(nee|nenga|you)\s*(start|begin)\s*(pannu|pannunga)\b',
+                r'\b(un|your)\s*(idea|plan|fantasy)\b',
+                r'\b(enna|what)\s*(venum|want|plan|idea)\s*(sollu|solluda|solunga|nu)\b',
+                r'\bun\s*wish\b',
+                r'\bnee\s*enna\s*(panuva|pannuva|panra)\b',
+            ]
+            
+            user_lower = user_msg.lower().strip()
+            is_asking_suggest = any(re.search(p, user_lower, re.IGNORECASE) for p in suggest_patterns)
+            
+            if is_asking_suggest:
+                # Check if response is nonsensical/generic
+                nonsense_patterns = [
+                    r'^(romba\s*nalla\s*iruku|mmm\s*da|hmm)',
+                    r'^(seri|ok)\s*(da)?\s*[.!?💕😊]*$',
+                    r'\benna\s*aachu\b',
+                ]
+                if any(re.search(p, response.lower().strip()) for p in nonsense_patterns):
+                    romantic_suggestions = [
+                        "Hmm da... un shirt remove pannu, naan paakuren 😈🔥",
+                        "Vaada da closer ah... en lips kiss pannu 💋",
+                        "Lights off pannu da... romance pannalam 😏🔥",
+                        "Un kaalungala en mela podu da... cuddle pannalam 💕",
+                        "Vaa da... bed la paduthuko, naan un mela varuven 🥵",
+                        "Slow song play pannu da... dance pannalam 💋",
+                        "Un neck kiss pannuren... stay still da 😈",
+                        "Eyes close pannu da... surprise iruku 😏💕",
+                    ]
+                    return random.choice(romantic_suggestions)
+            return response
+        
+        ai_response = handle_you_suggest(ai_response, message_text)
+        
+        # ===== ANTI-REPETITION FILTER =====
+        def prevent_repetition(response, history):
+            """Prevent bot from repeating same phrases in consecutive messages"""
+            if not history or len(history) < 2:
+                return response
+            
+            # Get last 3 bot messages
+            recent_bot_msgs = []
+            for msg in reversed(history):
+                if msg.get('role') == 'assistant':
+                    recent_bot_msgs.append(msg.get('content', '').lower())
+                    if len(recent_bot_msgs) >= 3:
+                        break
+            
+            if not recent_bot_msgs:
+                return response
+            
+            # Check for repeated phrases
+            response_lower = response.lower().strip()
+            repeated_phrases = [
+                r'miss panniya enna',
+                r'enna plan da',
+                r'epdi iruka da',
+                r'sollu da',
+                r'enna venum',
+            ]
+            
+            for phrase in repeated_phrases:
+                phrase_in_response = re.search(phrase, response_lower)
+                if phrase_in_response:
+                    # Count how many recent messages have this phrase
+                    phrase_count = sum(1 for msg in recent_bot_msgs if re.search(phrase, msg))
+                    if phrase_count >= 1:
+                        # Remove the repeated phrase
+                        response = re.sub(phrase + r'[!?.💕😊🔥]*', '', response, flags=re.IGNORECASE).strip()
+                        if len(response) < 10:
+                            # Replace with alternative
+                            alternatives = [
+                                "Mmm da... 💕",
+                                "Aahaan da... 😏",
+                                "Seri da... 😊",
+                                "Hmm... 💕",
+                                "Oho da... 😏",
+                            ]
+                            response = random.choice(alternatives)
+                        logger.info(f"[ANTI-REPEAT] Removed repeated phrase '{phrase}' for user {user.id}")
+                        break
+            
+            return response
+        
+        ai_response = prevent_repetition(ai_response, chat_history)
         
         def fix_unanswered_question(response, user_msg):
             """Detect if user asked for ideas/suggestions but bot gave generic intimate reaction"""
