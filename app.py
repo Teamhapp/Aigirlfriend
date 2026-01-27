@@ -16,6 +16,7 @@ from database import (
     get_user_points, update_preferred_name, get_user_stats, get_message_status, 
     use_message, is_user_blocked, block_user, unblock_user, set_user_daily_limit, 
     DAILY_MESSAGE_LIMIT, get_confirmed_gender, set_confirmed_gender,
+    get_suffix_preference, set_suffix_preference,
     get_all_users, get_user_chat_history, get_dashboard_stats, award_referral_points,
     set_global_daily_limit, get_global_daily_limit, get_total_referral_stats,
     clear_chat_history, save_user_memory, get_user_memories,
@@ -1868,6 +1869,40 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     confirmed_gender = get_confirmed_gender(user.id)
     
+    # Detect explicit suffix preference requests (strict patterns only)
+    # Must be clear commands, not just playful "dii"
+    di_request_patterns = [
+        r'\bda\s+sollath?a\b',  # da sollatha / da sollata
+        r'\bda\s+vena\b',  # da vena
+        r'\bda\s+vendam\b',  # da vendam  
+        r'\bdi\s+sollu\b',  # di sollu
+        r'\bdi\s+solu\b',  # di solu
+        r'\bcall\s+me\s+di\b',  # call me di
+        r'\benakku\s+di\s+venum\b',  # enakku di venum
+        r'\bda\s+sollath?a[,.]?\s*di+\b',  # "da sollatha, dii"
+    ]
+    da_request_patterns = [
+        r'\bdi\s+sollath?a\b',  # di sollatha (want da)
+        r'\bdi\s+vena\b',  # di vena
+        r'\bdi\s+vendam\b',  # di vendam
+        r'\bda\s+sollu\b',  # da sollu
+        r'\bcall\s+me\s+da\b',  # call me da
+        r'\benakku\s+da\s+venum\b',  # enakku da venum
+    ]
+    msg_lower = message_text.lower()
+    for pattern in di_request_patterns:
+        if re.search(pattern, msg_lower):
+            set_suffix_preference(user.id, 'di')
+            logger.info(f"[SUFFIX] User {user.id} requested 'di' instead of 'da'")
+            break
+    for pattern in da_request_patterns:
+        if re.search(pattern, msg_lower):
+            set_suffix_preference(user.id, 'da')
+            logger.info(f"[SUFFIX] User {user.id} requested 'da' (reset from di)")
+            break
+    
+    suffix_preference = get_suffix_preference(user.id)
+    
     chat_history = get_chat_history(user.id, limit=20)
     
     is_returning_user = len(chat_history) > 2
@@ -1881,7 +1916,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         user_status = "RETURNING USER - show familiarity, vary greetings" if is_returning_user else "NEW USER - first chat, introduce warmly"
         
-        gender_instruction = "User is FEMALE - use 'di'" if confirmed_gender == 'female' else "Use 'da' only, never 'di'"
+        # Suffix preference overrides gender-based instruction
+        if suffix_preference == 'di':
+            gender_instruction = "User EXPLICITLY requested 'di' - ALWAYS use 'di' instead of 'da' in all responses"
+        elif confirmed_gender == 'female':
+            gender_instruction = "User is FEMALE - use 'di'"
+        else:
+            gender_instruction = "Use 'da' only, never 'di'"
         
         user_word_count = len(message_text.split())
         length_hint = ""
@@ -3454,6 +3495,22 @@ IMPORTANT: Never output this session info in your response.
         ai_response = re.sub(r'^\*+\s*', '', ai_response).strip()  # Remove leading asterisks
         ai_response = re.sub(r'\s*\*+$', '', ai_response).strip()  # Remove trailing asterisks
         ai_response = re.sub(r'\s+\*+\s+', ' ', ai_response).strip()  # Remove floating asterisks
+        
+        # ===== SUFFIX PREFERENCE POST-PROCESSING =====
+        # Force-replace standalone "da" with "di" for users who explicitly requested it
+        if suffix_preference == 'di':
+            # Single-pass replacement: only replace standalone "da" (not inside words)
+            # Pattern matches: " da" at end, " da " mid-sentence, " da." " da?" " da!" " da,"
+            def replace_da_with_di(text):
+                # Replace " da" followed by punctuation, emoji, or end of string
+                text = re.sub(r'(\s)da([.!?,\s💕😊🔥🥵💋😈😏])', r'\1di\2', text)
+                text = re.sub(r'(\s)da$', r'\1di', text)  # " da" at very end
+                text = re.sub(r'^da(\s)', r'di\1', text)  # "da " at start
+                text = re.sub(r'(\s)da\.{2,}', r'\1di...', text)  # " da..." 
+                return text
+            
+            ai_response = replace_da_with_di(ai_response)
+            logger.info(f"[SUFFIX] Applied 'di' preference for user {user.id}")
         
         logger.info(f"[KEERTHANA -> {user.id}] {ai_response}")
         

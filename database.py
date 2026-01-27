@@ -78,6 +78,7 @@ def init_database():
             cur.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE')
             cur.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_daily_limit INTEGER DEFAULT NULL')
             cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS confirmed_gender VARCHAR(20) DEFAULT NULL")
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS suffix_preference VARCHAR(10) DEFAULT 'da'")
         except Exception:
             pass
         
@@ -239,6 +240,28 @@ def set_confirmed_gender(conn, user_id, gender):
         return True
     except Exception as e:
         logger.error(f"Error setting gender: {e}")
+        conn.rollback()
+        return False
+
+@with_db_retry()
+def get_suffix_preference(conn, user_id):
+    cur = conn.cursor()
+    cur.execute('SELECT suffix_preference FROM users WHERE user_id = %s', (user_id,))
+    result = cur.fetchone()
+    cur.close()
+    return result[0] if result else 'da'
+
+@with_db_retry()
+def set_suffix_preference(conn, user_id, suffix):
+    try:
+        cur = conn.cursor()
+        cur.execute('UPDATE users SET suffix_preference = %s WHERE user_id = %s', (suffix, user_id))
+        conn.commit()
+        cur.close()
+        logger.info(f"Set suffix preference for user {user_id} to {suffix}")
+        return True
+    except Exception as e:
+        logger.error(f"Error setting suffix preference: {e}")
         conn.rollback()
         return False
 
