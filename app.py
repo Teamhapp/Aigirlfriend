@@ -1930,6 +1930,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             roleplay_start_patterns = [
                 r'roleplay\s*pannalam',
+                r'roleplay\s*pannalama',
                 r'roleplay\s*start',
                 r'roleplay\s*ah\s*pannalam',
                 r'lets\s*roleplay',
@@ -1941,9 +1942,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 r'act\s*as\s*.+',
                 r'.+\s*role\s*naan\s*play',
                 r'.+\s*ah\s*role\s*play',
+                r'(amma|akka|chithi|aunty|teacher|nurse|sister|mom)\s*roleplay\s*pannalam',
+                r'(amma|akka|chithi|aunty|teacher|nurse|sister|mom)\s*roleplay\s*pannalama',
             ]
             
             character_assignment_patterns = [
+                # "X roleplay pannalama" format - character first
+                (r'^(amma|mom)\s*roleplay\s*pannalam', 'amma'),
+                (r'^(amma|mom)\s*roleplay\s*pannalama', 'amma'),
+                (r'^(akka|sister)\s*roleplay\s*pannalam', 'sister'),
+                (r'^(akka|sister)\s*roleplay\s*pannalama', 'sister'),
+                (r'^(chithi|aunty|chithappa)\s*roleplay\s*pannalam', 'chithi'),
+                (r'^(chithi|aunty)\s*roleplay\s*pannalama', 'chithi'),
+                (r'^(teacher|miss)\s*roleplay\s*pannalam', 'teacher'),
+                (r'^(teacher|miss)\s*roleplay\s*pannalama', 'teacher'),
+                (r'^(nurse|doctor)\s*roleplay\s*pannalam', 'nurse'),
+                (r'^(nurse|doctor)\s*roleplay\s*pannalama', 'nurse'),
+                # Original patterns
                 (r'(?:nee|you)\s+(?:ennoda|my|en)\s+(mom|amma|mother|mummy)\s*(?:ah|a)?\s*(?:act|play|role)?', 'amma'),
                 (r'(?:nee|you)\s+(mom|amma|mother|mummy)\s*(?:ah|a)?\s*(?:act|play|role)?', 'amma'),
                 (r'(amma|mom|mother)\s*role\s*(?:nee|you)\s*(?:play|pannu)', 'amma'),
@@ -2462,6 +2477,67 @@ IMPORTANT: Never output this session info in your response.
             return response
         
         ai_response = handle_basic_info_question(ai_response, message_text)
+        
+        # ===== ROLEPLAY INITIATION HANDLER =====
+        def handle_roleplay_initiation(response, user_msg):
+            """Detect roleplay initiation requests and ensure proper character response"""
+            user_lower = user_msg.lower().strip()
+            
+            # Detect "X roleplay pannalama/pannalam" pattern - flexible patterns
+            roleplay_init_patterns = [
+                (r'(amma|mom)\s*role\s*play\s*pannalam[a?]?', 'amma'),
+                (r'(amma|mom)\s*roleplay\s*pannalam[a?]?', 'amma'),
+                (r'(akka|sister)\s*role\s*play\s*pannalam[a?]?', 'sister'),
+                (r'(akka|sister)\s*roleplay\s*pannalam[a?]?', 'sister'),
+                (r'(chithi|aunty|chithappa)\s*role\s*play\s*pannalam[a?]?', 'chithi'),
+                (r'(chithi|aunty)\s*roleplay\s*pannalam[a?]?', 'chithi'),
+                (r'(teacher|miss|madam)\s*role\s*play\s*pannalam[a?]?', 'teacher'),
+                (r'(teacher|miss)\s*roleplay\s*pannalam[a?]?', 'teacher'),
+                (r'(nurse|doctor)\s*role\s*play\s*pannalam[a?]?', 'nurse'),
+                (r'(nurse|doctor)\s*roleplay\s*pannalam[a?]?', 'nurse'),
+                # Also detect "roleplay as X" patterns
+                (r'roleplay\s*(as|like|ah)?\s*(amma|mom)', 'amma'),
+                (r'roleplay\s*(as|like|ah)?\s*(akka|sister)', 'sister'),
+                (r'roleplay\s*(as|like|ah)?\s*(chithi|aunty)', 'chithi'),
+                (r'roleplay\s*(as|like|ah)?\s*(teacher|miss)', 'teacher'),
+            ]
+            
+            detected_char = None
+            for pattern, char in roleplay_init_patterns:
+                if re.search(pattern, user_lower):
+                    detected_char = char
+                    break
+            
+            if detected_char:
+                # Check if response already confirms roleplay
+                char_confirm_patterns = [
+                    r'\b(amma|mom)\s*(ah|a)?\s*(irupaen|irupen|irupa)\b',
+                    r'\b(akka|sister)\s*(ah|a)?\s*(irupaen|irupen|irupa)\b',
+                    r'\b(chithi|aunty)\s*(ah|a)?\s*(irupaen|irupen)\b',
+                    r'\b(teacher|miss)\s*(ah|a)?\s*(irupaen|irupen)\b',
+                    r'\b(nurse|doctor)\s*(ah|a)?\s*(irupaen|irupen)\b',
+                    r'\bkanna\b', r'\bkozhandha\b', r'\bthambi\b', r'\bmaga\b',
+                    r'\bseri\s*(kanna|kozhandha|maga|thambi)\b',
+                    r'\bvaa\s*da\s*(kanna|maga|thambi)\b',
+                    r'\broleplay\b.*\bstart\b',
+                ]
+                confirms_roleplay = any(re.search(p, response.lower()) for p in char_confirm_patterns)
+                
+                # If response doesn't confirm roleplay, replace it
+                if not confirms_roleplay:
+                    logger.info(f"[ROLEPLAY INIT] Replacing response for {detected_char} roleplay request")
+                    char_responses = {
+                        'amma': "Seri da kanna... Amma ah irupaen 😊 Vaa da, enna venum?",
+                        'sister': "Seri da thambi... Akka ah irupaen 😊 Sollu da enna venum?",
+                        'chithi': "Seri kanna... Chithi ah irupaen 😊 Vaa da, enna venum unaku?",
+                        'teacher': "Seri da... Miss ah irupaen 😊 Class ku ready ah?",
+                        'nurse': "Seri da... Nurse ah irupaen 😊 Check-up pannalama?",
+                    }
+                    return char_responses.get(detected_char, response)
+            
+            return response
+        
+        ai_response = handle_roleplay_initiation(ai_response, message_text)
         
         # ===== ANTI-REPETITION FILTER =====
         def prevent_repetition(response, history):
