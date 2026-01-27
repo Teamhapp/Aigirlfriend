@@ -2697,13 +2697,14 @@ IMPORTANT: Never output this session info in your response.
             
             casual_patterns = {
                 'enna_panra': [
-                    r'^enna\s*(panra|pannura|seiyura|seiyra)\s*[?]*$',
+                    r'^enna\s*(panra|pannura|seiyura|seiyra|pantra|pandraa?|pandre|pannre)\s*[?]*$',
                     r'^enna\s*pandringa\s*[?]*$',
                     r'^what\s*(are\s*you\s*doing|you\s*doing)\s*[?]*$',
+                    r'^en+a\s+pan+[ura]+\s*[?]*$',
                 ],
                 'saptta': [
                     r'^saptta\s*[?]*$',
-                    r'^(sapta|sapita|saptiya)\s*[?]*$',
+                    r'^(sapta|sapita|saptiya|saptaa?)\s*[?]*$',
                     r'^(lunch|dinner|breakfast)\s*aachi\s*[?]*$',
                     r'^sappadu\s*(aachi|over)\s*[?]*$',
                 ],
@@ -2711,10 +2712,16 @@ IMPORTANT: Never output this session info in your response.
                     r'^epdi\s*iruka\s*[?]*$',
                     r'^how\s*are\s*you\s*[?]*$',
                     r'^eppadi\s*irukka\s*[?]*$',
+                    r'^ep+[ai]di\s*iru[kc]+a\s*[?]*$',
                 ],
                 'enga_iruka': [
                     r'^enga\s*iruka\s*[?]*$',
                     r'^where\s*are\s*you\s*[?]*$',
+                ],
+                'summa': [
+                    r'^sum+a\s*(iruk+[ae]n?|da|di|sellam|chellam)?\s*[?]*$',
+                    r'^chilling\s*[?]*$',
+                    r'^nothing\s*(much)?\s*[?]*$',
                 ],
             }
             
@@ -2743,6 +2750,12 @@ IMPORTANT: Never output this session info in your response.
                     "Room la paduthitu iruken 💕",
                     "Home da, un pakkathula irukanum nu feel 😊",
                 ],
+                'summa': [
+                    "Aahaan da, summa ah? Naan kooda summa thaan 😊",
+                    "Seri da, relax pannu. Naan iruken 💕",
+                    "Hmm da, bore ah? Naan kooda same 😊",
+                    "Okie da, chill pannu 💕",
+                ],
             }
             
             for qtype, patterns in casual_patterns.items():
@@ -2754,6 +2767,78 @@ IMPORTANT: Never output this session info in your response.
             return response
         
         ai_response = handle_casual_questions(ai_response, message_text, chat_history)
+        
+        # ===== ENERGY-LEVEL MATCHING =====
+        def match_energy_level(response, user_msg, history):
+            """Match response energy to user's energy level"""
+            user_lower = user_msg.lower().strip()
+            
+            # Low-energy neutral messages that should NOT get sexual responses
+            low_energy_patterns = [
+                r'^(ok|okay|okie|k|kk|hmm+|hm|mm+|s|ss|yes|ya|yaa|aama|seri)\s*[.!?]*$',
+                r'^(alright|fine|cool|nice)\s*[.!?]*$',
+                r'^(puriyala|purila|what|enna|huh)\s*[?!.]*$',
+            ]
+            
+            is_low_energy = any(re.match(p, user_lower, re.IGNORECASE) for p in low_energy_patterns)
+            
+            if is_low_energy:
+                # Check if response is too sexual for low-energy input
+                sexual_markers = ['🥵', 'innum pannu', 'ready ah irukken', 'pannalam', 
+                                  'un touch', 'feel aaguthu', 'hard', 'wet']
+                
+                if any(marker in response.lower() for marker in sexual_markers):
+                    # Check recent history for intimate context
+                    recent_intimate = False
+                    if history and len(history) >= 2:
+                        last_msgs = [m.get('content', '').lower() for m in history[-4:]]
+                        intimate_history_markers = [
+                            'kiss', 'touch', 'mulai', 'pundai', 'sunni', 'sappu', 'oombu',
+                            'naked', 'remove', 'lick', 'suck', 'fuck', 'sex', 'hard', 'wet',
+                            'pannalam', 'nakku', 'konju', 'boobs', 'dick', 'cock',
+                            '🥵', '😈', '💦', '🔥'
+                        ]
+                        recent_intimate = any(any(m in msg for m in intimate_history_markers) for msg in last_msgs)
+                    
+                    if not recent_intimate:
+                        logger.info(f"[ENERGY MATCH] Low-energy input got sexual response, replacing")
+                        low_energy_responses = [
+                            "Hmm da... 😊", "Seri da 💕", "Okie da 😊", 
+                            "Aahaan da... 💕", "Mmm da 😊"
+                        ]
+                        return random.choice(low_energy_responses)
+            
+            return response
+        
+        ai_response = match_energy_level(ai_response, message_text, chat_history)
+        
+        # ===== DE-ESCALATION FOR CONFUSION =====
+        def handle_confusion(response, user_msg):
+            """De-escalate when user shows confusion"""
+            user_lower = user_msg.lower().strip()
+            
+            confusion_patterns = [
+                r'^(puriyala|purila|puriyale)\s*[.!?]*$',
+                r'^(what|enna|huh|en)\s*[?!.]*$',
+                r'^(enaku puriyala|i dont understand|don\'t understand)\s*[.!?]*$',
+            ]
+            
+            if any(re.match(p, user_lower, re.IGNORECASE) for p in confusion_patterns):
+                # Check if response continues sexual theme instead of clarifying
+                sexual_markers = ['🥵', 'innum', 'pannalam', 'ready', 'feel']
+                if any(marker in response.lower() for marker in sexual_markers):
+                    logger.info(f"[DE-ESCALATE] User confused but got sexual response, de-escalating")
+                    deescalate_responses = [
+                        "Aiyoo da, summa solluven... purinjutha? 😊",
+                        "Illa da, casual ah than sonna... 💕",
+                        "Haha da, leave it... enna venum sollu 😊",
+                        "Seri da, vera topic pesalama? 💕",
+                    ]
+                    return random.choice(deescalate_responses)
+            
+            return response
+        
+        ai_response = handle_confusion(ai_response, message_text)
         
         # ===== ACTION REQUEST HANDLER =====
         def handle_action_request(response, user_msg):
@@ -2847,6 +2932,15 @@ IMPORTANT: Never output this session info in your response.
         def replace_generic_phrases(response):
             """Replace overused generic phrases with varied alternatives"""
             replacements = [
+                # CRITICAL: Block overused "Pannalam" fallback
+                (r'^pannalam\s*(da|di)?[!.]*\s*ready\s*(ah|a)?\s*iruk+[ae]n\s*[😈🔥🥵]*\s*$', [
+                    'Sollu da enna venum 😊', 'Hmm da, un mood la iruken 💕',
+                    'Seri da, naan iruken 😊', 'Okie da 💕'
+                ]),
+                # Also catch mid-sentence
+                (r'pannalam\s*(da|di)?[!.]*\s*ready\s*(ah|a)?\s*iruk+[ae]n', [
+                    'un kitta iruken da', 'naan ready da', 'sollu da'
+                ]),
                 # vera level variations
                 (r'\bvera level\s*(feel|da|🥵|🔥)*', [
                     'amazing feel da', 'ufff da', 'un touch ku shiver aaguthu', 
