@@ -534,11 +534,18 @@ When user asks you to play MULTIPLE characters (e.g., "Amma and Poorna aunty rol
 - Switch between characters naturally based on the scene
 - When user addresses a specific character, that character responds
 
-CRITICAL "YOUR MOM" CLARIFICATION:
+CRITICAL "YOUR MOM" / "AUNTY" CLARIFICATION:
 - When user says "your mom" or "your mother" → They mean KEERTHANA'S MOM (en Amma / Keerthana oda Amma)
 - This is NOT user's mom! The user is talking to YOU (Keerthana), so "your mom" = YOUR (Keerthana's) mother
 - Respond as: "Keerthana: En Amma va kooda scene ah? Seri da..." NOT "naan un Amma va iruken"
 - Use "en Amma" (my mom) or "Keerthana oda Amma" - NOT "un Amma" (your mom)
+
+CHARACTER NAMING FROM USER'S POV:
+- When USER calls Keerthana's mom "Aunty" → Respond as "Aunty:" NOT "Amma:"
+- "Aunty" is what USER calls Keerthana's mom (their perspective)
+- "Amma" is what KEERTHANA calls her mom (daughter's perspective)
+- In multi-char scene: If user addresses "Aunty", respond with "Aunty: ..." not "Amma: ..."
+- Keerthana can still call her "Amma" in her dialogue, but the character prefix should match user's naming
 
 MULTI-CHARACTER FORMAT EXAMPLE:
 User: "Rajesh and Lincy rendu perum scene pannum"
@@ -2827,16 +2834,21 @@ IMPORTANT: Never output this session info in your response.
                     logger.info(f"[MULTICHAR] Vague response for threesome setup, replacing with scene")
                     
                     # Detect which character was mentioned - use proper multi-char format
-                    # CRITICAL: "your mom" = Keerthana's mom (en Amma), NOT user's mom (un Amma)
-                    if re.search(r'your\s*(mom|mother|amma)', user_lower):
+                    # CRITICAL: Use the name USER used to address the character
+                    # "Aunty" = user's POV (they call Keerthana's mom Aunty)
+                    # "your mom" = Keerthana's mom from user's perspective
+                    if re.search(r'\baunty\b', user_lower):
+                        # User addresses Keerthana's mom as "Aunty"
+                        return "Aunty: Aiyoo kanna... birthday party ku nee vandhurukkiye? Vaada closer ah... 😏\n\nKeerthana: Dei da... naan kooda inga iruken... Aunty oda saree slip aaguthu paaru 😈🔥"
+                    elif re.search(r'your\s*(mom|mother|amma)', user_lower):
                         # User said "your mom" = Keerthana's mom
-                        return "Keerthana: Mmm da... en Amma Lakshmi kooda scene ah? Seri da, naan ready 😈\nAmma Lakshmi: Aiyoo... en ponna kooda scene ah? Seri da kanna, vaa closer ah...\nKeerthana: Amma, un saree konjam adjust pannu... naan un shirt remove pannuren da 🔥"
+                        return "Aunty: Aiyoo... en ponna kooda scene ah? Seri da kanna, vaa closer ah... 😏\n\nKeerthana: Mmm da... en Amma kooda scene ah? Naan ready da! 😈🔥"
                     elif re.search(r'\b(amma|mom)\b', user_lower):
-                        return "Keerthana: Mmm da... naan un kitta close ah irukken 😈\nAmma Lakshmi: Enna da kanna, enna nadakuthu inga? Vaa closer ah...\nKeerthana: Amma kooda serthu da... un body touch pannurom 🔥"
+                        return "Amma: Enna da kanna, enna nadakuthu inga? Vaa closer ah... 😏\n\nKeerthana: Mmm da... naan un kitta close ah irukken... Amma kooda serthu un body touch pannurom 🔥"
                     elif re.search(r'\b(akka|sister)\b', user_lower):
-                        return "Keerthana: Seri da... naan un pakkathula 😈\nAkka Priya: Enna da neenga rendum? Vaa da, naan kooda iruken...\nKeerthana: Akka un mela climb aaguranga da... naan un lips la kiss 🔥"
+                        return "Akka: Enna da neenga rendum? Vaa da, naan kooda iruken... 😏\n\nKeerthana: Seri da... Akka un mela climb aaguranga da... naan un lips la kiss pannuren 🔥"
                     elif re.search(r'\b(friend|girlfriend)\b', user_lower):
-                        return "Keerthana: Mmm da... naan un lap la 😈\nFriend Priya: Oho, intha scene ah? Naan kooda join panren...\nKeerthana: Priya un shirt remove pannuranga, naan kiss pannuren 🔥"
+                        return "Priya: Oho, intha scene ah? Naan kooda join panren... 😈\n\nKeerthana: Mmm da... Priya un shirt remove pannuranga, naan kiss pannuren 🔥"
                     else:
                         return "Keerthana: Threesome ah da? Yaar kooda venum? En Amma, Akka, friend - sollu, scene start pannidurom 😈🔥"
             
@@ -2952,8 +2964,9 @@ IMPORTANT: Never output this session info in your response.
             # Also check if multi-character scene is active and scene is continuing
             recent_text = ' '.join([m.get('content', '') for m in history[-8:]]).lower() if history else ''
             multichar_scene_active = any(x in recent_text for x in [
-                'keerthana:', 'amma:', 'akka:', 'amma lakshmi:', 'chithi:',
-                'your mom', 'your mother', 'en amma', 'threesome', 'moonu perum'
+                'keerthana:', 'amma:', 'akka:', 'amma lakshmi:', 'chithi:', 'aunty:',
+                'your mom', 'your mother', 'en amma', 'threesome', 'moonu perum',
+                'unga amma', 'multi character', 'rendu role'
             ])
             
             # Short affirmations in active multichar scene should continue with dual dialogue
@@ -2976,24 +2989,32 @@ IMPORTANT: Never output this session info in your response.
                     char1 = 'Keerthana'  # Default first character
                     char2 = None
                     
-                    if 'amma' in recent_text or 'mummy' in recent_text:
+                    # IMPORTANT: Use the name USER used to address the character
+                    # "Aunty" is user's POV (Keerthana's mom from user's view)
+                    # "Amma" is Keerthana's POV (Keerthana calls her mom Amma)
+                    if 'aunty' in recent_text:
+                        char2 = 'Aunty'  # User's POV - they call Keerthana's mom "Aunty"
+                    elif 'amma' in recent_text or 'mummy' in recent_text:
                         char2 = 'Amma'
                     elif 'akka' in recent_text or 'sister' in recent_text:
                         char2 = 'Akka'
-                    elif 'chithi' in recent_text or 'aunty' in recent_text:
+                    elif 'chithi' in recent_text:
                         char2 = 'Chithi'
                     elif 'teacher' in recent_text:
                         char2 = 'Teacher'
                     
                     if char2:
                         # Generate dual dialogue based on characters
+                        # Scene-building, natural flow with proper character voices
                         dual_templates = [
-                            f"{char2}: Aiyoo kanna... nee ipdi panna enakku feel aaguthu da 🥵\n\n{char1}: Mmm da... {char2}-vum unnoda together ah... sema scene da! 😈💋",
-                            f"{char1}: Dei da... {char2}-ku romba pudikum, paaru 😈\n\n{char2}: Aiyoo kanna... en kozhandhai enna pannudhu 🥵💋",
-                            f"{char2}: Thambi... konjam soft ah da 🥵\n\n{char1}: Dei da, naan inga iruken... continue pannu 😏🔥",
-                            f"{char1}: Mmm da... naan un pakkathula closer ah varren 😈\n\n{char2}: Naan kooda thambi... un mela en kaigal slide aaguthu 🥵💋",
-                            f"{char2}: Enna da kanna, un lips taste different ah irukku 🥵\n\n{char1}: Dei da... {char2} oda saree slip aaguthu... paaru 😈🔥",
-                            f"{char1}: Dei da... naan undress panren... paaru 😈\n\n{char2}: Aiyoo kanna... naan kooda... saree kalaiyuren 🥵💋",
+                            f"{char2}: Aiyoo kanna... nee ipdi touch panna enakku feel aaguthu da 🥵\n\n{char1}: Mmm da... {char2} kooda serthu unnoda together ah irukkom... enjoy pannu 😈💋",
+                            f"{char1}: Dei da... paaru {char2} oda saree slip aaguthu 😈\n\n{char2}: Aiyoo... en kozhandhaiya paathiya nee? Vaa da closer ah 🥵💋",
+                            f"{char2}: Kanna... un kai enna pakkam vanthuruchu... konjam soft ah da 🥵\n\n{char1}: Dei da, naan kooda feel panren... innum continue pannu 😏🔥",
+                            f"{char1}: Mmm da... naan un left side la... {char2} un right side la 😈\n\n{char2}: Rendu pakkamum nanga irukkom da... nee relax pannu 🥵💋",
+                            f"{char2}: Enna da kanna, un lips taste sweet ah irukku 🥵\n\n{char1}: Dei da... {char2} oda mulai un mela touch aaguthu paaru 😈🔥",
+                            f"{char1}: Dei da... naan slowly undress panren 😈\n\n{char2}: Aiyoo kanna... naan kooda en saree loosen panren... wait da 🥵💋",
+                            f"{char2}: Kanna... birthday gift ippo thaan start aaguthu 😏\n\n{char1}: Dei da... {char2} romba excited ah irukka paaru 😈🔥",
+                            f"{char1}: Mmm da... naan un lips la kiss pannuren 😈\n\n{char2}: Naan un neck la kiss panren da... feel panra? 🥵💋",
                         ]
                         response = random.choice(dual_templates)
                         logger.info(f"[DUAL_DIALOGUE] Generated {char1}+{char2} dual response")
