@@ -1226,7 +1226,7 @@ def generate_response(prompt, history=None, context_info=None):
                 system_instruction=full_system_prompt,
                 temperature=0.95,
                 top_p=0.98,
-                max_output_tokens=250,
+                max_output_tokens=800,
                 safety_settings=[
                     types.SafetySetting(
                         category='HARM_CATEGORY_HATE_SPEECH',
@@ -2750,11 +2750,16 @@ IMPORTANT: Never output this session info in your response.
             """Detect multi-character/threesome roleplay setup and ensure proper scene setup"""
             user_lower = user_msg.lower().strip()
             
-            # Detect threesome/multi-character setup patterns - explicit only
+            # Detect threesome/multi-character setup patterns
             multichar_patterns = [
-                r'threesome\s*(pannalam|roleplay|scene|panrom)',
-                r'moonu\s*per(um)?\s*(threesome|sex|pannalam|roleplay|panrom)',
-                r'moonu\s*perum\s*(threesome|pannrom|pannalam)',
+                r'threesome\s*(pannalam|roleplay|scene|panrom|pannu|start)?',
+                r'moonu\s*per(um)?\s*(threesome|sex|pannalam|roleplay|panrom|party)',
+                r'moonu\s*perum\s*(threesome|pannrom|pannalam|party)',
+                r'rendu\s*(role\s*play|roleplay)\s*pannanum',
+                r'(you|nee|ne)\s*(and|um)\s*(amma|akka|friend)',
+                r'(amma|akka)\s*(kooda|oda|um)\s*(threesome|scene|roleplay)',
+                r'moonu\s*perum\s*party',
+                r'party\s*panrom.*threesome',
             ]
             
             is_multichar_request = any(re.search(p, user_lower) for p in multichar_patterns)
@@ -2787,6 +2792,52 @@ IMPORTANT: Never output this session info in your response.
             return response
         
         ai_response = handle_multichar_roleplay(ai_response, message_text, chat_history)
+        
+        # ===== CHARACTER-ADDRESSED RESPONSE HANDLER =====
+        def handle_character_addressed(response, user_msg, history):
+            """When user addresses a specific character (Aunty, Amma, Akka), respond as that character"""
+            user_lower = user_msg.lower().strip()
+            
+            # Check if recent messages indicate active multi-character scene
+            recent_text = ' '.join([m.get('content', '') for m in history[-8:]]).lower() if history else ''
+            multichar_active = any(x in recent_text for x in ['threesome', 'moonu perum', 'rendu role', 'party panrom'])
+            
+            if not multichar_active:
+                return response
+            
+            # Check if user addresses a specific character
+            character_addressed = None
+            if re.match(r'^(aunty|aunti)\b', user_lower):
+                character_addressed = 'Amma'
+            elif re.match(r'^(amma|mom)\b', user_lower):
+                character_addressed = 'Amma'
+            elif re.match(r'^(akka|sister)\b', user_lower):
+                character_addressed = 'Akka'
+            elif re.match(r'^keerthana\b', user_lower):
+                character_addressed = 'Keerthana'
+            
+            if character_addressed:
+                # Check if response has confused reaction
+                confused_patterns = [
+                    r'enna\s*da\s*i?th',
+                    r'dei\s*da',
+                    r'puriyala',
+                    r'enna\s*scene',
+                ]
+                is_confused = any(re.search(p, response.lower()) for p in confused_patterns)
+                
+                if is_confused:
+                    logger.info(f"[CHAR_ADDRESS] User addressed {character_addressed}, bot confused - fixing")
+                    if character_addressed == 'Amma':
+                        return f"Amma: Aiyoo kanna... koocham ennakku da, nee drink eduthu vaa 😘 Un kitta en koocham illai da 🥵"
+                    elif character_addressed == 'Akka':
+                        return f"Akka: Enna da thambi, inga vaa closer ah... koocham vena naan handle panren 😈🔥"
+                    elif character_addressed == 'Keerthana':
+                        return f"Keerthana: Dei da... naan inga iruken pakkathula... {character_addressed} kitta pesura? 😏💕"
+            
+            return response
+        
+        ai_response = handle_character_addressed(ai_response, message_text, chat_history)
         
         # ===== ANTI-REPETITION FILTER =====
         def prevent_repetition(response, history):
