@@ -2192,17 +2192,39 @@ IMPORTANT: Never output this session info in your response.
             if line_count < 3 and word_count < 30:
                 logger.info(f"[LENGTH EXPAND] Response too short for paragraph request, not trimming for user {user.id}")
         elif user_word_count <= 3:
-            sentences = re.split(r'[.!?।]+', ai_response)
-            sentences = [s.strip() for s in sentences if s.strip()]
-            if len(sentences) > 1:
-                first_sentence = sentences[0]
-                trailing_emojis = re.findall(r'[\U0001F300-\U0001F9FF]+\s*$', ai_response)
-                emoji_suffix = trailing_emojis[0] if trailing_emojis else ''
-                if not re.search(r'[\U0001F300-\U0001F9FF]', first_sentence):
-                    ai_response = first_sentence + emoji_suffix
+            words = ai_response.split()
+            # Apply word cap regardless of sentence structure
+            if len(words) > 12:
+                # Better sentence splitting - find complete sentences with punctuation
+                sentence_matches = re.findall(r'[^.!?।]+[.!?।]+', ai_response)
+                if sentence_matches and len(sentence_matches) > 1:
+                    first_sentence = sentence_matches[0].strip()
+                    if len(first_sentence) >= 5:
+                        trailing_emojis = re.findall(r'[\U0001F300-\U0001F9FF]+\s*$', ai_response)
+                        emoji_suffix = trailing_emojis[0].strip() if trailing_emojis else ''
+                        if not re.search(r'[\U0001F300-\U0001F9FF]', first_sentence):
+                            ai_response = first_sentence + (" " + emoji_suffix if emoji_suffix else "")
+                        else:
+                            ai_response = first_sentence
+                        ai_response = ai_response.strip()
+                        logger.info(f"[LENGTH FIX] Trimmed response for short input from user {user.id}")
                 else:
-                    ai_response = first_sentence
-                logger.info(f"[LENGTH FIX] Trimmed response for short input from user {user.id}")
+                    # Single long sentence or no punctuation - word cap at 12 words
+                    truncated = ' '.join(words[:12])
+                    # Try to end at natural break
+                    if '...' in truncated:
+                        truncated = truncated.split('...')[0] + '...'
+                    elif ',' in truncated:
+                        last_comma = truncated.rfind(',')
+                        if last_comma > len(truncated) // 2:
+                            truncated = truncated[:last_comma] + '...'
+                    else:
+                        # End with trailing emojis if available
+                        trailing_emojis = re.findall(r'[\U0001F300-\U0001F9FF]+', ai_response)
+                        if trailing_emojis:
+                            truncated = truncated.rstrip() + ' ' + trailing_emojis[-1]
+                    ai_response = truncated.strip()
+                    logger.info(f"[LENGTH FIX] Word-capped long response for user {user.id}")
         
         if confirmed_gender != 'female':
             original_response = ai_response
@@ -2699,10 +2721,17 @@ IMPORTANT: Never output this session info in your response.
         ai_response = re.sub(r'\bsollunga\s*[!?.💖💕]*\s*$', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsollunga\s*(da)?[,!?.💖💕]*', '', ai_response, flags=re.IGNORECASE).strip()
         
-        ai_response = re.sub(r'\s*kannu\s*[,!?.💋💕🔥🥵😈]*', ' ', ai_response, flags=re.IGNORECASE).strip()
-        ai_response = re.sub(r'\s*kanna\s*[,!?.💋💕🔥🥵😈]*', ' ', ai_response, flags=re.IGNORECASE).strip()
-        ai_response = re.sub(r'\bkannu\b', '', ai_response, flags=re.IGNORECASE).strip()
-        ai_response = re.sub(r'\bkanna\b', '', ai_response, flags=re.IGNORECASE).strip()
+        # Only strip kanna/kannu when NOT in roleplay context (preserve for roleplay character speech)
+        # Check user message for roleplay initiation OR response for roleplay confirmation
+        user_msg_lower = message_text.lower()
+        is_roleplay_request = re.search(r'(amma|akka|chithi|aunty|teacher|nurse|sister|mom)\s*role\s*play|roleplay\s*(as|ah|like)?\s*(amma|akka|chithi|teacher)', user_msg_lower)
+        is_roleplay_response = re.search(r'irupaen|irupen|irupa|kozhandha|thambi|maga', ai_response.lower())
+        is_roleplay_context = is_roleplay_request or is_roleplay_response or roleplay_active
+        if not is_roleplay_context:
+            ai_response = re.sub(r'\s*kannu\s*[,!?.💋💕🔥🥵😈]*', ' ', ai_response, flags=re.IGNORECASE).strip()
+            ai_response = re.sub(r'\s*kanna\s*[,!?.💋💕🔥🥵😈]*', ' ', ai_response, flags=re.IGNORECASE).strip()
+            ai_response = re.sub(r'\bkannu\b', '', ai_response, flags=re.IGNORECASE).strip()
+            ai_response = re.sub(r'\bkanna\b', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsollu da,?\s*solluda[!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\benna scene\s*(da)?[,!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\benna nadakuthu\s*(da|inga)?[,!?.]*', '', ai_response, flags=re.IGNORECASE).strip()
