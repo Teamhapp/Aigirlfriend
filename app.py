@@ -2405,6 +2405,73 @@ IMPORTANT: Never output this session info in your response.
         
         ai_response = handle_compliment(ai_response, message_text)
         
+        # ===== DIRECT QUESTION HANDLERS =====
+        def handle_direct_questions(response, user_msg):
+            """Answer specific questions directly instead of giving vague responses"""
+            user_lower = user_msg.lower().strip()
+            
+            # SIZE QUESTIONS - boob size, body measurements
+            size_patterns = [
+                r'\b(boob|boobs|mulai|breast)\s*(size|enna)\b',
+                r'\bsize\s*(enna|evlo|ethana)\b',
+                r'\b(bra|cup)\s*size\b',
+                r'\b(periya|big)\s*(boobs|mulai)\b.*\b(size|ethana)\b',
+            ]
+            if any(re.search(p, user_lower) for p in size_patterns):
+                size_answers = [
+                    "34C da 😏 Un kaiku fit aagum!",
+                    "Hmm 34C da... perusa nu feel aaguthaa? 😈",
+                    "34C kannu 😊 Touch pannida venum?",
+                    "Nalla size thaan da 😏 Un hand la pudikkum!",
+                ]
+                logger.info(f"[DIRECT_Q] Answered size question")
+                return random.choice(size_answers)
+            
+            # BODY COUNT QUESTION
+            body_count_patterns = [
+                r'\bbody\s*count\b',
+                r'\bhow many\s*(guys|boys|people|persons)\b',
+                r'\bethana\s*(per|paiyan|guy)\b.*\b(sex|senji|pannita)\b',
+            ]
+            if any(re.search(p, user_lower) for p in body_count_patterns):
+                count_answers = [
+                    "Aiyoo da... 2 da 😏 Aana un kooda special ah iruku!",
+                    "3 da 😅 Aana nee mattum thaan en heart la!",
+                    "2 thaan da... aana un touch vera level 😈",
+                    "Hmm 3 da kannu 😊 Jealous aa?",
+                ]
+                logger.info(f"[DIRECT_Q] Answered body count question")
+                return random.choice(count_answers)
+            
+            # OOMBURIYAA - Will you suck? Should respond with action
+            oombu_patterns = [
+                r'\b(oombu|oomb)\s*(ri|ru|vi|ra|va)[yia]*',
+                r'\boomburiyaa?\b',
+                r'\boombalama\b',
+                r'\boombu\s*(va|vaa|da|di)?\b',
+                r'\boomburiya\s*(nu|da|di)?\b',
+            ]
+            if any(re.search(p, user_lower) for p in oombu_patterns):
+                # Check if response is wrong/generic (like "Sollu da", vague, doesn't describe action)
+                wrong_patterns = [
+                    r'\bsollu\s*(da|di)\b', r'\benna venum\b', r'\bready\b',
+                    r'^mmm\s*(da)?\.{0,3}\s*[🥵🔥😈💋]*\s*$',  # Just "Mmm da..."
+                    r'\bun\s+touch\b',  # Generic touch response
+                ]
+                if any(re.search(p, response.lower()) for p in wrong_patterns):
+                    oombu_actions = [
+                        "Mmm da... un sunniya en lips la edukkuren 🥵💋",
+                        "Aaha... vaa da closer... oombuven 😈💦",
+                        "Mmm... un sunniya en vaai kulla vidu da 🥵",
+                        "Slow ah start pannuren da... un tip ah nakki 💋🥵",
+                    ]
+                    logger.info(f"[DIRECT_Q] Fixed oomburiyaa with action")
+                    return random.choice(oombu_actions)
+            
+            return response
+        
+        ai_response = handle_direct_questions(ai_response, message_text)
+        
         # ===== VC/CALL REQUEST HANDLING =====
         def handle_vc_request(response, user_msg):
             """Detect VC/call requests and playfully decline"""
@@ -2975,14 +3042,19 @@ IMPORTANT: Never output this session info in your response.
         def replace_generic_phrases(response):
             """Replace overused generic phrases with varied alternatives"""
             replacements = [
-                # CRITICAL: Block overused "Pannalam" fallback
-                (r'^pannalam\s*(da|di)?[!.]*\s*ready\s*(ah|a)?\s*iruk+[ae]n\s*[😈🔥🥵]*\s*$', [
-                    'Sollu da enna venum 😊', 'Hmm da, un mood la iruken 💕',
-                    'Seri da, naan iruken 😊', 'Okie da 💕'
+                # CRITICAL: Block overused "Pannalam" fallback - EXACT matches only
+                # "Pannalam da! 😈 😉 ennoda feel vera level 🔥" - the full phrase
+                (r'^pannalam\s*(da|di)?[!.😈🔥🥵😉 ]+ennoda\s*feel\s*vera\s*level[!🔥😈🥵 ]*$', [
+                    'Mmm da 💕', 'Aaha da 😊', 'Seri da 💕', 'Okie 😊'
                 ]),
-                # Also catch mid-sentence
-                (r'pannalam\s*(da|di)?[!.]*\s*ready\s*(ah|a)?\s*iruk+[ae]n', [
-                    'un kitta iruken da', 'naan ready da', 'sollu da'
+                # "Pannalam da! Ready ah irukken 😈" - standalone
+                (r'^pannalam\s*(da|di)?[!.😈🔥🥵 ]*ready\s*(ah|a)?\s*iruk+[ae]n[!😈🔥🥵 ]*$', [
+                    'Mmm da un kitta iruken 💕', 'Hmm da, un mood la iruken 😊',
+                    'Seri da 💕', 'Okie da 😊'
+                ]),
+                # "Pannalam da! 😈" - just this short form as entire response
+                (r'^pannalam\s*(da|di)?[!.😈🔥🥵😉 ]*$', [
+                    'Mmm da 💕', 'Aaha da 😊', 'Seri da 💕'
                 ]),
                 # vera level variations
                 (r'\bvera level\s*(feel|da|🥵|🔥)*', [
@@ -3275,11 +3347,15 @@ IMPORTANT: Never output this session info in your response.
         
         ai_response = enforce_role_address(ai_response, message_text, chat_history)
         
-        ai_response = re.sub(r'\bsollu\s*da\b[,!?.]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
-        ai_response = re.sub(r'\bsolluda\b[,!?.]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
-        ai_response = re.sub(r'\bsollu\s*[!?.]*\s*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bsollu\s*da\b[,!?.💕]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bsolluda\b[,!?.💕]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bsollu\s*[!?.💕]*\s*$', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsollunga\s*[!?.💖💕]*\s*$', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsollunga\s*(da)?[,!?.💖💕]*', '', ai_response, flags=re.IGNORECASE).strip()
+        # Additional sollu patterns
+        ai_response = re.sub(r'\bsollu\s*da\s*\.{2,3}\s*💕\s*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'^\s*sollu\s*da\s*\.{2,3}\s*💕?\s*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\bMmm\s*(da)?\.{2,3}\s*🥵\s*Sollu\s*da\.{2,3}\s*💕\s*$', 'Mmm da... 🥵', ai_response, flags=re.IGNORECASE).strip()
         
         # Only strip kanna/kannu when NOT in roleplay context (preserve for roleplay character speech)
         # Check user message for roleplay initiation OR response for roleplay confirmation
@@ -3388,6 +3464,9 @@ IMPORTANT: Never output this session info in your response.
         ai_response = re.sub(r'why are you acting like this[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'treating with dignity[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'personal details pathi[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        # Fix body count avoidance - only when user actually asked about body count
+        if re.search(r'\bbody\s*count\b', message_text, re.IGNORECASE):
+            ai_response = re.sub(r'\bathu\s*konjam\s*personal\b[^.!?]*[.!?]*', 'Aiyoo da... 2 da 😏 Jealous aa?', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'will you be respectful[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'please understand[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'you\'?re going too far[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
