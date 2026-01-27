@@ -3208,6 +3208,12 @@ IMPORTANT: Never output this session info in your response.
                 (r'\bun\s+sunniya\s+ennoda\s*$', 'un sunniya ennoda vaai kulla vaikuren 🥵'),
                 (r'\bennoda\s*$', 'ennoda pakkam vaa da 💕'),
                 (r'\bun\s+kitta\s*$', 'un kitta iruken da 💕'),
+                (r'\btouch\s+pann\s*$', 'touch pannuven da 🥵'),
+                (r'\ben\s+mouth\s*$', 'en mouth kulla vaikuren da 🥵'),
+                (r'\bun\s+sunniya\s+en\s+mouth\s*$', 'un sunniya en mouth kulla deep ah edukkuren 🥵'),
+                (r'\bun\s+sunni\s+touch\s+pann\s*$', 'un sunni touch pannuven da... slow ah 🥵'),
+                (r'\birukum\s*$', 'irukum da 🥵'),
+                (r'\bkudupen\s*$', 'kudupen da 🥵'),
             ]
             
             for pattern, suffix in incomplete_word_patterns:
