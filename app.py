@@ -2198,15 +2198,15 @@ IMPORTANT: Never output this session info in your response.
         ai_response = ai_response.strip()
         
         # ===== FIX LEADING TRUNCATION =====
-        # If response starts with "..." it means beginning was cut - fix contextually
-        if ai_response.startswith('...'):
-            # Remove leading dots and check what comes after
+        # Only fix if response starts with exactly "... " (dot-dot-dot-space) - this is truncation, not style
+        # Stylistic trailing like "Mmm..." has text BEFORE dots, not after
+        if re.match(r'^\.{2,4}\s+[a-z]', ai_response):
+            # This pattern: "... word" with lowercase indicates continuation/truncation
             clean_start = ai_response.lstrip('.').strip()
-            # If it's just continuation text without proper start, add context
-            if clean_start and not re.match(r'^[A-Z]', clean_start):
-                # Capitalize first letter and add proper start
+            if clean_start:
+                # Just capitalize first letter - don't force mood starters
                 ai_response = clean_start[0].upper() + clean_start[1:] if len(clean_start) > 1 else clean_start.upper()
-                logger.info(f"[LEADING_FIX] Removed leading truncation dots")
+                logger.info(f"[LEADING_FIX] Fixed leading truncation dots")
         
         intimate_keywords = {'sunni', 'pundai', 'mulai', 'oombu', 'blowjob', 'nakku', 'sappu', 'fuck', 'pool', 'kuthi', 'boobs', 'cock', 'dick', 'thanni', 'cum', 'suck', 'lick', 'poola', 'otha', 'olu', 'moonu', 'boob', 'sexy', 'strip', 'nude', 'naked', 'kiss', 'touch', 'bed', 'romance'}
         recent_msgs = ' '.join([m.get('content', '') for m in chat_history[-5:]]).lower()
@@ -3335,6 +3335,9 @@ IMPORTANT: Never output this session info in your response.
                 (r'\benna\s+da\s+idhellam\s*$', 'enna da idhellam? 😂'),
                 (r'\bpoolai\s*$', 'poolai pidichiruku da 🥵'),
                 (r'\bpoolaiyum\s+en\s*$', 'poolaiyum ennoda vaaikulla vaikuren 🥵'),
+                # Fix "pur" incomplete - likely puriyala, puriyadhu, etc.
+                (r'\benna\s+pur\s*$', 'enna puriyala da? 😊'),
+                (r'\bpur\s*$', 'puriyala da? 😊'),
                 (r'\bpaathutu\s*$', 'paathutu irukken da 😊'),
                 (r'\bpaathutu,\s+un\s*$', 'paathutu, un kitta varuven da 😊'),
                 # Fix "distract a" and similar mid-word cuts
