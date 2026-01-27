@@ -2443,6 +2443,31 @@ IMPORTANT: Never output this session info in your response.
                 logger.info(f"[DIRECT_Q] Answered body count question")
                 return random.choice(count_answers)
             
+            # ENNA PANNALAM - When user asks what to do, give suggestions instead of echoing
+            enna_pannalam_patterns = [
+                r'\benna\s*pannalam\b',
+                r'\byenna\s*pannalam\b',
+                r'\bippo\s*enna\s*pannalam\b',
+            ]
+            if any(re.search(p, user_lower) for p in enna_pannalam_patterns):
+                # Check if response is just echoing the question
+                echo_patterns = [
+                    r'^enna\s*pannalam\?+',
+                    r'^mmm\s*(da)?\?+\s*enna\s*pannalam',
+                    r'\benna\s*pannalam\?{2,}',
+                ]
+                if any(re.search(p, response.lower()) for p in echo_patterns):
+                    activity_suggestions = [
+                        "Pool la jump pannalama da? 🔥",
+                        "Dance floor ku polama? 😈",
+                        "Closer ah vaa da... kiss pannalam 💋",
+                        "Beer sip pannitu chill pannalam da 😏",
+                        "Un kitta cuddle pannalam 💕",
+                        "Massage pannava da? 😈🔥",
+                    ]
+                    logger.info(f"[DIRECT_Q] Fixed enna pannalam echo with suggestion")
+                    return random.choice(activity_suggestions)
+            
             # OOMBURIYAA - Will you suck? Should respond with action
             oombu_patterns = [
                 r'\b(oombu|oomb)\s*(ri|ru|vi|ra|va)[yia]*',
@@ -3053,8 +3078,12 @@ IMPORTANT: Never output this session info in your response.
                     'Seri da 💕', 'Okie da 😊'
                 ]),
                 # "Pannalam da! 😈" - just this short form as entire response
-                (r'^pannalam\s*(da|di)?[!.😈🔥🥵😉 ]*$', [
+                (r'^pannalam\s*(da|di)?[!.😈🔥🥵😉💯 ]*$', [
                     'Mmm da 💕', 'Aaha da 😊', 'Seri da 💕'
+                ]),
+                # "Pannalam da!" followed by question or short phrase
+                (r'^pannalam\s*(da|di)?[!.😈🔥🥵😉💯 ]*\s*(unnoda|un|enna|serious)', [
+                    'Mmm da... 💕', 'Aaha ready da 😊', 'Seri vaada 💕'
                 ]),
                 # vera level variations
                 (r'\bvera level\s*(feel|da|🥵|🔥)*', [
@@ -3375,6 +3404,24 @@ IMPORTANT: Never output this session info in your response.
         
         # Fix Russian/Cyrillic "да" that sometimes appears instead of "da"
         ai_response = re.sub(r'\bда\b', 'da', ai_response)
+        
+        # ===== STRIP ASTERISK ACTIONS =====
+        # Convert *action* format to natural inline descriptions
+        asterisk_conversions = [
+            (r'\*whispers\*', 'konjam soft ah...'),
+            (r'\*moves closer( and whispers)?\*', 'closer ah varen da...'),
+            (r'\*bites lip\*', 'lip bite pannuren...'),
+            (r'\*blushes\*', 'shy ah iruku da...'),
+            (r'\*giggles\*', 'hehe...'),
+            (r'\*smiles\*', ''),
+            (r'\*winks\*', '😉'),
+            (r'\*moans\*', 'mmm...'),
+            (r'\*breathes heavily\*', 'uff...'),
+            (r'\*eyes widen[^*]*\*', 'aiyoo...'),
+            (r'\*[^*]{1,30}\*', ''),  # Remove any remaining short asterisk actions
+        ]
+        for pattern, replacement in asterisk_conversions:
+            ai_response = re.sub(pattern, replacement, ai_response, flags=re.IGNORECASE).strip()
         
         ai_response = re.sub(r'\bsollu\s*da\b[,!?.💕]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsolluda\b[,!?.💕]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
