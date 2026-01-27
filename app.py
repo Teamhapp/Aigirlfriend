@@ -3204,6 +3204,10 @@ IMPORTANT: Never output this session info in your response.
                 (r'\binnum\s+ke\s*$', 'innum kekka venum da 😏'),
                 (r'\bun\s+sun\s*$', 'un sunni 🥵'),
                 (r'\ben\s+pun\s*$', 'en pundai 🥵'),
+                (r'\benna\s+nadak\s*$', 'enna nadakuthu da? 😊'),
+                (r'\bun\s+sunniya\s+ennoda\s*$', 'un sunniya ennoda vaai kulla vaikuren 🥵'),
+                (r'\bennoda\s*$', 'ennoda pakkam vaa da 💕'),
+                (r'\bun\s+kitta\s*$', 'un kitta iruken da 💕'),
             ]
             
             for pattern, suffix in incomplete_word_patterns:
@@ -3350,6 +3354,21 @@ IMPORTANT: Never output this session info in your response.
             return response
         
         ai_response = enforce_role_address(ai_response, message_text, chat_history)
+        
+        # ===== CRITICAL: STRIP INTERNAL THINKING LEAKS =====
+        # AI sometimes outputs internal reasoning - must be stripped
+        ai_response = re.sub(r'^THINKING:.*?(?=\n|[A-Z][a-z])', '', ai_response, flags=re.DOTALL).strip()
+        ai_response = re.sub(r'\bTHINKING:.*$', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'\b(I need to|I should|I will|I must|Let me)\b.*?(?=\n|[.!?])', '', ai_response, flags=re.IGNORECASE).strip()
+        # More thinking leak patterns
+        ai_response = re.sub(r'^User\s+(wants|is|asked|asking|said)[^.!?]*[.!?]\s*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'^(The user|This user)[^.!?]*[.!?]\s*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'^(I am|I\'m)\s+(going to|about to|trying to)[^.!?]*[.!?]\s*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'^(My response|Response|Responding)[^.!?]*[.!?]\s*', '', ai_response, flags=re.IGNORECASE).strip()
+        ai_response = re.sub(r'^(Context|Note|Remember)[^.!?:]*[:.]?\s*', '', ai_response, flags=re.IGNORECASE).strip()
+        
+        # Fix Russian/Cyrillic "да" that sometimes appears instead of "da"
+        ai_response = re.sub(r'\bда\b', 'da', ai_response)
         
         ai_response = re.sub(r'\bsollu\s*da\b[,!?.💕]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsolluda\b[,!?.💕]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
