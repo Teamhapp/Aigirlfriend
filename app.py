@@ -2273,86 +2273,10 @@ IMPORTANT: Never output this session info in your response.
         if is_intimate:
             intimate_context = True
         
-        if wants_long_paragraph:
-            line_count = len([l for l in ai_response.split('\n') if l.strip()])
-            word_count = len(ai_response.split())
-            if line_count < 3 and word_count < 30:
-                logger.info(f"[LENGTH EXPAND] Response too short for paragraph request, not trimming for user {user.id}")
-        elif is_continuation_request and intimate_context:
-            # DON'T trim - user wants continuation in intimate scene
-            logger.info(f"[LENGTH SKIP] Continuation request in intimate scene, not trimming for user {user.id}")
-        elif roleplay_active:
-            # DON'T trim during active roleplay - scenes need space
-            logger.info(f"[LENGTH SKIP] Active roleplay detected, not trimming for user {user.id}")
-        elif user_word_count <= 3:
-            words = ai_response.split()
-            # Apply word cap regardless of sentence structure
-            if len(words) > 12:
-                # Better sentence splitting - find complete sentences with punctuation
-                sentence_matches = re.findall(r'[^.!?।]+[.!?।]+', ai_response)
-                if sentence_matches and len(sentence_matches) > 1:
-                    first_sentence = sentence_matches[0].strip()
-                    # Check if first sentence is incomplete (ends with common Tamil incomplete patterns)
-                    incomplete_endings = [
-                        r'\bevlo\s*[.!?।]*$', r'\bithu\s*[.!?।]*$', r'\bidhellam\s*[.!?।]*$',
-                        r'\benna\s+da\s*[.!?।]*$', r'\bun\s*[.!?।]*$', r'\ben\s*[.!?।]*$',
-                        r'\bpaathutu\s*[,]?\s*$', r'\bpoolaiyum\s*$',
-                    ]
-                    is_incomplete = any(re.search(p, first_sentence, re.IGNORECASE) for p in incomplete_endings)
-                    
-                    if len(first_sentence) >= 5 and not is_incomplete:
-                        trailing_emojis = re.findall(r'[\U0001F300-\U0001F9FF]+\s*$', ai_response)
-                        emoji_suffix = trailing_emojis[0].strip() if trailing_emojis else ''
-                        if not re.search(r'[\U0001F300-\U0001F9FF]', first_sentence):
-                            ai_response = first_sentence + (" " + emoji_suffix if emoji_suffix else "")
-                        else:
-                            ai_response = first_sentence
-                        ai_response = ai_response.strip()
-                        logger.info(f"[LENGTH FIX] Trimmed response for short input from user {user.id}")
-                    elif is_incomplete:
-                        # Don't trim - sentence is incomplete
-                        logger.info(f"[LENGTH FIX] Skipped trim - first sentence incomplete for user {user.id}")
-                else:
-                    # Single long sentence or no punctuation - word cap at 12 words
-                    truncated = ' '.join(words[:12])
-                    # Try to end at natural break
-                    if '...' in truncated:
-                        truncated = truncated.split('...')[0] + '...'
-                    elif ',' in truncated:
-                        last_comma = truncated.rfind(',')
-                        if last_comma > len(truncated) // 2:
-                            truncated = truncated[:last_comma] + '...'
-                    else:
-                        # End with trailing emojis if available
-                        trailing_emojis = re.findall(r'[\U0001F300-\U0001F9FF]+', ai_response)
-                        if trailing_emojis:
-                            truncated = truncated.rstrip() + ' ' + trailing_emojis[-1]
-                    
-                    # CRITICAL: Check if we cut mid-word (incomplete Tamil/Tanglish word)
-                    # Expanded list includes all known incomplete fragments
-                    truncated_words = truncated.split()
-                    incomplete_fragments = [
-                        'p', 'k', 'm', 'n', 'a', 't', 'r',  # single chars
-                        'rom', 'ad', 'ir', 'pur', 'mul', 'sun', 'pun',  # common Tamil incomplete
-                        'pidicha', 'paathutu', 'iruk', 'iruka', 'pannuv',  # mid-word cuts
-                        'venum', 'thaan', 'mattum', 'pakkath',  # trailing incomplete
-                        'nalla', 'romba', 'konjam', 'innum',  # adverbs cut
-                        'che', 'chel', 'vaa', 'naa', 'enn', 'sol', 'pan',  # word-start cuts
-                    ]
-                    if truncated_words:
-                        last_word = truncated_words[-1].lower().rstrip('.,!?…')
-                        if last_word in incomplete_fragments or len(last_word) <= 2:
-                            # Remove the incomplete last word and add ellipsis
-                            truncated = ' '.join(truncated_words[:-1])
-                            # If still ends with incomplete, remove one more
-                            if truncated.split():
-                                second_last = truncated.split()[-1].lower().rstrip('.,!?…')
-                                if second_last in incomplete_fragments:
-                                    truncated = ' '.join(truncated.split()[:-1])
-                            truncated = truncated.rstrip() + '...'
-                    
-                    ai_response = truncated.strip()
-                    logger.info(f"[LENGTH FIX] Word-capped long response for user {user.id}")
+        # ===== LENGTH TRIMMING DISABLED =====
+        # All sentence/word trimming disabled per user request
+        # Bot will now give full-length responses regardless of input length
+        pass
         
         if confirmed_gender != 'female':
             original_response = ai_response
