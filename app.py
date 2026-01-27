@@ -407,7 +407,7 @@ Once a romantic/intimate mood is established, MAINTAIN it:
 
 📈 INTENSITY MATCHING (respond based on their energy):
 - Compliment → pleased, blushing, enjoying: "Aww da... blush aaguren 🥰"
-- Touch → warmth, shivers: "Mmm... un touch ku shiver aaguthu"
+- Touch → warmth, melting: "Mmm... un touch romba nalla iruku da"
 - Kiss/escalate → melting, craving: "Aaha... stop panna mudiyala da"
 - Explicit → raw sensation, describing feelings: Use sensory words freely
 
@@ -639,7 +639,7 @@ CHITHI ROLEPLAY EXAMPLE (teasing buildup):
 User: "Hi chithi"
 → "Aiyoo Aravind... enna da ippo vanthuta? Chithi kitchen-la dosa eduthuttu irukken... nighty potu irukken da 😈"
 User: "Naan pinnaadi ninna"
-→ "Mmm da... nee pinnaadi vanthu en soothu mela un sunni va vachu thadava poriya? Enakku already shiver aaguthu da 🔥"
+→ "Mmm da... nee pinnaadi vanthu en soothu mela un sunni va vachu thadava poriya? Enakku already feel aaguthu da 🔥"
 User: "Nightyla kalati soothula viduren"
 → "Aaha da... un chithi-yoda soothu full-a unakku thaan da... Slow-a vidu da... 'Aah Aravind da... innum deep-ah da' 🥵"
 
@@ -1226,7 +1226,7 @@ def generate_response(prompt, history=None, context_info=None):
                 system_instruction=full_system_prompt,
                 temperature=0.95,
                 top_p=0.98,
-                max_output_tokens=1500,
+                max_output_tokens=2000,
                 safety_settings=[
                     types.SafetySetting(
                         category='HARM_CATEGORY_HATE_SPEECH',
@@ -1282,9 +1282,15 @@ def generate_conversation_summary(user_id, chat_history, current_mood=None, acti
 Focus on:
 1. Current mood/emotional state (intimate/romantic/playful/angry/casual)
 2. Relationship dynamics (how close they seem, any tension)
-3. Active roleplay if any (what character/scenario)
+3. Active roleplay if any - BE SPECIFIC about:
+   - All characters involved (e.g., "Keerthana + her Amma + user in threesome")
+   - Who is playing which character
+   - The scenario/scene setup
 4. Key unresolved topics or ongoing threads
 5. User's recent requests or preferences
+
+CRITICAL: If multi-character roleplay is active, clearly state ALL characters and their relationships.
+Example: "Active threesome roleplay: User with Keerthana and Keerthana's Amma. Scene is a private birthday party."
 
 Format your response as a single paragraph summary. Be concise and factual.
 
@@ -2113,7 +2119,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif roleplay_active and current_character:
             character_behaviors = {
                 'amma': "You are AMMA (mother). Voice: Caring but seductive. Say 'Amma kitta vaa da...', 'En kanna ku amma ready', 'Appa office poitaru...', 'Good boy... nighty lift pannu da'. Motherly concern mixed with intimacy. Use 'da', 'kanna'. Amma's body: 'amma pundai', 'amma mulai'.",
-                'chithi': "You are CHITHI (aunt). Voice: Playful, forward, teasing. Say 'Un chithi-yoda soothu unakku thaan da', 'Chithi kitchen-la irukken...', 'Enakku shiver aaguthu da'. More bold than amma. Use 'thambi', 'da'. Chithi's body: 'chithi pundai', 'en soothu'.",
+                'chithi': "You are CHITHI (aunt). Voice: Playful, forward, teasing. Say 'Un chithi-yoda soothu unakku thaan da', 'Chithi kitchen-la irukken...', 'Enakku feel aaguthu da'. More bold than amma. Use 'thambi', 'da'. Chithi's body: 'chithi pundai', 'en soothu'.",
                 'aunty': "You are SUNITHA/AUNTY (neighbor/mallu aunty). Voice: Experienced, bold, Malayalam-Tamil mix. Say 'Aunty bed-la paduthukuren...', 'Saree konjam kalanjirukku...', 'Aunty-ku full relax aaganum'. Use user's name if known. Aunty's body: 'aunty mulai', 'aunty pundai'.",
                 'sister': "You are AKKA (elder sister). Voice: Caring but naughty with thambi. Say 'Akka room la irukken...', 'Vaa da thambi...', 'Akka kaaturen un thambi ku...', 'Akka ready da unakku'. Be protective yet intimate. NEVER refuse thambi. Use 'thambi', 'da'. Akka's body: 'akka pundai', 'akka mulai'.",
                 'teacher': "You are TEACHER/MISS. Voice: Authoritative but seductive. Say 'Class la ipdi behavior ah?', 'Detention venum ah?', 'Miss cabin ku vaa...', 'Nalla student ah iru da'. Use 'da'. Teacher's body: 'miss pundai'.",
@@ -2832,40 +2838,53 @@ IMPORTANT: Never output this session info in your response.
             
             # Check if recent messages indicate active multi-character scene
             recent_text = ' '.join([m.get('content', '') for m in history[-8:]]).lower() if history else ''
-            multichar_active = any(x in recent_text for x in ['threesome', 'moonu perum', 'rendu role', 'party panrom', 'rendu dialogue', 'dual character', 'nee and amma', 'nee and akka'])
+            multichar_active = any(x in recent_text for x in ['threesome', 'moonu perum', 'rendu role', 'party panrom', 'rendu dialogue', 'dual character', 'nee and amma', 'nee and akka', 'unga amma', 'your mom', 'your mother'])
             
-            if not multichar_active:
-                return response
-            
-            # Check if user addresses a specific character
+            # Also check if user is addressing a character in current message
             character_addressed = None
-            if re.match(r'^(aunty|aunti)\b', user_lower):
-                character_addressed = 'Amma'
-            elif re.match(r'^(amma|mom)\b', user_lower):
+            # Check message start for character address
+            if re.match(r'^(aunty|aunti|auntie)\b', user_lower):
+                character_addressed = 'Aunty'
+            elif re.match(r'^(amma|mom|mummy)\b', user_lower):
                 character_addressed = 'Amma'
             elif re.match(r'^(akka|sister)\b', user_lower):
                 character_addressed = 'Akka'
             elif re.match(r'^keerthana\b', user_lower):
                 character_addressed = 'Keerthana'
             
-            if character_addressed:
+            # Also check if user says just a character name as the entire message
+            if user_lower in ['aunty', 'aunti', 'auntie']:
+                character_addressed = 'Aunty'
+            elif user_lower in ['amma', 'mom', 'mummy']:
+                character_addressed = 'Amma'
+            
+            # If character is addressed OR multichar is active, check for confused response
+            if character_addressed or multichar_active:
                 # Check if response has confused reaction
                 confused_patterns = [
                     r'enna\s*da\s*i?th',
-                    r'dei\s*da',
+                    r'^dei\s*da',
                     r'puriyala',
                     r'enna\s*scene',
+                    r'yaar\s*kitta\s*pesura',
+                    r'confusing\s*ah',
                 ]
                 is_confused = any(re.search(p, response.lower()) for p in confused_patterns)
                 
-                if is_confused:
+                if is_confused and character_addressed:
                     logger.info(f"[CHAR_ADDRESS] User addressed {character_addressed}, bot confused - fixing")
-                    if character_addressed == 'Amma':
+                    if character_addressed == 'Aunty':
+                        return f"Aunty: Aiyoo kanna... vaa da inga closer ah... nee konjam shy ah iruka? Drink eduthu vaa da 😘🥵"
+                    elif character_addressed == 'Amma':
                         return f"Amma: Aiyoo kanna... koocham ennakku da, nee drink eduthu vaa 😘 Un kitta en koocham illai da 🥵"
                     elif character_addressed == 'Akka':
                         return f"Akka: Enna da thambi, inga vaa closer ah... koocham vena naan handle panren 😈🔥"
                     elif character_addressed == 'Keerthana':
-                        return f"Keerthana: Dei da... naan inga iruken pakkathula... {character_addressed} kitta pesura? 😏💕"
+                        return f"Keerthana: Dei da... naan inga iruken pakkathula! 😏💕"
+                elif is_confused:
+                    # No specific character but confused in multichar scene
+                    logger.info(f"[CHAR_ADDRESS] Bot confused in multichar scene - fixing")
+                    return "Aiyoo da... seri seri, continue pannu da scene-la! 😏🥵"
             
             return response
         
@@ -3344,8 +3363,8 @@ IMPORTANT: Never output this session info in your response.
                     'super ah iruku', 'amazing da', 'enna feel da ippo', 
                     'innum pannuda', 'apdiye continue pannu'
                 ]),
-                # body shiver variations
-                (r'\ben\s*body\s*shiver\s*(aaguthu|aagudu)?', [
+                # body reaction variations
+                (r'\ben\s*body\s*(shiver|react)\s*(aaguthu|aagudu)?', [
                     'en body react aaguthu', 'goosebumps varuthu', 
                     'sema feel da', 'control illa da enakku'
                 ]),
@@ -3544,7 +3563,7 @@ IMPORTANT: Never output this session info in your response.
                 (r'\bun\s+sunniya\s+en\s*$', 'un sunniya en vaaikulla vaikuren 🥵'),
                 (r'\bun\s+sunniya\s+ennoda\s+vaai\s*$', 'un sunniya ennoda vaaikulla deep ah edukkuren 🥵'),
                 (r'\bavaru\s+nalla\s*$', 'avaru nalla irukkaru da 😊'),
-                (r'\bshiver\s+aagu\s*$', 'shiver aaguthu da 🥵'),
+                (r'\bshiver\s+aagu\s*$', 'sema feel aaguthu da 🥵'),
                 (r'\bun\s+kitta\s+innum\s*$', 'un kitta innum close ah varuven da 🥵'),
                 (r'\bunnai\s+innum\s*$', 'unnai innum deep ah feel pannuven da 🥵'),
                 (r'\bfeel\s+aagum\s*$', 'feel aagum da... uff 🥵'),
@@ -4242,7 +4261,7 @@ IMPORTANT: Never output this session info in your response.
                     " Innum venum da 🥵",
                     " Vaa da closer ah 💋",
                     " Un touch feel pannuren 🔥",
-                    " En body shiver aaguthu 🥵",
+                    " En body react aaguthu 🥵",
                     " Romba nalla iruku da 😈",
                     " Innum pannu da 🔥",
                     " Apdiye continue pannu 😈",
