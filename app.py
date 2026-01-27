@@ -3123,6 +3123,11 @@ IMPORTANT: Never output this session info in your response.
                 (r'\bmul\s*$', 'mulai'),
                 (r'\bsun\s*$', 'sunni'),
                 (r'\btham\s*$', 'thambi'),
+                (r'\bvideo\s+ed\s*$', 'video edukkala da 😏'),
+                (r'\bnaan\s+apdi\s*$', 'naan apdi illa da 😊'),
+                (r'\bun\s+pai\s*$', 'un pakkathula iruken da 💕'),
+                (r'\bennathaan\s*$', 'ennathaan da? 😏'),
+                (r'\beppadi\s+pa\s*$', 'eppadi da? 😊'),
             ]
             
             for pattern, suffix in incomplete_word_patterns:
@@ -3131,18 +3136,20 @@ IMPORTANT: Never output this session info in your response.
                     logger.info(f"[INCOMPLETE_FIX] Fixed incomplete word ending")
                     break
             
-            # Only fix obvious truncation artifacts (gibberish/cut-off words)
-            truncation_artifacts = [
-                (r'\binnum\s+pannudair\s*$', 'innum pannuda 🥵'),  # "pannudair" -> "pannuda"
-                (r'\badha\s+soll\s*$', 'adha solluven da 🥵'),  # complete the thought
-                (r'\bnee\s+patha\s+adha\s+soll\s*$', 'nee patha thaan puriyum da 😏'),
-            ]
-            
-            for pattern, replacement in truncation_artifacts:
-                if re.search(pattern, response, re.IGNORECASE):
-                    response = re.sub(pattern, replacement, response, flags=re.IGNORECASE)
-                    logger.info(f"[INCOMPLETE_FIX] Fixed truncation artifact")
-                    break
+            # Sentence-level truncation - only for responses with trailing hyphen or clear cut-off
+            # Only apply to longer responses (>30 chars) to avoid affecting short replies
+            if len(response) > 30:
+                sentence_truncation_patterns = [
+                    (r'sunni-\s*$', 'sunni romba nalla iruku da 🥵'),
+                    (r'kanna\s+ku\s*$', 'kanna ku mattum thaan da 💕'),
+                    (r'-\s*$', '... 🥵'),  # Response ends with hyphen = cut off
+                ]
+                
+                for pattern, replacement in sentence_truncation_patterns:
+                    if re.search(pattern, response, re.IGNORECASE):
+                        response = re.sub(pattern, replacement, response, flags=re.IGNORECASE)
+                        logger.info(f"[INCOMPLETE_FIX] Fixed sentence-level truncation")
+                        break
             
             return response
         
@@ -3204,6 +3211,69 @@ IMPORTANT: Never output this session info in your response.
             return response
         
         ai_response = ensure_response_quality(ai_response, message_text)
+        
+        # ===== ROLE ADDRESS ENFORCEMENT =====
+        def enforce_role_address(response, user_msg, history):
+            """Fix anna/thambi confusion when user explicitly requests a role"""
+            user_lower = user_msg.lower().strip()
+            
+            # Detect explicit role address requests
+            anna_request_patterns = [
+                r'\banna\s+(sollu|solu|mari\s+pesu)\b',
+                r'\banna\s+ah\s+(pesu|sollu)\b',
+                r'\bthambi\s+illa\s+anna\b',
+                r'\banna\b.*\bmunda\b',
+            ]
+            
+            thambi_request_patterns = [
+                r'\bthambi\s+(sollu|mari\s+pesu)\b',
+                r'\bthambi\s+ah\s+(pesu|sollu)\b',
+            ]
+            
+            # Check for explicit anna request
+            wants_anna = any(re.search(p, user_lower) for p in anna_request_patterns)
+            wants_thambi = any(re.search(p, user_lower) for p in thambi_request_patterns)
+            
+            if wants_anna:
+                # Replace thambi with anna in response
+                if re.search(r'\bthambi\b', response, re.IGNORECASE):
+                    response = re.sub(r'\bthambi\b', 'anna', response, flags=re.IGNORECASE)
+                    logger.info(f"[ROLE FIX] Changed thambi to anna per user request")
+            
+            elif wants_thambi:
+                # Replace anna with thambi in response
+                if re.search(r'\banna\b', response, re.IGNORECASE):
+                    response = re.sub(r'\banna\b', 'thambi', response, flags=re.IGNORECASE)
+                    logger.info(f"[ROLE FIX] Changed anna to thambi per user request")
+            
+            # Thangachi role fix - if user wants thangachi, bot should call user "anna" not "thambi"
+            thangachi_patterns = [
+                r'\bthangachi\s+(mari\s+pesu|ah\s+pesu|role)\b',
+                r'\bnee\s+thangachi\b',
+                r'\bun\s+thangachi\b',
+            ]
+            
+            if any(re.search(p, user_lower) for p in thangachi_patterns):
+                # In thangachi role, user is anna (elder brother), bot is thangachi (younger sister)
+                if re.search(r'\bthambi\b', response, re.IGNORECASE):
+                    response = re.sub(r'\bthambi\b', 'anna', response, flags=re.IGNORECASE)
+                    logger.info(f"[ROLE FIX] Thangachi role: changed thambi to anna")
+            
+            # Akka role fix - if bot is akka, user should be called "thambi" not "anna"
+            akka_patterns = [
+                r'\bakka\s+(mari\s+pesu|ah\s+pesu|role)\b',
+                r'\bnee\s+akka\b',
+            ]
+            
+            if any(re.search(p, user_lower) for p in akka_patterns):
+                # In akka role, user is thambi (younger brother), bot is akka (elder sister)
+                if re.search(r'\banna\b', response, re.IGNORECASE):
+                    response = re.sub(r'\banna\b', 'thambi', response, flags=re.IGNORECASE)
+                    logger.info(f"[ROLE FIX] Akka role: changed anna to thambi")
+            
+            return response
+        
+        ai_response = enforce_role_address(ai_response, message_text, chat_history)
         
         ai_response = re.sub(r'\bsollu\s*da\b[,!?.]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'\bsolluda\b[,!?.]*\s*', '', ai_response, flags=re.IGNORECASE).strip()
