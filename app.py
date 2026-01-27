@@ -4203,22 +4203,31 @@ IMPORTANT: Never output this session info in your response.
             ai_response = re.sub(character_prefix_pattern, '', ai_response, flags=re.IGNORECASE).strip()
             logger.info(f"[PREFIX STRIP] Removed character prefix for user {user.id}")
         
-        if len(ai_response) > 5 and ai_response[-1] not in '.!?😀😁😂🤣😃😄😅😆😉😊😋😎😍😘🥰😗😙🥲😚☺️🙂🤗🤔😐😑😶🙄😏😣😥😮🤐😯😪😫🥱😴😌😛😜😝🤤😒😓😔😕🙃🤑😲☹️🙁😖😞😟😤😢😭😦😧😨😩🤯😬😰😱🥵🥶😳🤪😵🤠🥳🥸😎🤓🧐😕😈👿👹👺💀☠️👻👽👾🤖💩😺😸😹😻😼😽🙀😿😾🙈🙉🙊💋💕💞💓💗💖💘💝❤️🧡💛💚💙💜🖤🤍🤎💔❤️‍🔥💯💢💥💫💦💨🔥':
-            if re.search(r'[a-zA-Z\u0B80-\u0BFF]{1,3}$', ai_response) and not re.search(r'\b(da|di|ah|eh|oh|ma|pa|la|va|na|ra|ka|ta|ya)\s*$', ai_response, re.IGNORECASE):
-                ai_response = ai_response.rstrip()
-                if ai_response:
-                    last_punct = max(ai_response.rfind('.'), ai_response.rfind('!'), ai_response.rfind('?'), ai_response.rfind('💋'), ai_response.rfind('🔥'), ai_response.rfind('🥵'), ai_response.rfind('😈'))
-                    if last_punct > len(ai_response) // 2:
-                        ai_response = ai_response[:last_punct+1]
-                        logger.info(f"[TRUNCATION FIX] Trimmed incomplete word at end for user {user.id}")
+        # NOTE: Generic truncation handling disabled - fix_incomplete_endings() handles known patterns
+        # The existing pattern-based approach in fix_incomplete_endings is safer than generic detection
         
-        ai_response = re.sub(r'\*{2,}\s*$', '', ai_response).strip()
-        ai_response = re.sub(r'\*{2,}([^*]+)$', r'\1', ai_response).strip()
-        # Comprehensive asterisk cleanup - remove ALL stray asterisks
-        ai_response = re.sub(r'\*{2,}', '', ai_response).strip()  # Remove all ** sequences
-        ai_response = re.sub(r'^\*+\s*', '', ai_response).strip()  # Remove leading asterisks
-        ai_response = re.sub(r'\s*\*+$', '', ai_response).strip()  # Remove trailing asterisks
-        ai_response = re.sub(r'\s+\*+\s+', ' ', ai_response).strip()  # Remove floating asterisks
+        # ===== ASTERISK CLEANUP =====
+        # 1. Complete bold: **text** → text
+        ai_response = re.sub(r'\*\*([^*]+)\*\*', r'\1', ai_response)
+        # 2. Unmatched ** - count pairs and remove lone **
+        double_asterisk_count = ai_response.count('**')
+        if double_asterisk_count == 1:
+            # Single unmatched ** - remove it but keep surrounding text
+            ai_response = ai_response.replace('**', '', 1)
+        elif double_asterisk_count > 2:
+            # Multiple - try to pair them, remove any extras
+            while '**' in ai_response:
+                ai_response = re.sub(r'\*\*([^*]+)\*\*', r'\1', ai_response)
+                if ai_response.count('**') <= 1:
+                    break
+            # Remove any remaining single **
+            if ai_response.count('**') == 1:
+                ai_response = ai_response.replace('**', '', 1)
+        # 3. Strip *action* format (short actions only, bounded length)
+        ai_response = re.sub(r'\*([^*\n]{1,40})\*', r'\1', ai_response)
+        # 4. Clean up edge asterisks
+        ai_response = re.sub(r'^\*+\s*', '', ai_response).strip()
+        ai_response = re.sub(r'\s*\*+$', '', ai_response).strip()
         
         # ===== SUFFIX PREFERENCE POST-PROCESSING =====
         # Force-replace standalone "da" with "di" for users who explicitly requested it
