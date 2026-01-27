@@ -1859,7 +1859,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         r"\bi am female\b", r"\bi'm female\b", r"\bim female\b",
         r"\bi am a woman\b", r"\bi'm a woman\b",
         r"\bnaan ponnu\b", r"\bnaan girl\b", r"\bna ponnu\b",
-        r"\bmy gender is female\b", r"\bgender female\b"
+        r"\bmy gender is female\b", r"\bgender female\b",
+        # Malayalam/Tanglish variations
+        r"\bnjan\s*(oru\s*)?ponnu\b", r"\bnjan\s*girl\b",
+        r"\boru\s*ponnu\s*(tha|thaan|than|da|di)?\b",
+        r"\bponnu\s*(tha|thaan|than)\b",
+        r"\bna\s*oru\s*ponnu\b", r"\bnaan\s*oru\s*ponnu\b",
+        r"\bi\s*am\s*ponnu\b", r"\bponnu\s*naan\b",
+        r"\bgirl\s*(tha|thaan|than)\b", r"\bfemale\s*(tha|thaan)\b",
     ]
     for pattern in girl_patterns:
         if re.search(pattern, message_text.lower()):
