@@ -2238,11 +2238,31 @@ IMPORTANT: Never output this session info in your response.
             ai_response = random.choice(safe_responses)
             logger.info(f"[LEAK BLOCKED] Blocked potential prompt leak for user {user.id}")
         
+        # ===== INTIMATE SCENE CONTINUATION DETECTION =====
+        # Don't trim if user is asking for continuation in intimate scene
+        continuation_patterns = [
+            r'^vera\s*(de|da|di)?$', r'^then\s*(de|da|di)?$', r'^approm\s*(de|da|di)?$',
+            r'^yenna\s+pannuv[ao]?\s*(de|da|di)?$', r'^sollu\s*(de|da|di)?$',
+            r'^next\s*(de|da|di)?$', r'^innum\s*(de|da|di)?$', r'^continue\s*(de|da|di)?$',
+            r'^super\s*(de|da|di)?.*yenna\s+pannuva', r'^vera\s+yenna\s+pannuva',
+            r'^then\s+yenna\s+pannuva', r'^approm\s+yenna', r'^vera\s+level',
+            r'^hmm\s+super', r'^super\s+de', r'^ok\s+ok\s+then',
+        ]
+        is_continuation_request = any(re.search(p, message_text.lower().strip(), re.IGNORECASE) for p in continuation_patterns)
+        
+        # Check if in intimate context (recent messages have intimate keywords)
+        intimate_context = False
+        if is_intimate:
+            intimate_context = True
+        
         if wants_long_paragraph:
             line_count = len([l for l in ai_response.split('\n') if l.strip()])
             word_count = len(ai_response.split())
             if line_count < 3 and word_count < 30:
                 logger.info(f"[LENGTH EXPAND] Response too short for paragraph request, not trimming for user {user.id}")
+        elif is_continuation_request and intimate_context:
+            # DON'T trim - user wants continuation in intimate scene
+            logger.info(f"[LENGTH SKIP] Continuation request in intimate scene, not trimming for user {user.id}")
         elif user_word_count <= 3:
             words = ai_response.split()
             # Apply word cap regardless of sentence structure
@@ -3319,6 +3339,33 @@ IMPORTANT: Never output this session info in your response.
                 (r'\bun\s+sunni\s+touch\s+pann\s*$', 'un sunni touch pannuven da... slow ah 🥵'),
                 (r'\birukum\s*$', 'irukum da 🥵'),
                 (r'\bkudupen\s*$', 'kudupen da 🥵'),
+                # NEW: More mid-word truncation fixes from chat logs
+                (r'\bpesumb\s*$', 'pesumbodhu enakku pidikum da 🥵'),
+                (r'\bnee\s+ipdi\s+pesumb\s*$', 'nee ipdi pesumbodhu enakku pidikum da 🥵'),
+                (r'\bapdi\s+mood\s+aana\s+un\s*$', 'apdi mood aana un kitta varuven da 🥵'),
+                (r'\benna\s+pannanu\s*$', 'enna pannanum nu nee sollu da 😏'),
+                (r'\bennoda\s+vaaikul\s*$', 'ennoda vaaikulla vaikuren da 🥵'),
+                (r'\bennoda\s+vaai\s*$', 'ennoda vaaikulla vaikuren da 🥵'),
+                (r'\bun\s+sunniya\s+en\s*$', 'un sunniya en vaaikulla vaikuren 🥵'),
+                (r'\bun\s+sunniya\s+ennoda\s+vaai\s*$', 'un sunniya ennoda vaaikulla deep ah edukkuren 🥵'),
+                (r'\bavaru\s+nalla\s*$', 'avaru nalla irukkaru da 😊'),
+                (r'\bshiver\s+aagu\s*$', 'shiver aaguthu da 🥵'),
+                (r'\bun\s+kitta\s+innum\s*$', 'un kitta innum close ah varuven da 🥵'),
+                (r'\bunnai\s+innum\s*$', 'unnai innum deep ah feel pannuven da 🥵'),
+                (r'\bfeel\s+aagum\s*$', 'feel aagum da... uff 🥵'),
+                (r'\bun\s+touch\s+ku\s*$', 'un touch ku shiver aaguren da 🥵'),
+                (r'\bun\s+sunni\s+ennoda\s+mouth\s*$', 'un sunni ennoda mouth kulla deep ah poyirum da 🥵'),
+                (r'\bun\s+sunni\s+ennoda\s*$', 'un sunni ennoda vaaikulla irukum da 🥵'),
+                (r'\benna\s+pannuv\s*$', 'enna pannuven da sollu 😏'),
+                (r'\bkonjam\s+wait\s+pa\s*$', 'konjam wait pannu da 😊'),
+                (r'\binnum\s+pannu\s*$', 'innum pannu da 🥵'),
+                (r'\bApdiye\s+continue\s+pannu\s*$', 'Apdiye continue pannu da 🥵 Naan ready!'),
+                (r'\bsumma\s+iru\s*$', 'summa iru... naan paaruven da 😏'),
+                (r'\benna\s+plan\s*$', 'enna plan da sollu 😏'),
+                (r'\bavaludan\s*$', 'avaludan iruken da 😊'),
+                (r'\bava\s+kitta\s*$', 'ava kitta solliruken da 😏'),
+                (r'\bkitta\s+varuven\s*$', 'kitta varuven da 🥵'),
+                (r'\bpaathutenன\.\.\s*$', 'paathutten da 😏'),
             ]
             
             for pattern, suffix in incomplete_word_patterns:
@@ -3345,6 +3392,30 @@ IMPORTANT: Never output this session info in your response.
             return response
         
         ai_response = fix_incomplete_endings(ai_response)
+        
+        # ===== THANGACHI/AKKA CONTEXT FIX =====
+        # If user said "thangachi" (younger sister), bot should NOT use "akka" (elder sister)
+        def fix_thangachi_akka_context(response, recent_messages):
+            """Fix wrong sister terminology based on what user specified"""
+            recent_text = ' '.join([m.get('content', '') for m in recent_messages[-10:]]).lower()
+            response_lower = response.lower()
+            
+            # User said thangachi but bot is using akka - WRONG
+            if 'thangachi' in recent_text and 'akka' in response_lower:
+                # Replace akka references with thangachi in roleplay context
+                response = re.sub(r'\bakka\b', 'thangachi', response, flags=re.IGNORECASE)
+                response = re.sub(r'\bAkka\b', 'Thangachi', response)
+                logger.info(f"[SISTER_FIX] Replaced akka with thangachi per user context")
+            
+            # User said akka but bot is using thangachi - also fix
+            elif 'akka' in recent_text and 'thangachi' not in recent_text and 'thangachi' in response_lower:
+                response = re.sub(r'\bthangachi\b', 'akka', response, flags=re.IGNORECASE)
+                response = re.sub(r'\bThangachi\b', 'Akka', response)
+                logger.info(f"[SISTER_FIX] Replaced thangachi with akka per user context")
+            
+            return response
+        
+        ai_response = fix_thangachi_akka_context(ai_response, chat_history)
         
         # ===== MINIMUM RESPONSE QUALITY CHECK =====
         def ensure_response_quality(response, user_msg):
