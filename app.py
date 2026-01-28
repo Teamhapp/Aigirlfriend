@@ -1273,14 +1273,12 @@ def generate_response(prompt, history=None, context_info=None):
         # Varied fallback messages for rate limits - pick random one
         import random
         rate_limit_fallbacks = [
-            "Aiyoo da... konjam busy 😅 2 sec da!",
-            "Mmm wait da... naan think pannuren 🤔",
-            "Dei... konjam slow ah type panren 😊",
-            "Aah da... signal issue 📶 Try again!",
-            "Oho... konjam overload 😵 One sec!",
-            "Hehe wait pannuda... naan varren 💕",
+            "Aiyoo da... konjam busy 😅",
+            "Dei... slow ah type panren 😊",
             "Dei hold on da 😏",
             "Shh... yosikkuren da 🤫",
+            "Mmm da... un msg paathuren 💕",
+            "Aah da... konjam wait pannu 😊",
         ]
         return random.choice(rate_limit_fallbacks)
 
@@ -3104,10 +3102,12 @@ IMPORTANT: Never output this session info in your response.
                     logger.info(f"[BASIC INFO] Replaced wrong response for location question")
                     return "Thoothukudi da! Beach oorula 😊"
             
-            # Job/work questions - flexible patterns
+            # Job/work questions - specific patterns only (avoid matching "enna panra" casual question)
             job_patterns = [
-                r'\bjob\b', r'\bwork\b', r'\benna\s*pan(ra|nura|nuva)\b',
-                r'\bwhat.*do\s*(you|u)\s*do\b', r'\boccupation\b', r'\bprofession\b'
+                r'\bjob\b', r'\boccupation\b', r'\bprofession\b',
+                r'\bwhat.*do\s*(you|u)\s*do\b', r'\bfor\s*a\s*living\b',
+                r'\bvela\s*enna\b', r'\bwork\s*enna\b', r'\bjob\s*enna\b',
+                r'\benna\s*velai\b', r'\benna\s*job\b', r'\benna\s*work\b'
             ]
             if any(re.search(p, user_lower) for p in job_patterns):
                 # Force correct answer if response doesn't mention work/degree
@@ -4813,13 +4813,16 @@ IMPORTANT: Never output this session info in your response.
             ai_response = random.choice(her_action_suggestions)
             logger.info(f"[NEE PANUVA FIX] Replaced deflection with her action for user {user.id}")
         
-        if is_intimate and len(ai_response.strip()) < 20:
+        if is_intimate and len(ai_response.strip()) < 50:
             intimate_continuations = [
-                " romba nalla iruku da... 🥵",
-                " ennoda feel vera level 🔥",
-                " un touch amazing da 💋",
-                " innum venum da... 🥵🔥",
-                " enakku pudikum da 😈",
+                " romba nalla iruku da... un touch enakku current paayuthu 🥵",
+                " ennoda body full ah react aaguthu da 🔥",
+                " un touch amazing da... innum venum 💋",
+                " innum deep ah pannu da... en body unakku thaan 🥵🔥",
+                " enakku pudikum da... stop pannatha 😈",
+                " aahh da... enna feel ippo 🥵💋",
+                " mmm... un mela irundha ah iruku da 🔥",
+                " ennoda body un control la thaan da 😈🥵",
             ]
             ai_response = ai_response.rstrip('.,!? ') + random.choice(intimate_continuations)
             logger.info(f"[INTIMATE EXPAND] Appended to short intimate response for user {user.id}")
