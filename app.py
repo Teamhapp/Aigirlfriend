@@ -1727,9 +1727,9 @@ async def buy_pack_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("❌ Error creating payment. Please try again.")
 
 async def verify_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle payment verification - marks for admin verification"""
+    """Handle payment verification - tries auto-verify via Paytm API first"""
     query = update.callback_query
-    await query.answer("Submitting payment...")
+    await query.answer("Checking payment status...")
     
     user = update.effective_user
     order_id = query.data.replace("verify_", "")
@@ -1763,11 +1763,60 @@ async def verify_payment_callback(update: Update, context: ContextTypes.DEFAULT_
     
     result = payment_service.user_confirm_payment(order_id)
     
-    if result['status'] == 'PENDING_VERIFICATION':
+    if result['status'] == 'TXN_SUCCESS':
+        utr_info = f"\n🔢 UTR: <code>{result.get('utr', 'N/A')}</code>" if result.get('utr') else ""
+        await query.edit_message_caption(
+            caption=(
+                f"✅ <b>Payment Verified!</b>\n\n"
+                f"🎉 <b>{result.get('credits', order['credits'])} credits</b> added to your account!{utr_info}\n\n"
+                f"Use /credits to check your balance.\n"
+                f"Enjoy chatting! 💕"
+            ),
+            parse_mode=ParseMode.HTML
+        )
+        logger.info(f"[PAYMENT] Auto-verified order {order_id} for user {user.id}")
+    
+    elif result['status'] == 'PENDING':
+        keyboard = [
+            [InlineKeyboardButton("🔄 Check Again", callback_data=f"verify_{order_id}")],
+            [InlineKeyboardButton("❌ Cancel", callback_data="cancel_payment")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_caption(
+            caption=(
+                f"⏳ <b>Payment Processing...</b>\n\n"
+                f"Your payment is still being processed.\n"
+                f"Please wait 10-30 seconds and click 'Check Again'.\n\n"
+                f"🆔 Order: <code>{order_id}</code>"
+            ),
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML
+        )
+    
+    elif result['status'] == 'NO_RECORD':
+        keyboard = [
+            [InlineKeyboardButton("🔄 Check Again", callback_data=f"verify_{order_id}")],
+            [InlineKeyboardButton("📝 Paid via Other App", callback_data=f"manual_{order_id}")],
+            [InlineKeyboardButton("❌ Cancel", callback_data="cancel_payment")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_caption(
+            caption=(
+                f"⏳ <b>Payment Not Received Yet</b>\n\n"
+                f"Please complete the payment, then click 'Check Again'.\n\n"
+                f"💡 <b>Auto-verification works with Paytm app only</b>\n"
+                f"If you paid via GPay/PhonePe/other, click 'Paid via Other App' for admin verification.\n\n"
+                f"🆔 Order: <code>{order_id}</code>"
+            ),
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML
+        )
+    
+    elif result['status'] == 'PENDING_VERIFICATION':
         await query.edit_message_caption(
             caption=(
                 f"✅ <b>Payment Submitted!</b>\n\n"
-                f"Your payment is being verified.\n"
+                f"Your payment is being verified by admin.\n"
                 f"Credits will be added within 5-10 minutes.\n\n"
                 f"📧 If delayed, contact support with:\n"
                 f"🆔 Order: <code>{order_id}</code>\n\n"
@@ -1775,7 +1824,18 @@ async def verify_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             ),
             parse_mode=ParseMode.HTML
         )
-        logger.info(f"[PAYMENT] User {user.id} confirmed payment for order {order_id}")
+        logger.info(f"[PAYMENT] User {user.id} confirmed payment for order {order_id} - pending admin verification")
+    
+    elif result['status'] == 'TXN_FAILURE':
+        await query.edit_message_caption(
+            caption=(
+                f"❌ <b>Payment Failed</b>\n\n"
+                f"The payment was not successful.\n\n"
+                f"If money was deducted, it will be refunded within 5-7 business days.\n"
+                f"Please try again or contact support."
+            ),
+            parse_mode=ParseMode.HTML
+        )
     
     elif result['status'] == 'EXPIRED':
         await query.edit_message_caption(
@@ -1794,10 +1854,64 @@ async def verify_payment_callback(update: Update, context: ContextTypes.DEFAULT_
         )
     
     else:
+        keyboard = [
+            [InlineKeyboardButton("🔄 Try Again", callback_data=f"verify_{order_id}")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_caption(
             caption=f"ℹ️ {result.get('message', 'Please wait and try again.')}",
+            reply_markup=reply_markup,
             parse_mode=ParseMode.HTML
         )
+
+async def manual_verify_request_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle request for manual verification (paid via non-Paytm app)"""
+    query = update.callback_query
+    await query.answer("Submitting for admin verification...")
+    
+    user = update.effective_user
+    order_id = query.data.replace("manual_", "")
+    
+    order = get_payment_order(order_id)
+    if not order:
+        await query.edit_message_caption(
+            caption="❌ Order not found.",
+            parse_mode=ParseMode.HTML
+        )
+        return
+    
+    if order['user_id'] != user.id:
+        await query.edit_message_caption(
+            caption="❌ This order doesn't belong to you.",
+            parse_mode=ParseMode.HTML
+        )
+        return
+    
+    if order['status'] == 'SUCCESS':
+        await query.edit_message_caption(
+            caption=(
+                f"✅ <b>Payment Already Verified!</b>\n\n"
+                f"🎉 <b>{order['credits']} credits</b> were added to your account.\n\n"
+                f"Use /credits to check your balance."
+            ),
+            parse_mode=ParseMode.HTML
+        )
+        return
+    
+    update_payment_order_status(order_id, 'PENDING_VERIFICATION')
+    
+    await query.edit_message_caption(
+        caption=(
+            f"✅ <b>Payment Submitted for Admin Verification!</b>\n\n"
+            f"Since you paid via GPay/PhonePe/other UPI app, admin will verify manually.\n"
+            f"Credits will be added within 5-10 minutes.\n\n"
+            f"📧 If delayed, contact support with:\n"
+            f"🆔 Order: <code>{order_id}</code>\n\n"
+            f"<i>Thank you for your patience!</i> 💕"
+        ),
+        parse_mode=ParseMode.HTML
+    )
+    logger.info(f"[PAYMENT] User {user.id} requested manual verification for order {order_id}")
 
 async def cancel_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle payment cancellation"""
@@ -5310,6 +5424,7 @@ def ensure_initialized():
             application.add_handler(CallbackQueryHandler(check_subscription_callback, pattern="^check_sub$"))
             application.add_handler(CallbackQueryHandler(buy_pack_callback, pattern="^buy_"))
             application.add_handler(CallbackQueryHandler(verify_payment_callback, pattern="^verify_"))
+            application.add_handler(CallbackQueryHandler(manual_verify_request_callback, pattern="^manual_"))
             application.add_handler(CallbackQueryHandler(cancel_payment_callback, pattern="^cancel_payment$"))
             application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
             application.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO | filters.Document.IMAGE, handle_photo))

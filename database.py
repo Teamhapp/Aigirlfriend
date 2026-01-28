@@ -207,6 +207,21 @@ def init_database():
             )
         ''')
         
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS payment_reports (
+                id SERIAL PRIMARY KEY,
+                order_id VARCHAR(50) REFERENCES payment_orders(order_id),
+                user_token VARCHAR(100),
+                status VARCHAR(50),
+                transaction_id VARCHAR(100),
+                utr VARCHAR(100),
+                amount INTEGER NOT NULL,
+                payment_app VARCHAR(50) DEFAULT 'Paytm',
+                verified_by BIGINT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
         conn.commit()
         logger.info("Database initialized successfully")
     except Exception as e:
@@ -1133,5 +1148,66 @@ def update_payment_order_utr(conn, order_id, paytm_txn_id=None, utr=None, status
         return True
     except Exception as e:
         logger.error(f"Error updating payment order UTR: {e}")
+        conn.rollback()
+        return False
+
+@with_db_retry()
+def log_payment_report(conn, order_id, user_token, status, transaction_id, utr, amount, payment_app='Paytm', verified_by=None):
+    """Log payment verification to reports table for audit trail"""
+    try:
+        cur = conn.cursor()
+        cur.execute('''
+            INSERT INTO payment_reports (order_id, user_token, status, transaction_id, utr, amount, payment_app, verified_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (order_id, user_token, status, transaction_id, utr, amount, payment_app, verified_by))
+        conn.commit()
+        cur.close()
+        logger.info(f"Logged payment report for order {order_id}: status={status}")
+        return True
+    except Exception as e:
+        logger.error(f"Error logging payment report: {e}")
+        conn.rollback()
+        return False
+
+@with_db_retry()
+def atomic_credit_payment(conn, order_id, paytm_txn_id, utr, credits_to_add, user_id):
+    """
+    Atomically credit user for payment - prevents double-credit via conditional UPDATE.
+    Returns True if credits were added, False if already credited (order was SUCCESS).
+    """
+    try:
+        cur = conn.cursor()
+        
+        cur.execute('''
+            UPDATE payment_orders 
+            SET status = 'SUCCESS', 
+                paytm_txn_id = %s, 
+                utr = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE order_id = %s AND status != 'SUCCESS'
+            RETURNING id
+        ''', (paytm_txn_id, utr, order_id))
+        
+        result = cur.fetchone()
+        
+        if result is None:
+            conn.rollback()
+            cur.close()
+            logger.info(f"[ATOMIC] Order {order_id} already credited, skipping")
+            return False
+        
+        cur.execute('''
+            UPDATE users 
+            SET purchased_credits = COALESCE(purchased_credits, 0) + %s
+            WHERE user_id = %s
+        ''', (credits_to_add, user_id))
+        
+        conn.commit()
+        cur.close()
+        logger.info(f"[ATOMIC] Credited {credits_to_add} to user {user_id} for order {order_id}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"[ATOMIC] Error crediting payment: {e}")
         conn.rollback()
         return False
