@@ -45,6 +45,15 @@ Keerthana AI is a Telegram bot designed to serve as a romantic AI girlfriend, of
 - **Scalability**: Webhook mode is enabled to support cost-effective auto-scaling.
 - **Gender Detection**: Server-side logic dynamically adjusts "da" or "di" usage based on user declarations.
 - **Message Limits & Referral System**: Implements a daily free message limit and rewards bonus messages for successful referrals.
+- **Credit Pack Monetization System**: Users can purchase message credits via UPI QR code payments:
+  - Starter Pack: ₹50 = 200 credits
+  - Value Pack: ₹100 = 500 credits
+  - Pro Pack: ₹200 = 1200 credits
+  - Credits never expire and are used after daily free messages and bonus are exhausted
+  - `/buy` command shows available packs with inline buttons
+  - `/credits` command shows current balance
+  - Admin commands: `/setupi` to set UPI ID, `/verify` to manually verify payments
+- **Payment Service**: Generates UPI QR codes for payment, stores orders in `payment_orders` table, and tracks `purchased_credits` in users table.
 - **Force Subscription**: Requires users to join a specified Telegram channel before using the bot.
 - **Context Awareness & Memory**: Stores conversation history and extracts user facts (name, occupation, location, likes, dislikes) in `user_memories` table for personalized interactions.
 - **Post-processing**: Extensive rules ensure responses adhere to user preferences, including stripping unwanted phrases, managing questions and emojis, and enforcing conversational styles.
@@ -84,8 +93,8 @@ Keerthana AI is a Telegram bot designed to serve as a romantic AI girlfriend, of
 - **"You Suggest" Handling**: When user asks bot to suggest, gives actual romantic activity suggestions instead of generic responses.
 - **Anti-Repetition Filter**: Checks last 3 bot messages and removes repeated phrases like "miss panniya enna?" to prevent loops.
 - **Context-Aware Response Rules**: System prompt enforces proper contextual responses matching what user actually said.
-- **Admin Commands**: Includes commands for managing user limits, blocking, and viewing statistics.
-- **User Commands**: Provides commands like `/start`, `/referral`, `/points`, `/stats`.
+- **Admin Commands**: Includes commands for managing user limits, blocking, viewing statistics, setting UPI ID (`/setupi`), and verifying payments (`/verify`).
+- **User Commands**: Provides commands like `/start`, `/buy`, `/credits`, `/referral`, `/stats`, `/reset`.
 
 ## External Dependencies
 - **Telegram Bot API**: Used for communication with the Telegram platform.
@@ -93,3 +102,10 @@ Keerthana AI is a Telegram bot designed to serve as a romantic AI girlfriend, of
 - **PostgreSQL**: Serves as the primary database for data persistence.
 - **Flask**: The web framework for the administrative dashboard and integrated application.
 - **psycopg2**: Python adapter for PostgreSQL.
+- **qrcode**: Generates UPI QR codes for the payment system.
+- **Pillow**: Image processing library used by qrcode.
+
+## Files
+- **app.py**: Main application combining Telegram bot and Flask dashboard
+- **database.py**: All database operations and models
+- **payment_service.py**: UPI payment handling with QR generation and order management

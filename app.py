@@ -20,8 +20,14 @@ from database import (
     get_all_users, get_user_chat_history, get_dashboard_stats, award_referral_points,
     set_global_daily_limit, get_global_daily_limit, get_total_referral_stats,
     clear_chat_history, save_user_memory, get_user_memories,
-    get_message_count, save_conversation_summary, get_conversation_summary, clear_conversation_summary
+    get_message_count, save_conversation_summary, get_conversation_summary, clear_conversation_summary,
+    create_payment_order, get_payment_order, update_payment_order_status,
+    add_purchased_credits, get_purchased_credits, use_purchased_credit,
+    get_pending_payment_orders, expire_old_payment_orders, get_user_payment_orders,
+    get_bot_setting, set_bot_setting
 )
+from payment_service import PaymentService, PRICING_PACKS
+import database as db_module
 import re
 import requests
 
@@ -1613,6 +1619,179 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode=ParseMode.HTML
         )
 
+payment_service = PaymentService(db_module)
+
+async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show available credit packs for purchase"""
+    user = update.effective_user
+    
+    keyboard = [
+        [InlineKeyboardButton(f"🌟 Starter - ₹50 → 200 messages", callback_data="buy_starter")],
+        [InlineKeyboardButton(f"💎 Value - ₹100 → 500 messages", callback_data="buy_value")],
+        [InlineKeyboardButton(f"👑 Pro - ₹200 → 1200 messages", callback_data="buy_pro")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    current_credits = get_purchased_credits(user.id)
+    
+    await update.message.reply_text(
+        f"🛒 <b>Buy Message Credits</b>\n\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"💰 <b>Your Credits:</b> {current_credits} messages\n"
+        f"━━━━━━━━━━━━━━━\n\n"
+        f"<b>Choose a pack:</b>\n\n"
+        f"🌟 <b>Starter</b> - ₹50 → 200 messages\n"
+        f"💎 <b>Value</b> - ₹100 → 500 messages (Best value!)\n"
+        f"👑 <b>Pro</b> - ₹200 → 1200 messages\n\n"
+        f"<i>Credits never expire! Use anytime.</i>",
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML
+    )
+
+async def credits_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Check purchased credits balance"""
+    user = update.effective_user
+    msg_status = get_message_status(user.id)
+    
+    purchased = msg_status.get('purchased', 0)
+    daily_remaining = msg_status.get('daily_remaining', 0)
+    bonus = msg_status.get('bonus', 0)
+    daily_limit = msg_status.get('daily_limit', DAILY_MESSAGE_LIMIT)
+    total = msg_status.get('total_remaining', 0)
+    
+    await update.message.reply_text(
+        f"💰 <b>Your Message Balance</b>\n\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"📩 <b>Daily Free:</b> {daily_remaining}/{daily_limit}\n"
+        f"🎁 <b>Bonus:</b> {bonus}\n"
+        f"🎫 <b>Purchased:</b> {purchased}\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"💬 <b>Total Available:</b> {total}\n\n"
+        f"<i>Use /buy to get more credits!</i>",
+        parse_mode=ParseMode.HTML
+    )
+
+async def buy_pack_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle pack selection and generate QR code"""
+    query = update.callback_query
+    await query.answer()
+    
+    user = update.effective_user
+    pack_id = query.data.replace("buy_", "")
+    
+    if pack_id not in PRICING_PACKS:
+        await query.edit_message_text("❌ Invalid pack selected.")
+        return
+    
+    pack = PRICING_PACKS[pack_id]
+    
+    try:
+        order_id, qr_bytes, upi_link, pack_info = payment_service.create_payment_order(user.id, pack_id)
+        
+        from io import BytesIO
+        qr_file = BytesIO(qr_bytes)
+        qr_file.name = f"payment_{order_id}.png"
+        
+        keyboard = [
+            [InlineKeyboardButton("✅ I've Paid - Verify", callback_data=f"verify_{order_id}")],
+            [InlineKeyboardButton("❌ Cancel", callback_data="cancel_payment")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await context.bot.send_photo(
+            chat_id=user.id,
+            photo=qr_file,
+            caption=(
+                f"📱 <b>Scan & Pay</b>\n\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"{pack['emoji']} <b>{pack['name']}</b>\n"
+                f"💵 Amount: <b>{pack['price_display']}</b>\n"
+                f"📩 Credits: <b>{pack['credits']} messages</b>\n"
+                f"━━━━━━━━━━━━━━━\n\n"
+                f"🔹 Scan QR with any UPI app\n"
+                f"🔹 (GPay, PhonePe, Paytm)\n"
+                f"🔹 After payment, click <b>\"I've Paid\"</b>\n\n"
+                f"⏰ <i>Valid for 30 minutes</i>\n"
+                f"🆔 Order: <code>{order_id}</code>"
+            ),
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML
+        )
+        
+        await query.delete_message()
+        logger.info(f"[PAYMENT] Created order {order_id} for user {user.id} - {pack_id}")
+        
+    except Exception as e:
+        logger.error(f"[PAYMENT] Error creating order: {e}")
+        await query.edit_message_text("❌ Error creating payment. Please try again.")
+
+async def verify_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle payment verification request - marks as pending for admin verification"""
+    query = update.callback_query
+    await query.answer()
+    
+    user = update.effective_user
+    order_id = query.data.replace("verify_", "")
+    
+    order = get_payment_order(order_id)
+    if not order:
+        await query.edit_message_caption(
+            caption="❌ Order not found.",
+            parse_mode=ParseMode.HTML
+        )
+        return
+    
+    if order['user_id'] != user.id:
+        await query.edit_message_caption(
+            caption="❌ This order doesn't belong to you.",
+            parse_mode=ParseMode.HTML
+        )
+        return
+    
+    if order['status'] == 'SUCCESS':
+        await query.edit_message_caption(
+            caption=(
+                f"✅ <b>Payment Already Verified!</b>\n\n"
+                f"🎉 <b>{order['credits']} credits</b> were added to your account.\n\n"
+                f"Use /credits to check your balance.\n"
+                f"Enjoy chatting! 💕"
+            ),
+            parse_mode=ParseMode.HTML
+        )
+        return
+    
+    result = payment_service.user_confirm_payment(order_id)
+    
+    if result['status'] == 'PENDING_VERIFICATION':
+        await query.edit_message_caption(
+            caption=(
+                f"⏳ <b>Payment Submitted for Verification</b>\n\n"
+                f"Your payment is being verified by admin.\n"
+                f"Credits will be added within 5-10 minutes.\n\n"
+                f"📧 If delayed, contact support with:\n"
+                f"🆔 Order: <code>{order_id}</code>\n\n"
+                f"<i>Thank you for your patience!</i> 💕"
+            ),
+            parse_mode=ParseMode.HTML
+        )
+        logger.info(f"[PAYMENT] User {user.id} confirmed payment for order {order_id}")
+    elif result['status'] == 'EXPIRED':
+        await query.edit_message_caption(
+            caption=f"❌ {result['message']}",
+            parse_mode=ParseMode.HTML
+        )
+    else:
+        await query.edit_message_caption(
+            caption=f"ℹ️ {result['message']}",
+            parse_mode=ParseMode.HTML
+        )
+
+async def cancel_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle payment cancellation"""
+    query = update.callback_query
+    await query.answer("Payment cancelled")
+    await query.delete_message()
+
 async def admin_setlimit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id != ADMIN_USER_ID:
@@ -1672,6 +1851,61 @@ async def admin_unblock(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ Unblocked user {target_user_id}")
     except ValueError:
         await update.message.reply_text("Invalid user ID. Must be a number.")
+
+async def admin_setupi(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to set UPI ID for payments"""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        logger.warning(f"[ADMIN] Unauthorized /setupi attempt by user {user.id} ({user.username})")
+        return
+    
+    current_upi = get_bot_setting('paytm_upi_id') or 'Not set'
+    
+    if len(context.args) < 1:
+        await update.message.reply_text(
+            f"💳 <b>Payment UPI Settings</b>\n\n"
+            f"Current UPI ID: <code>{current_upi}</code>\n\n"
+            f"Usage: /setupi [upi_id]\n"
+            f"Example: /setupi yourname@paytm",
+            parse_mode=ParseMode.HTML
+        )
+        return
+    
+    new_upi = context.args[0]
+    from database import set_bot_setting
+    set_bot_setting('paytm_upi_id', new_upi)
+    logger.info(f"[ADMIN] User {user.id} set UPI ID to {new_upi}")
+    await update.message.reply_text(f"✅ UPI ID updated to: {new_upi}")
+
+async def admin_verify_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to manually verify a payment"""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        return
+    
+    if len(context.args) < 1:
+        pending = get_pending_payment_orders()
+        if not pending:
+            await update.message.reply_text("No pending payments.")
+            return
+        
+        msg = "📋 <b>Pending Payments:</b>\n\n"
+        for order in pending[:10]:
+            msg += (f"🆔 <code>{order['order_id']}</code>\n"
+                   f"   User: {order['first_name']} (@{order['username']})\n"
+                   f"   Pack: {order['pack_id']} ({order['credits']} credits)\n"
+                   f"   Amount: ₹{order['amount_paise']//100}\n\n")
+        msg += "\nTo verify: /verify [order_id]"
+        await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
+        return
+    
+    order_id = context.args[0]
+    result = payment_service.verify_payment_manual(order_id, user.id)
+    
+    if result['success']:
+        await update.message.reply_text(f"✅ {result['message']}")
+    else:
+        await update.message.reply_text(f"❌ {result['message']}")
 
 async def admin_setdailylimit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -5007,7 +5241,14 @@ def ensure_initialized():
             application.add_handler(CommandHandler("totalreferrals", admin_totalreferrals))
             application.add_handler(CommandHandler("block", admin_block))
             application.add_handler(CommandHandler("unblock", admin_unblock))
+            application.add_handler(CommandHandler("setupi", admin_setupi))
+            application.add_handler(CommandHandler("verify", admin_verify_payment))
+            application.add_handler(CommandHandler("buy", buy_command))
+            application.add_handler(CommandHandler("credits", credits_command))
             application.add_handler(CallbackQueryHandler(check_subscription_callback, pattern="^check_sub$"))
+            application.add_handler(CallbackQueryHandler(buy_pack_callback, pattern="^buy_"))
+            application.add_handler(CallbackQueryHandler(verify_payment_callback, pattern="^verify_"))
+            application.add_handler(CallbackQueryHandler(cancel_payment_callback, pattern="^cancel_payment$"))
             application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
             application.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO | filters.Document.IMAGE, handle_photo))
             
@@ -5016,8 +5257,9 @@ def ensure_initialized():
                 await application.start()
                 commands = [
                     BotCommand("start", "Start chatting with Keerthana"),
+                    BotCommand("buy", "Buy message credits (₹50-₹200)"),
+                    BotCommand("credits", "Check your message balance"),
                     BotCommand("referral", "Get referral link & earn free messages"),
-                    BotCommand("points", "Check your message credits"),
                     BotCommand("stats", "View your statistics"),
                     BotCommand("reset", "Clear chat & restart roleplay fresh")
                 ]

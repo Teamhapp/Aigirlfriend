@@ -164,6 +164,29 @@ def init_database():
         ''')
         cur.execute('CREATE INDEX IF NOT EXISTS idx_conversation_summaries_user_id ON conversation_summaries(user_id)')
         
+        try:
+            cur.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS purchased_credits INTEGER DEFAULT 0')
+        except Exception:
+            pass
+        
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS payment_orders (
+                id SERIAL PRIMARY KEY,
+                order_id VARCHAR(20) UNIQUE NOT NULL,
+                user_id BIGINT REFERENCES users(user_id),
+                txn_ref VARCHAR(20),
+                pack_id VARCHAR(20),
+                amount_paise INTEGER,
+                credits INTEGER,
+                status VARCHAR(30) DEFAULT 'PENDING',
+                verified_by BIGINT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_payment_orders_user_id ON payment_orders(user_id)')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_payment_orders_status ON payment_orders(status)')
+        
         conn.commit()
         logger.info("Database initialized successfully")
     except Exception as e:
@@ -354,20 +377,52 @@ def _get_global_limit_from_conn(conn):
     return DEFAULT_DAILY_MESSAGE_LIMIT
 
 @with_db_retry()
+def get_bot_setting(conn, key):
+    """Get a bot setting value by key"""
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT value FROM bot_settings WHERE key = %s", (key,))
+        result = cur.fetchone()
+        cur.close()
+        if result:
+            return result[0]
+    except Exception:
+        pass
+    return None
+
+@with_db_retry()
+def set_bot_setting(conn, key, value):
+    """Set a bot setting value"""
+    try:
+        cur = conn.cursor()
+        cur.execute('''
+            INSERT INTO bot_settings (key, value, updated_at) 
+            VALUES (%s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (key) DO UPDATE SET value = %s, updated_at = CURRENT_TIMESTAMP
+        ''', (key, value, value))
+        conn.commit()
+        cur.close()
+        return True
+    except Exception as e:
+        logger.error(f"Error setting bot setting: {e}")
+        conn.rollback()
+        return False
+
+@with_db_retry()
 def get_message_status(conn, user_id):
     global_limit = _get_global_limit_from_conn(conn)
     cur = conn.cursor()
     cur.execute('''
-        SELECT daily_messages_used, bonus_messages, last_reset_date, custom_daily_limit 
+        SELECT daily_messages_used, bonus_messages, last_reset_date, custom_daily_limit, COALESCE(purchased_credits, 0)
         FROM users WHERE user_id = %s
     ''', (user_id,))
     result = cur.fetchone()
     cur.close()
     
     if not result:
-        return {'daily_used': 0, 'daily_remaining': global_limit, 'bonus': 0, 'total_remaining': global_limit}
+        return {'daily_used': 0, 'daily_remaining': global_limit, 'bonus': 0, 'purchased': 0, 'total_remaining': global_limit}
     
-    daily_used, bonus, last_reset, custom_limit = result[0] or 0, result[1] or 0, result[2], result[3]
+    daily_used, bonus, last_reset, custom_limit, purchased = result[0] or 0, result[1] or 0, result[2], result[3], result[4] or 0
     user_limit = custom_limit if custom_limit else global_limit
     today = date.today()
     
@@ -375,12 +430,13 @@ def get_message_status(conn, user_id):
         daily_used = 0
     
     daily_remaining = max(0, user_limit - daily_used)
-    total_remaining = daily_remaining + bonus
+    total_remaining = daily_remaining + bonus + purchased
     
     return {
         'daily_used': daily_used,
         'daily_remaining': daily_remaining,
         'bonus': bonus,
+        'purchased': purchased,
         'total_remaining': total_remaining,
         'daily_limit': user_limit
     }
@@ -390,7 +446,7 @@ def use_message(conn, user_id):
     try:
         cur = conn.cursor()
         cur.execute('''
-            SELECT daily_messages_used, bonus_messages, last_reset_date, custom_daily_limit 
+            SELECT daily_messages_used, bonus_messages, last_reset_date, custom_daily_limit, COALESCE(purchased_credits, 0)
             FROM users WHERE user_id = %s
         ''', (user_id,))
         result = cur.fetchone()
@@ -399,7 +455,7 @@ def use_message(conn, user_id):
             cur.close()
             return False, 0
         
-        daily_used, bonus, last_reset, custom_limit = result[0] or 0, result[1] or 0, result[2], result[3]
+        daily_used, bonus, last_reset, custom_limit, purchased = result[0] or 0, result[1] or 0, result[2], result[3], result[4] or 0
         global_limit = _get_global_limit_from_conn(conn)
         user_limit = custom_limit if custom_limit else global_limit
         today = date.today()
@@ -411,7 +467,7 @@ def use_message(conn, user_id):
             ''', (today, user_id))
             conn.commit()
             cur.close()
-            remaining = user_limit - 1 + bonus
+            remaining = user_limit - 1 + bonus + purchased
             return True, remaining
         
         daily_remaining = user_limit - daily_used
@@ -423,7 +479,7 @@ def use_message(conn, user_id):
             ''', (user_id,))
             conn.commit()
             cur.close()
-            remaining = daily_remaining - 1 + bonus
+            remaining = daily_remaining - 1 + bonus + purchased
             return True, remaining
         elif bonus > 0:
             cur.execute('''
@@ -432,7 +488,17 @@ def use_message(conn, user_id):
             ''', (user_id,))
             conn.commit()
             cur.close()
-            remaining = bonus - 1
+            remaining = bonus - 1 + purchased
+            return True, remaining
+        elif purchased > 0:
+            cur.execute('''
+                UPDATE users SET purchased_credits = purchased_credits - 1
+                WHERE user_id = %s
+            ''', (user_id,))
+            conn.commit()
+            cur.close()
+            remaining = purchased - 1
+            logger.info(f"[CREDITS] User {user_id} used 1 purchased credit, {purchased - 1} remaining")
             return True, remaining
         else:
             cur.close()
@@ -779,3 +845,190 @@ def delete_user_memory(conn, user_id, memory_type, memory_key):
         logger.error(f"Error deleting memory: {e}")
         conn.rollback()
         return False
+
+@with_db_retry()
+def create_payment_order(conn, user_id, order_id, txn_ref, pack_id, amount_paise, credits):
+    """Create a new payment order"""
+    try:
+        cur = conn.cursor()
+        cur.execute('''
+            INSERT INTO payment_orders (order_id, user_id, txn_ref, pack_id, amount_paise, credits, status)
+            VALUES (%s, %s, %s, %s, %s, %s, 'PENDING')
+        ''', (order_id, user_id, txn_ref, pack_id, amount_paise, credits))
+        conn.commit()
+        cur.close()
+        logger.info(f"Created payment order {order_id} for user {user_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Error creating payment order: {e}")
+        conn.rollback()
+        return False
+
+@with_db_retry()
+def get_payment_order(conn, order_id):
+    """Get payment order by order_id"""
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT order_id, user_id, txn_ref, pack_id, amount_paise, credits, status, verified_by, created_at, updated_at
+        FROM payment_orders WHERE order_id = %s
+    ''', (order_id,))
+    order = cur.fetchone()
+    cur.close()
+    if order:
+        return {
+            'order_id': order[0],
+            'user_id': order[1],
+            'txn_ref': order[2],
+            'pack_id': order[3],
+            'amount_paise': order[4],
+            'credits': order[5],
+            'status': order[6],
+            'verified_by': order[7],
+            'created_at': order[8],
+            'updated_at': order[9]
+        }
+    return None
+
+@with_db_retry()
+def update_payment_order_status(conn, order_id, status, verified_by=None):
+    """Update payment order status"""
+    try:
+        cur = conn.cursor()
+        if verified_by:
+            cur.execute('''
+                UPDATE payment_orders 
+                SET status = %s, verified_by = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE order_id = %s
+            ''', (status, verified_by, order_id))
+        else:
+            cur.execute('''
+                UPDATE payment_orders 
+                SET status = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE order_id = %s
+            ''', (status, order_id))
+        conn.commit()
+        cur.close()
+        logger.info(f"Updated order {order_id} status to {status}")
+        return True
+    except Exception as e:
+        logger.error(f"Error updating payment order: {e}")
+        conn.rollback()
+        return False
+
+@with_db_retry()
+def add_purchased_credits(conn, user_id, credits):
+    """Add purchased credits to user account"""
+    try:
+        cur = conn.cursor()
+        cur.execute('''
+            UPDATE users 
+            SET purchased_credits = COALESCE(purchased_credits, 0) + %s
+            WHERE user_id = %s
+        ''', (credits, user_id))
+        conn.commit()
+        cur.close()
+        logger.info(f"Added {credits} purchased credits to user {user_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Error adding purchased credits: {e}")
+        conn.rollback()
+        return False
+
+@with_db_retry()
+def get_purchased_credits(conn, user_id):
+    """Get user's purchased credits balance"""
+    cur = conn.cursor()
+    cur.execute('SELECT COALESCE(purchased_credits, 0) FROM users WHERE user_id = %s', (user_id,))
+    result = cur.fetchone()
+    cur.close()
+    return result[0] if result else 0
+
+@with_db_retry()
+def use_purchased_credit(conn, user_id):
+    """Deduct one purchased credit from user, returns True if deducted"""
+    try:
+        cur = conn.cursor()
+        cur.execute('''
+            UPDATE users 
+            SET purchased_credits = purchased_credits - 1
+            WHERE user_id = %s AND purchased_credits > 0
+            RETURNING purchased_credits
+        ''', (user_id,))
+        result = cur.fetchone()
+        conn.commit()
+        cur.close()
+        return result is not None
+    except Exception as e:
+        logger.error(f"Error using purchased credit: {e}")
+        conn.rollback()
+        return False
+
+@with_db_retry()
+def get_pending_payment_orders(conn):
+    """Get all pending payment orders for admin verification"""
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT po.order_id, po.user_id, u.username, u.first_name, 
+               po.pack_id, po.amount_paise, po.credits, po.status, po.created_at
+        FROM payment_orders po
+        JOIN users u ON po.user_id = u.user_id
+        WHERE po.status IN ('PENDING', 'PENDING_VERIFICATION')
+        ORDER BY po.created_at DESC
+    ''')
+    orders = cur.fetchall()
+    cur.close()
+    return [{
+        'order_id': o[0],
+        'user_id': o[1],
+        'username': o[2],
+        'first_name': o[3],
+        'pack_id': o[4],
+        'amount_paise': o[5],
+        'credits': o[6],
+        'status': o[7],
+        'created_at': o[8]
+    } for o in orders]
+
+@with_db_retry()
+def expire_old_payment_orders(conn):
+    """Expire orders older than 30 minutes"""
+    try:
+        cur = conn.cursor()
+        cur.execute('''
+            UPDATE payment_orders 
+            SET status = 'EXPIRED', updated_at = CURRENT_TIMESTAMP
+            WHERE status = 'PENDING' 
+            AND created_at < NOW() - INTERVAL '30 minutes'
+        ''')
+        affected = cur.rowcount
+        conn.commit()
+        cur.close()
+        if affected > 0:
+            logger.info(f"Expired {affected} old payment orders")
+        return affected
+    except Exception as e:
+        logger.error(f"Error expiring orders: {e}")
+        conn.rollback()
+        return 0
+
+@with_db_retry()
+def get_user_payment_orders(conn, user_id, limit=10):
+    """Get user's recent payment orders"""
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT order_id, pack_id, amount_paise, credits, status, created_at
+        FROM payment_orders 
+        WHERE user_id = %s
+        ORDER BY created_at DESC
+        LIMIT %s
+    ''', (user_id, limit))
+    orders = cur.fetchall()
+    cur.close()
+    return [{
+        'order_id': o[0],
+        'pack_id': o[1],
+        'amount_paise': o[2],
+        'credits': o[3],
+        'status': o[4],
+        'created_at': o[5]
+    } for o in orders]
