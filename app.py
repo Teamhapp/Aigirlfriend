@@ -5370,18 +5370,26 @@ DASHBOARD_HTML = '''
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
         h1 { color: #ff6b9d; margin-bottom: 20px; }
         .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card { background: #16213e; padding: 20px; border-radius: 10px; text-align: center; }
         .stat-value { font-size: 2.5em; color: #ff6b9d; font-weight: bold; }
         .stat-label { color: #888; margin-top: 5px; }
+        .search-box { width: 100%; padding: 12px 20px; font-size: 16px; border: 2px solid #0f3460; border-radius: 10px; background: #16213e; color: #eee; margin-bottom: 20px; }
+        .search-box:focus { outline: none; border-color: #ff6b9d; }
+        .search-box::placeholder { color: #666; }
+        .table-wrapper { overflow-x: auto; }
         .users-table { width: 100%; border-collapse: collapse; background: #16213e; border-radius: 10px; overflow: hidden; }
-        .users-table th, .users-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #2a2a4e; }
-        .users-table th { background: #0f3460; color: #ff6b9d; }
+        .users-table th, .users-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #2a2a4e; white-space: nowrap; }
+        .users-table th { background: #0f3460; color: #ff6b9d; position: sticky; top: 0; }
         .users-table tr:hover { background: #1f4068; cursor: pointer; }
+        .users-table tr.hidden { display: none; }
         .btn { background: #ff6b9d; color: white; padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; display: inline-block; }
         .btn:hover { background: #e91e63; }
+        .user-id { font-family: monospace; font-size: 0.9em; color: #888; }
+        .credits { color: #ffd700; font-weight: bold; }
+        .result-count { color: #888; margin-bottom: 10px; font-size: 0.9em; }
     </style>
 </head>
 <body>
@@ -5403,58 +5411,90 @@ DASHBOARD_HTML = '''
                 <div class="stat-value">{{ stats.active_today }}</div>
                 <div class="stat-label">Active Today</div>
             </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ stats.total_revenue or 0 }}</div>
+                <div class="stat-label">Revenue (₹)</div>
+            </div>
         </div>
         <h2 style="margin-bottom: 15px;">Users</h2>
-        <table class="users-table">
-            <thead>
-                <tr>
-                    <th>User</th>
-                    <th>Username</th>
-                    <th>Messages</th>
-                    <th>Limit</th>
-                    <th>Bonus</th>
-                    <th>Referrals</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for user in users %}
-                <tr>
-                    <td>{{ user.preferred_name or user.first_name or 'Unknown' }}</td>
-                    <td>@{{ user.username or 'N/A' }}</td>
-                    <td>{{ user.message_count }}</td>
-                    <td>{{ user.daily_messages_used }}/{{ user.custom_daily_limit or default_limit }}</td>
-                    <td>{{ user.bonus_messages }}</td>
-                    <td>{{ user.referral_count }}</td>
-                    <td>
-                        {% if user.is_blocked %}
-                        <span style="color: #ff4444;">Blocked</span>
-                        {% else %}
-                        <span style="color: #44ff44;">Active</span>
-                        {% endif %}
-                    </td>
-                    <td style="display: flex; gap: 5px; flex-wrap: wrap;">
-                        <a href="/chat/{{ user.user_id }}" class="btn">Chat</a>
-                        {% if user.is_blocked %}
-                        <form action="/unblock/{{ user.user_id }}" method="POST" style="display: inline;">
-                            <button type="submit" class="btn" style="background: #44aa44;">Unblock</button>
-                        </form>
-                        {% else %}
-                        <form action="/block/{{ user.user_id }}" method="POST" style="display: inline;">
-                            <button type="submit" class="btn" style="background: #aa4444;">Block</button>
-                        </form>
-                        {% endif %}
-                        <form action="/set_limit/{{ user.user_id }}" method="POST" style="display: inline-flex; gap: 5px;">
-                            <input type="number" name="limit" placeholder="{{ user.custom_daily_limit or default_limit }}" style="width: 60px; padding: 5px; border-radius: 5px; border: none; background: #0f3460; color: white;">
-                            <button type="submit" class="btn" style="background: #4488ff;">Set</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <input type="text" id="searchBox" class="search-box" placeholder="🔍 Search by name, username, or user ID...">
+        <div id="resultCount" class="result-count">Showing {{ users|length }} users</div>
+        <div class="table-wrapper">
+            <table class="users-table" id="usersTable">
+                <thead>
+                    <tr>
+                        <th>User ID</th>
+                        <th>Name</th>
+                        <th>Username</th>
+                        <th>Messages</th>
+                        <th>Limit</th>
+                        <th>Bonus</th>
+                        <th>Credits</th>
+                        <th>Referrals</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="usersBody">
+                    {% for user in users %}
+                    <tr data-search="{{ user.user_id }} {{ user.preferred_name or user.first_name or '' }} {{ user.username or '' }}">
+                        <td class="user-id">{{ user.user_id }}</td>
+                        <td>{{ user.preferred_name or user.first_name or 'Unknown' }}</td>
+                        <td>@{{ user.username or 'N/A' }}</td>
+                        <td>{{ user.message_count }}</td>
+                        <td>{{ user.daily_messages_used }}/{{ user.custom_daily_limit or default_limit }}</td>
+                        <td>{{ user.bonus_messages }}</td>
+                        <td class="credits">{{ user.purchased_credits or 0 }}</td>
+                        <td>{{ user.referral_count }}</td>
+                        <td>
+                            {% if user.is_blocked %}
+                            <span style="color: #ff4444;">Blocked</span>
+                            {% else %}
+                            <span style="color: #44ff44;">Active</span>
+                            {% endif %}
+                        </td>
+                        <td style="display: flex; gap: 5px; flex-wrap: wrap;">
+                            <a href="/chat/{{ user.user_id }}" class="btn">Chat</a>
+                            {% if user.is_blocked %}
+                            <form action="/unblock/{{ user.user_id }}" method="POST" style="display: inline;">
+                                <button type="submit" class="btn" style="background: #44aa44;">Unblock</button>
+                            </form>
+                            {% else %}
+                            <form action="/block/{{ user.user_id }}" method="POST" style="display: inline;">
+                                <button type="submit" class="btn" style="background: #aa4444;">Block</button>
+                            </form>
+                            {% endif %}
+                            <form action="/set_limit/{{ user.user_id }}" method="POST" style="display: inline-flex; gap: 5px;">
+                                <input type="number" name="limit" placeholder="{{ user.custom_daily_limit or default_limit }}" style="width: 60px; padding: 5px; border-radius: 5px; border: none; background: #0f3460; color: white;">
+                                <button type="submit" class="btn" style="background: #4488ff;">Set</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
+    <script>
+        document.getElementById('searchBox').addEventListener('input', function() {
+            const query = this.value.toLowerCase().trim();
+            const rows = document.querySelectorAll('#usersBody tr');
+            let visibleCount = 0;
+            
+            rows.forEach(row => {
+                const searchData = row.getAttribute('data-search').toLowerCase();
+                if (query === '' || searchData.includes(query)) {
+                    row.classList.remove('hidden');
+                    visibleCount++;
+                } else {
+                    row.classList.add('hidden');
+                }
+            });
+            
+            document.getElementById('resultCount').textContent = 
+                query ? `Found ${visibleCount} user(s) matching "${this.value}"` : `Showing ${rows.length} users`;
+        });
+    </script>
 </body>
 </html>
 '''

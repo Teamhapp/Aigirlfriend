@@ -686,6 +686,7 @@ def get_all_users(conn):
         SELECT u.user_id, u.username, u.first_name, u.preferred_name, 
                u.daily_messages_used, u.bonus_messages, u.referral_count,
                u.created_at, u.last_active, u.is_blocked, u.custom_daily_limit,
+               u.purchased_credits,
                (SELECT COUNT(*) FROM chat_messages WHERE user_id = u.user_id) as message_count
         FROM users u
         ORDER BY u.last_active DESC
@@ -704,7 +705,8 @@ def get_all_users(conn):
         'last_active': u[8],
         'is_blocked': u[9] or False,
         'custom_daily_limit': u[10],
-        'message_count': u[11]
+        'purchased_credits': u[11] or 0,
+        'message_count': u[12]
     } for u in users]
 
 @with_db_retry()
@@ -729,11 +731,14 @@ def get_dashboard_stats(conn):
     total_messages = cur.fetchone()[0]
     cur.execute("SELECT COUNT(*) FROM users WHERE last_active > NOW() - INTERVAL '24 hours'")
     active_today = cur.fetchone()[0]
+    cur.execute("SELECT COALESCE(SUM(amount_paise), 0) FROM payment_orders WHERE status = 'SUCCESS'")
+    total_revenue_paise = cur.fetchone()[0]
     cur.close()
     return {
         'total_users': total_users,
         'total_messages': total_messages,
-        'active_today': active_today
+        'active_today': active_today,
+        'total_revenue': total_revenue_paise // 100
     }
 
 @with_db_retry()
