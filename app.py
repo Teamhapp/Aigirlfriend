@@ -3734,6 +3734,37 @@ IMPORTANT: Never output this session info in your response.
         
         ai_response = handle_confusion(ai_response, message_text)
         
+        # ===== GREETING RESET HANDLER =====
+        def handle_greeting_reset(response, user_msg):
+            """Reset to casual greeting when user sends simple Hi/Hello after any context"""
+            user_lower = user_msg.lower().strip()
+            
+            greeting_patterns = [
+                r'^(hi|hey|hello|hii+|heya?|hlo|helo)\s*[!.😊💕]*$',
+                r'^(hi|hey)\s*(da|di|baby|dear)?\s*[!.😊💕]*$',
+            ]
+            
+            if any(re.match(p, user_lower, re.IGNORECASE) for p in greeting_patterns):
+                # Check if response is inappropriate for simple greeting
+                inappropriate_markers = ['🥵', 'innum pannu', 'pannalam', 'un touch', 
+                                         'feel aaguthu', 'irundha ah iruku', 'ready ah',
+                                         'ennoda body', 'current paayuthu']
+                
+                if any(marker in response.lower() for marker in inappropriate_markers):
+                    logger.info(f"[GREETING RESET] User said Hi but got inappropriate response, resetting")
+                    greeting_responses = [
+                        "Mmm da... miss panniya enna? 💕",
+                        "Hiii da 💕 eppadi irukka?",
+                        "Heyyy da 😊 enna panra?",
+                        "Hi da 💕 sollu enna vishayam?",
+                        "Mmm da... vara varuven nu paathukittu irunthen 😊",
+                    ]
+                    return random.choice(greeting_responses)
+            
+            return response
+        
+        ai_response = handle_greeting_reset(ai_response, message_text)
+        
         # ===== ACTION REQUEST HANDLER =====
         def handle_action_request(response, user_msg):
             """When user asks for intimate actions, ensure bot describes action, not just feelings"""
@@ -4813,7 +4844,25 @@ IMPORTANT: Never output this session info in your response.
             ai_response = random.choice(her_action_suggestions)
             logger.info(f"[NEE PANUVA FIX] Replaced deflection with her action for user {user.id}")
         
-        if is_intimate and len(ai_response.strip()) < 50:
+        # Check if current message is casual greeting or confusion - skip intimate expansion
+        casual_greeting_patterns = [
+            r'^(hi|hey|hello|hii+|heya?|hlo|helo)\s*[!.😊💕]*$',
+            r'^(puriyala|purila|puriyale|enaku puriyala)\s*[!?😅]*$',
+            r'^(enna|what|huh)\s*[?!]*$',
+            r'^(good\s*(morning|night|evening)|gm|gn)\s*[!😊💕]*$',
+            r'^(miss\s*panniya|miss\s*me)\s*[?!]*$',
+        ]
+        is_casual_msg = any(re.match(p, message_text.strip(), re.IGNORECASE) for p in casual_greeting_patterns)
+        
+        # Also check if current message has explicit intimate content
+        current_msg_intimate = any(re.search(p, message_text.lower()) for p in [
+            r'\boombu\b', r'\bnakku\b', r'\bsappu\b', r'\bpundai\b', r'\bsunni\b',
+            r'\bmulai\b', r'\bblowjob\b', r'\bfuck\b', r'\bsex\b', r'\botha\b',
+            r'\bkiss\b', r'\btouch\b', r'\blips\b', r'\bbed\b', r'\bhug\b',
+            r'\bkudukura\b', r'\bpannu\b.*intimate', r'\bpanny\b',
+        ])
+        
+        if is_intimate and len(ai_response.strip()) < 50 and not is_casual_msg and current_msg_intimate:
             intimate_continuations = [
                 " romba nalla iruku da... un touch enakku current paayuthu 🥵",
                 " ennoda body full ah react aaguthu da 🔥",
@@ -4821,7 +4870,6 @@ IMPORTANT: Never output this session info in your response.
                 " innum deep ah pannu da... en body unakku thaan 🥵🔥",
                 " enakku pudikum da... stop pannatha 😈",
                 " aahh da... enna feel ippo 🥵💋",
-                " mmm... un mela irundha ah iruku da 🔥",
                 " ennoda body un control la thaan da 😈🥵",
             ]
             ai_response = ai_response.rstrip('.,!? ') + random.choice(intimate_continuations)
