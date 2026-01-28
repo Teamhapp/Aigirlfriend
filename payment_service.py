@@ -51,17 +51,26 @@ class PaymentService:
         self._cache_duration = 300
 
     def _get_cached_credentials(self) -> Optional[Dict]:
-        """Get Paytm credentials with caching"""
+        """Get Paytm credentials from environment secrets with caching"""
         now = datetime.now()
         if self._credentials_cache and self._cache_time:
             if (now - self._cache_time).seconds < self._cache_duration:
                 return self._credentials_cache
         
-        creds = self.db.get_paytm_credentials()
-        if creds:
+        mid = os.environ.get('PAYTM_MERCHANT_ID')
+        upi_id = os.environ.get('PAYTM_UPI_ID')
+        
+        if mid and upi_id:
+            creds = {
+                'mid': mid,
+                'upi_id': upi_id,
+                'merchant_key': os.environ.get('PAYTM_MERCHANT_KEY')
+            }
             self._credentials_cache = creds
             self._cache_time = now
-        return creds
+            return creds
+        
+        return None
 
     def generate_transaction_id(self, length: int = 10) -> str:
         """Generate unique alphanumeric transaction ID"""
