@@ -1,10 +1,12 @@
 import qrcode
 import io
-import base64
 import random
 import string
+import logging
 from typing import Dict, Tuple, Optional
 from datetime import datetime, timedelta
+
+logger = logging.getLogger(__name__)
 
 PRICING_PACKS = {
     'starter': {
@@ -33,6 +35,22 @@ PRICING_PACKS = {
 class PaymentService:
     def __init__(self, db_module):
         self.db = db_module
+        self._credentials_cache = None
+        self._cache_time = None
+        self._cache_duration = 300
+
+    def _get_cached_credentials(self) -> Optional[Dict]:
+        """Get Paytm credentials with caching"""
+        now = datetime.now()
+        if self._credentials_cache and self._cache_time:
+            if (now - self._cache_time).seconds < self._cache_duration:
+                return self._credentials_cache
+        
+        creds = self.db.get_paytm_credentials()
+        if creds:
+            self._credentials_cache = creds
+            self._cache_time = now
+        return creds
 
     def generate_transaction_id(self, length: int = 10) -> str:
         chars = string.ascii_uppercase + string.digits
@@ -74,7 +92,12 @@ class PaymentService:
             raise ValueError(f"Invalid pack_id: {pack_id}")
         
         pack = PRICING_PACKS[pack_id]
-        upi_id = self.db.get_bot_setting('paytm_upi_id') or 'keerthanabot@paytm'
+        
+        creds = self._get_cached_credentials()
+        if creds and creds.get('upi_id'):
+            upi_id = creds['upi_id']
+        else:
+            upi_id = self.db.get_bot_setting('paytm_upi_id') or 'keerthanabot@paytm'
         
         order_id = self.generate_transaction_id()
         txn_ref = self.generate_transaction_id()
@@ -100,6 +123,7 @@ class PaymentService:
         return order_id, qr_bytes, upi_link, pack
 
     def verify_payment_manual(self, order_id: str, admin_user_id: int) -> Dict:
+        """Admin manually verifies a payment and credits the user"""
         order = self.db.get_payment_order(order_id)
         
         if not order:
@@ -129,11 +153,13 @@ class PaymentService:
         return {
             'success': True,
             'status': 'SUCCESS',
-            'message': f"✅ Payment verified! {order['credits']} credits added",
-            'order': order
+            'message': f"✅ Payment verified! {order['credits']} credits added to user {order['user_id']}",
+            'order': order,
+            'credits': order['credits']
         }
 
     def user_confirm_payment(self, order_id: str) -> Dict:
+        """Called when user clicks 'I've Paid' - marks order for admin verification"""
         order = self.db.get_payment_order(order_id)
         
         if not order:

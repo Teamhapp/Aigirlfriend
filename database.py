@@ -180,12 +180,32 @@ def init_database():
                 credits INTEGER,
                 status VARCHAR(30) DEFAULT 'PENDING',
                 verified_by BIGINT,
+                paytm_txn_id VARCHAR(50),
+                utr VARCHAR(50),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
         cur.execute('CREATE INDEX IF NOT EXISTS idx_payment_orders_user_id ON payment_orders(user_id)')
         cur.execute('CREATE INDEX IF NOT EXISTS idx_payment_orders_status ON payment_orders(status)')
+        
+        try:
+            cur.execute('ALTER TABLE payment_orders ADD COLUMN IF NOT EXISTS paytm_txn_id VARCHAR(50)')
+            cur.execute('ALTER TABLE payment_orders ADD COLUMN IF NOT EXISTS utr VARCHAR(50)')
+        except Exception:
+            pass
+        
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS paytm_tokens (
+                id SERIAL PRIMARY KEY,
+                mid VARCHAR(50) NOT NULL,
+                upi_id VARCHAR(100) NOT NULL,
+                merchant_key VARCHAR(100),
+                status VARCHAR(20) DEFAULT 'Active',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
         
         conn.commit()
         logger.info("Database initialized successfully")
@@ -1032,3 +1052,86 @@ def get_user_payment_orders(conn, user_id, limit=10):
         'status': o[4],
         'created_at': o[5]
     } for o in orders]
+
+@with_db_retry()
+def save_paytm_credentials(conn, mid, upi_id, merchant_key=None):
+    """Save or update Paytm merchant credentials"""
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT id FROM paytm_tokens LIMIT 1')
+        existing = cur.fetchone()
+        
+        if existing:
+            if merchant_key:
+                cur.execute('''
+                    UPDATE paytm_tokens 
+                    SET mid = %s, upi_id = %s, merchant_key = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                ''', (mid, upi_id, merchant_key, existing[0]))
+            else:
+                cur.execute('''
+                    UPDATE paytm_tokens 
+                    SET mid = %s, upi_id = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                ''', (mid, upi_id, existing[0]))
+        else:
+            cur.execute('''
+                INSERT INTO paytm_tokens (mid, upi_id, merchant_key)
+                VALUES (%s, %s, %s)
+            ''', (mid, upi_id, merchant_key))
+        
+        conn.commit()
+        cur.close()
+        logger.info(f"Saved Paytm credentials: MID={mid}, UPI={upi_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Error saving Paytm credentials: {e}")
+        conn.rollback()
+        return False
+
+@with_db_retry()
+def get_paytm_credentials(conn):
+    """Get Paytm merchant credentials"""
+    cur = conn.cursor()
+    cur.execute('SELECT mid, upi_id, merchant_key, status FROM paytm_tokens WHERE status = %s LIMIT 1', ('Active',))
+    creds = cur.fetchone()
+    cur.close()
+    if creds:
+        return {
+            'mid': creds[0],
+            'upi_id': creds[1],
+            'merchant_key': creds[2],
+            'status': creds[3]
+        }
+    return None
+
+@with_db_retry()
+def update_payment_order_utr(conn, order_id, paytm_txn_id=None, utr=None, status=None):
+    """Update payment order with Paytm transaction details"""
+    try:
+        cur = conn.cursor()
+        updates = ['updated_at = CURRENT_TIMESTAMP']
+        values = []
+        
+        if paytm_txn_id:
+            updates.append('paytm_txn_id = %s')
+            values.append(paytm_txn_id)
+        if utr:
+            updates.append('utr = %s')
+            values.append(utr)
+        if status:
+            updates.append('status = %s')
+            values.append(status)
+        
+        values.append(order_id)
+        
+        query = f"UPDATE payment_orders SET {', '.join(updates)} WHERE order_id = %s"
+        cur.execute(query, tuple(values))
+        conn.commit()
+        cur.close()
+        logger.info(f"Updated order {order_id} with UTR={utr}, status={status}")
+        return True
+    except Exception as e:
+        logger.error(f"Error updating payment order UTR: {e}")
+        conn.rollback()
+        return False

@@ -24,7 +24,8 @@ from database import (
     create_payment_order, get_payment_order, update_payment_order_status,
     add_purchased_credits, get_purchased_credits, use_purchased_credit,
     get_pending_payment_orders, expire_old_payment_orders, get_user_payment_orders,
-    get_bot_setting, set_bot_setting
+    get_bot_setting, set_bot_setting, save_paytm_credentials, get_paytm_credentials,
+    update_payment_order_utr
 )
 from payment_service import PaymentService, PRICING_PACKS
 import database as db_module
@@ -1726,9 +1727,9 @@ async def buy_pack_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("❌ Error creating payment. Please try again.")
 
 async def verify_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle payment verification request - marks as pending for admin verification"""
+    """Handle payment verification - marks for admin verification"""
     query = update.callback_query
-    await query.answer()
+    await query.answer("Submitting payment...")
     
     user = update.effective_user
     order_id = query.data.replace("verify_", "")
@@ -1765,8 +1766,8 @@ async def verify_payment_callback(update: Update, context: ContextTypes.DEFAULT_
     if result['status'] == 'PENDING_VERIFICATION':
         await query.edit_message_caption(
             caption=(
-                f"⏳ <b>Payment Submitted for Verification</b>\n\n"
-                f"Your payment is being verified by admin.\n"
+                f"✅ <b>Payment Submitted!</b>\n\n"
+                f"Your payment is being verified.\n"
                 f"Credits will be added within 5-10 minutes.\n\n"
                 f"📧 If delayed, contact support with:\n"
                 f"🆔 Order: <code>{order_id}</code>\n\n"
@@ -1775,14 +1776,26 @@ async def verify_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             parse_mode=ParseMode.HTML
         )
         logger.info(f"[PAYMENT] User {user.id} confirmed payment for order {order_id}")
+    
     elif result['status'] == 'EXPIRED':
         await query.edit_message_caption(
             caption=f"❌ {result['message']}",
             parse_mode=ParseMode.HTML
         )
+    
+    elif result['status'] == 'ALREADY_VERIFIED':
+        await query.edit_message_caption(
+            caption=(
+                f"✅ <b>Payment Already Verified!</b>\n\n"
+                f"{result['message']}\n\n"
+                f"Use /credits to check your balance."
+            ),
+            parse_mode=ParseMode.HTML
+        )
+    
     else:
         await query.edit_message_caption(
-            caption=f"ℹ️ {result['message']}",
+            caption=f"ℹ️ {result.get('message', 'Please wait and try again.')}",
             parse_mode=ParseMode.HTML
         )
 
@@ -1853,7 +1866,7 @@ async def admin_unblock(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Invalid user ID. Must be a number.")
 
 async def admin_setupi(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Admin command to set UPI ID for payments"""
+    """Admin command to set UPI ID for payments (simple mode)"""
     user = update.effective_user
     if user.id != ADMIN_USER_ID:
         logger.warning(f"[ADMIN] Unauthorized /setupi attempt by user {user.id} ({user.username})")
@@ -1866,7 +1879,8 @@ async def admin_setupi(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"💳 <b>Payment UPI Settings</b>\n\n"
             f"Current UPI ID: <code>{current_upi}</code>\n\n"
             f"Usage: /setupi [upi_id]\n"
-            f"Example: /setupi yourname@paytm",
+            f"Example: /setupi yourname@paytm\n\n"
+            f"💡 For auto-verification, use /setpaytm instead",
             parse_mode=ParseMode.HTML
         )
         return
@@ -1876,6 +1890,53 @@ async def admin_setupi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     set_bot_setting('paytm_upi_id', new_upi)
     logger.info(f"[ADMIN] User {user.id} set UPI ID to {new_upi}")
     await update.message.reply_text(f"✅ UPI ID updated to: {new_upi}")
+
+async def admin_setpaytm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to set Paytm MID and UPI ID for auto-verification"""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        logger.warning(f"[ADMIN] Unauthorized /setpaytm attempt by user {user.id} ({user.username})")
+        return
+    
+    from database import get_paytm_credentials, save_paytm_credentials
+    current_creds = get_paytm_credentials()
+    
+    if len(context.args) < 2:
+        if current_creds:
+            mid = current_creds.get('mid', 'Not set')
+            upi = current_creds.get('upi_id', 'Not set')
+            has_key = 'Yes ✅' if current_creds.get('merchant_key') else 'No ❌'
+        else:
+            mid = 'Not set'
+            upi = 'Not set'
+            has_key = 'No ❌'
+        
+        await update.message.reply_text(
+            f"💳 <b>Paytm API Settings</b>\n\n"
+            f"📌 Merchant ID: <code>{mid}</code>\n"
+            f"📌 UPI ID: <code>{upi}</code>\n"
+            f"🔑 Merchant Key: {has_key}\n\n"
+            f"<b>Usage:</b> /setpaytm [MID] [UPI_ID]\n"
+            f"<b>Example:</b>\n"
+            f"<code>/setpaytm ABC123MID456 merchant@paytm</code>\n\n"
+            f"💡 Set PAYTM_MERCHANT_KEY in Secrets for auto-verification",
+            parse_mode=ParseMode.HTML
+        )
+        return
+    
+    mid = context.args[0]
+    upi_id = context.args[1]
+    
+    save_paytm_credentials(mid, upi_id)
+    logger.info(f"[ADMIN] User {user.id} set Paytm MID={mid}, UPI={upi_id}")
+    
+    await update.message.reply_text(
+        f"✅ <b>Paytm credentials saved!</b>\n\n"
+        f"📌 Merchant ID: <code>{mid}</code>\n"
+        f"📌 UPI ID: <code>{upi_id}</code>\n\n"
+        f"💡 Make sure PAYTM_MERCHANT_KEY is set in Secrets for auto-verification to work.",
+        parse_mode=ParseMode.HTML
+    )
 
 async def admin_verify_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin command to manually verify a payment"""
@@ -5242,6 +5303,7 @@ def ensure_initialized():
             application.add_handler(CommandHandler("block", admin_block))
             application.add_handler(CommandHandler("unblock", admin_unblock))
             application.add_handler(CommandHandler("setupi", admin_setupi))
+            application.add_handler(CommandHandler("setpaytm", admin_setpaytm))
             application.add_handler(CommandHandler("verify", admin_verify_payment))
             application.add_handler(CommandHandler("buy", buy_command))
             application.add_handler(CommandHandler("credits", credits_command))
