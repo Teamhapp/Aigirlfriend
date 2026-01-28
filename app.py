@@ -4,6 +4,7 @@ import asyncio
 import random
 import html
 import secrets
+import time
 from google import genai
 from google.genai import types
 from flask import Flask, render_template_string, request, redirect, url_for, session, Response
@@ -39,10 +40,77 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 FORCE_SUB_CHANNEL = os.environ.get('FORCE_SUB_CHANNEL', '')
 ADMIN_USER_ID = 6474452917
 ADMIN_PASSWORD = os.environ.get('DASHBOARD_PASSWORD')
+
+# Multi-key Gemini API rotation for cost optimization
+class GeminiKeyRotator:
+    """Rotates between multiple Gemini API keys to stay within free tier limits"""
+    
+    def __init__(self):
+        self.keys = []
+        self.clients = []
+        self.current_index = 0
+        self.rate_limited_until = {}  # key_index -> timestamp when rate limit expires
+        
+        # Load keys from environment (GEMINI_API_KEY, GEMINI_API_KEY_1, GEMINI_API_KEY_2, etc.)
+        primary_key = os.environ.get('GEMINI_API_KEY')
+        if primary_key:
+            self.keys.append(primary_key)
+            self.clients.append(genai.Client(api_key=primary_key))
+        
+        # Load additional keys
+        for i in range(1, 10):
+            key = os.environ.get(f'GEMINI_API_KEY_{i}')
+            if key:
+                self.keys.append(key)
+                self.clients.append(genai.Client(api_key=key))
+        
+        logger.info(f"[GEMINI KEYS] Loaded {len(self.keys)} API key(s) for rotation")
+    
+    def get_client(self):
+        """Get the next available client, skipping rate-limited ones"""
+        if not self.clients:
+            raise ValueError("No Gemini API keys configured")
+        
+        current_time = time.time()
+        attempts = 0
+        
+        while attempts < len(self.clients):
+            # Check if current key is rate limited
+            if self.current_index in self.rate_limited_until:
+                if current_time < self.rate_limited_until[self.current_index]:
+                    # Still rate limited, try next key
+                    self.current_index = (self.current_index + 1) % len(self.clients)
+                    attempts += 1
+                    continue
+                else:
+                    # Rate limit expired, remove from tracking
+                    del self.rate_limited_until[self.current_index]
+            
+            client = self.clients[self.current_index]
+            key_num = self.current_index + 1
+            # Rotate for next call
+            self.current_index = (self.current_index + 1) % len(self.clients)
+            logger.debug(f"[GEMINI ROTATE] Using key #{key_num} of {len(self.keys)}")
+            return client, key_num
+        
+        # All keys are rate limited, use the one with shortest wait
+        self.current_index = min(self.rate_limited_until, key=lambda k: self.rate_limited_until[k])
+        wait_time = self.rate_limited_until[self.current_index] - current_time
+        logger.warning(f"[GEMINI ROTATE] All keys rate limited, using key #{self.current_index + 1} (wait {wait_time:.0f}s)")
+        return self.clients[self.current_index], self.current_index + 1
+    
+    def mark_rate_limited(self, key_index, retry_after=60):
+        """Mark a key as rate limited"""
+        self.rate_limited_until[key_index - 1] = time.time() + retry_after
+        logger.warning(f"[GEMINI ROTATE] Key #{key_index} rate limited for {retry_after}s")
+    
+    def key_count(self):
+        return len(self.keys)
+
+gemini_rotator = GeminiKeyRotator()
 
 def get_webhook_domain():
     if os.environ.get('WEBHOOK_URL'):
@@ -56,8 +124,6 @@ def get_webhook_domain():
     return None
 
 WEBHOOK_DOMAIN = get_webhook_domain()
-
-genai_client = genai.Client(api_key=GEMINI_API_KEY)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SESSION_SECRET') or secrets.token_hex(32)
@@ -1226,61 +1292,81 @@ When user mentions amma/family roleplay:
 """
 
 def generate_response(prompt, history=None, context_info=None):
-    """Generate AI response using the new google.genai SDK"""
-    try:
-        contents = []
-        if history:
-            for msg in history:
-                role = "user" if msg['role'] == 'user' else "model"
-                contents.append({"role": role, "parts": [{"text": msg['content']}]})
-        contents.append({"role": "user", "parts": [{"text": prompt}]})
-        
-        full_system_prompt = GIRLFRIEND_SYSTEM_PROMPT
-        if context_info:
-            full_system_prompt = f"{GIRLFRIEND_SYSTEM_PROMPT}\n\n--- CURRENT SESSION INFO (DO NOT OUTPUT THIS) ---\n{context_info}"
-        
-        response = genai_client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=contents,
-            config=types.GenerateContentConfig(
-                system_instruction=full_system_prompt,
-                temperature=0.95,
-                top_p=0.98,
-                max_output_tokens=2000,
-                safety_settings=[
-                    types.SafetySetting(
-                        category='HARM_CATEGORY_HATE_SPEECH',
-                        threshold='BLOCK_NONE',
-                    ),
-                    types.SafetySetting(
-                        category='HARM_CATEGORY_HARASSMENT',
-                        threshold='BLOCK_NONE',
-                    ),
-                    types.SafetySetting(
-                        category='HARM_CATEGORY_SEXUALLY_EXPLICIT',
-                        threshold='BLOCK_NONE',
-                    ),
-                    types.SafetySetting(
-                        category='HARM_CATEGORY_DANGEROUS_CONTENT',
-                        threshold='BLOCK_NONE',
-                    ),
-                ]
+    """Generate AI response using multi-key rotation for cost optimization"""
+    contents = []
+    if history:
+        for msg in history:
+            role = "user" if msg['role'] == 'user' else "model"
+            contents.append({"role": role, "parts": [{"text": msg['content']}]})
+    contents.append({"role": "user", "parts": [{"text": prompt}]})
+    
+    full_system_prompt = GIRLFRIEND_SYSTEM_PROMPT
+    if context_info:
+        full_system_prompt = f"{GIRLFRIEND_SYSTEM_PROMPT}\n\n--- CURRENT SESSION INFO (DO NOT OUTPUT THIS) ---\n{context_info}"
+    
+    # Try with key rotation - attempt up to 3 keys on rate limit
+    max_retries = min(3, gemini_rotator.key_count())
+    last_error = None
+    
+    for attempt in range(max_retries):
+        try:
+            client, key_num = gemini_rotator.get_client()
+            
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=full_system_prompt,
+                    temperature=0.95,
+                    top_p=0.98,
+                    max_output_tokens=2000,
+                    safety_settings=[
+                        types.SafetySetting(
+                            category='HARM_CATEGORY_HATE_SPEECH',
+                            threshold='BLOCK_NONE',
+                        ),
+                        types.SafetySetting(
+                            category='HARM_CATEGORY_HARASSMENT',
+                            threshold='BLOCK_NONE',
+                        ),
+                        types.SafetySetting(
+                            category='HARM_CATEGORY_SEXUALLY_EXPLICIT',
+                            threshold='BLOCK_NONE',
+                        ),
+                        types.SafetySetting(
+                            category='HARM_CATEGORY_DANGEROUS_CONTENT',
+                            threshold='BLOCK_NONE',
+                        ),
+                    ]
+                )
             )
-        )
-        return response.text
-    except Exception as e:
-        logger.error(f"Gemini API error: {e}")
-        # Varied fallback messages for rate limits - pick random one
-        import random
-        rate_limit_fallbacks = [
-            "Aiyoo da... konjam busy 😅",
-            "Dei... slow ah type panren 😊",
-            "Dei hold on da 😏",
-            "Shh... yosikkuren da 🤫",
-            "Mmm da... un msg paathuren 💕",
-            "Aah da... konjam wait pannu 😊",
-        ]
-        return random.choice(rate_limit_fallbacks)
+            return response.text
+            
+        except Exception as e:
+            last_error = e
+            error_str = str(e).lower()
+            
+            # Check for rate limit errors (429, quota, rate limit)
+            if '429' in error_str or 'rate' in error_str or 'quota' in error_str or 'resource' in error_str:
+                logger.warning(f"[GEMINI] Key #{key_num} hit rate limit, trying next key (attempt {attempt + 1}/{max_retries})")
+                gemini_rotator.mark_rate_limited(key_num, retry_after=60)
+                continue
+            else:
+                # Non-rate-limit error, don't retry
+                logger.error(f"Gemini API error (key #{key_num}): {e}")
+                break
+    
+    # All retries exhausted or non-retryable error
+    logger.error(f"Gemini API failed after {max_retries} attempts: {last_error}")
+    rate_limit_fallbacks = [
+        "Aiyoo da... konjam busy 😅",
+        "Dei... slow ah type panren 😊",
+        "Dei hold on da 😏",
+        "Shh... yosikkuren da 🤫",
+        "Mmm da... un msg paathuren 💕",
+        "Aah da... konjam wait pannu 😊",
+    ]
+    return random.choice(rate_limit_fallbacks)
 
 def markdown_to_html(text):
     text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
@@ -1320,7 +1406,8 @@ Chat history:
         history_text += f"{role}: {msg['content']}\n"
     
     try:
-        response = genai_client.models.generate_content(
+        client, key_num = gemini_rotator.get_client()
+        response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=[{"role": "user", "parts": [{"text": summary_prompt + history_text}]}],
             config=types.GenerateContentConfig(
@@ -5443,8 +5530,8 @@ def ensure_initialized():
         if initialized:
             return True
         
-        if not TELEGRAM_BOT_TOKEN or not GEMINI_API_KEY:
-            logger.error("Missing TELEGRAM_BOT_TOKEN or GEMINI_API_KEY")
+        if not TELEGRAM_BOT_TOKEN or gemini_rotator.key_count() == 0:
+            logger.error("Missing TELEGRAM_BOT_TOKEN or no GEMINI_API_KEY(s) configured")
             return False
         
         try:
