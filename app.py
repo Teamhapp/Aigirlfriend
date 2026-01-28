@@ -1765,6 +1765,29 @@ async def buy_pack_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     pack_id = query.data.replace("buy_", "")
     
+    if pack_id == "credits":
+        keyboard = [
+            [InlineKeyboardButton(f"🌟 Starter - ₹50 → 200 messages", callback_data="buy_starter")],
+            [InlineKeyboardButton(f"💎 Value - ₹100 → 500 messages", callback_data="buy_value")],
+            [InlineKeyboardButton(f"👑 Pro - ₹200 → 1200 messages", callback_data="buy_pro")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            f"💎 <b>Credit Packs</b>\n\n"
+            f"Buy message credits that never expire!\n"
+            f"Credits are used after your daily free messages.\n\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"🌟 <b>Starter</b> - ₹50 → 200 messages\n"
+            f"💎 <b>Value</b> - ₹100 → 500 messages\n"
+            f"👑 <b>Pro</b> - ₹200 → 1200 messages\n"
+            f"━━━━━━━━━━━━━━━\n\n"
+            f"<i>Select a pack to continue:</i>",
+            parse_mode=ParseMode.HTML,
+            reply_markup=reply_markup
+        )
+        return
+    
     if pack_id not in PRICING_PACKS:
         await query.edit_message_text("❌ Invalid pack selected.")
         return
@@ -2255,6 +2278,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_limit = msg_status.get('daily_limit', DAILY_MESSAGE_LIMIT)
         bot_info = await context.bot.get_me()
         referral_link = f"https://t.me/{bot_info.username}?start=ref_{user.id}"
+        
+        keyboard = [[InlineKeyboardButton("💎 Buy Credits", callback_data="buy_credits")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
         await update.message.reply_text(
             f"😢 <b>Oops {preferred_name}!</b>\n\n"
             f"You've used all your messages for today, baby! 🥺\n\n"
@@ -2265,8 +2292,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"💡 <b>Want more messages?</b>\n"
             f"Refer friends and get <b>10 free messages</b> per friend! 🎁\n\n"
             f"🔗 Your referral link:\n<code>{referral_link}</code>\n\n"
-            f"<i>Come back tomorrow or invite friends to chat more!</i> 💕",
-            parse_mode=ParseMode.HTML
+            f"<i>Or buy credits for unlimited chatting!</i> 💕",
+            parse_mode=ParseMode.HTML,
+            reply_markup=reply_markup
         )
         return
     
