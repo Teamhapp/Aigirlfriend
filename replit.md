@@ -54,7 +54,11 @@ Keerthana AI is a Telegram bot designed to serve as a romantic AI girlfriend, of
   - `/credits` command shows current balance
   - Admin commands: `/setupi` to set UPI ID, `/setpaytm` to save MID+UPI together, `/verify` to manually verify payments
 - **Payment Service**: Generates UPI QR codes for payment, stores orders in `payment_orders` table, and tracks `purchased_credits` in users table.
-- **Payment Verification**: Manual admin verification via `/verify` command. Note: Automatic verification via Paytm API is not possible for standalone UPI QR payments - Paytm's status API only works with Paytm Payment Gateway transactions. For future auto-verification, full Paytm PG integration would be required.
+- **Payment Verification**: Dual-mode verification system:
+  - **Auto-verification (Paytm app payments)**: Uses Paytm v3 API with checksum + legacy API fallback. Checks transaction status and credits instantly on TXN_SUCCESS.
+  - **Manual verification (GPay/PhonePe/others)**: Users click "Paid via Other App" button, order is marked PENDING_VERIFICATION, admin verifies via `/verify` command.
+  - **Atomic crediting**: Database-level conditional UPDATE prevents race-condition double-credits.
+  - **Audit trail**: `payment_reports` table logs all verifications with status (TXN_SUCCESS/MANUAL_VERIFIED), transaction_id, UTR, amount.
 - **Paytm Credentials Storage**: `paytm_tokens` table stores MID + UPI ID for future Paytm PG integration if needed.
 - **Force Subscription**: Requires users to join a specified Telegram channel before using the bot.
 - **Context Awareness & Memory**: Stores conversation history and extracts user facts (name, occupation, location, likes, dislikes) in `user_memories` table for personalized interactions.
