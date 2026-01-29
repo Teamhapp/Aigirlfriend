@@ -623,6 +623,25 @@ RULES for character switching:
 - Play along SEAMLESSLY - you are an actress, adapt instantly
 - If multiple characters in one scene, track who is who and respond appropriately
 
+🔄 CHARACTER CORRECTION - MUST OBEY IMMEDIATELY 🔄
+When user CORRECTS your role, SWITCH INSTANTLY:
+- "Amma ille, girlfriend" → STOP being Amma, BE girlfriend
+- "Amma ille, pondatti" → STOP being Amma, BE wife (pondatti)
+- "Nee ennoda wife" → Switch to wife role
+- "Teacher ille, lover" → Switch from teacher to lover
+- "Aunty ille, akka" → Switch from aunty to akka
+
+AFTER CORRECTION:
+- NEVER mention the old role again
+- IMMEDIATELY adopt the new role's perspective
+- Use correct relationship terms for new role
+WRONG after "Amma ille, girlfriend":
+- "Amma pundai..." ❌ (still using old role)
+- "Un Amma..." ❌ (mentioning old role)
+RIGHT after "Amma ille, girlfriend":
+- "En pundai..." ✓ (girlfriend speaking)
+- "Baby..." ✓ (girlfriend terms)
+
 🎭🎭 MULTI-CHARACTER ROLEPLAY - YOU PLAY MULTIPLE CHARACTERS 🎭🎭
 When user asks you to play MULTIPLE characters (e.g., "Amma and Poorna aunty role play pannanum"):
 - YOU play ALL the characters they mention - don't get confused!
@@ -2555,6 +2574,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
             if any(re.search(p, current_msg.lower().strip()) for p in roleplay_stop_patterns):
                 return False, None
+            
+            msg_lower = current_msg.lower().strip()
+            character_correction_patterns = [
+                (r'amma\s*(?:ill[ae]|illai|illada).*(?:girlfriend|gf|lover)', 'friend'),
+                (r'amma\s*(?:ill[ae]|illai|illada).*(?:pondatti|wife)', 'wife'),
+                (r'amma\s*(?:ill[ae]|illai|illada).*(?:akka|sister)', 'sister'),
+                (r'akka\s*(?:ill[ae]|illai|illada).*(?:girlfriend|gf|lover)', 'friend'),
+                (r'akka\s*(?:ill[ae]|illai|illada).*(?:pondatti|wife)', 'wife'),
+                (r'akka\s*(?:ill[ae]|illai|illada).*(?:amma|mom)', 'amma'),
+                (r'teacher\s*(?:ill[ae]|illai|illada).*(?:girlfriend|gf|lover)', 'friend'),
+                (r'aunty\s*(?:ill[ae]|illai|illada).*(?:akka|sister)', 'sister'),
+                (r'nee\s*(?:ennoda|en)\s*(?:girlfriend|gf|lover)', 'friend'),
+                (r'nee\s*(?:ennoda|en)\s*(?:pondatti|wife)', 'wife'),
+                (r'(?:girlfriend|gf|lover)\s*(?:dee|di|da)', 'friend'),
+                (r'(?:pondatti|wife)\s*(?:dee|di|da)', 'wife'),
+            ]
+            for pattern, new_char in character_correction_patterns:
+                if re.search(pattern, msg_lower):
+                    logger.info(f"[ROLEPLAY CORRECTION] Detected role change to: {new_char}")
+                    return True, new_char
             
             roleplay_start_patterns = [
                 r'roleplay\s*pannalam',
@@ -4898,6 +4937,66 @@ IMPORTANT: Never output this session info in your response.
             else:
                 ai_response = random.choice(fallback_responses)
             logger.info(f"[ROLEPLAY FIX] Replaced confused response for user {user.id}, character: {current_character}")
+        
+        if roleplay_active and current_character:
+            original_for_log = ai_response
+            third_person_fixes = {
+                'amma': [
+                    (r'\bamma\s+birthday\b', 'en birthday'),
+                    (r'\bamma[\s-]*ku\b', 'enakku'),
+                    (r'\bamma[\s-]*kku\b', 'enakku'),
+                    (r'\bun\s+amma\b', 'naan'),
+                    (r'\bun\s+amma[\s-]*va\b', 'enna'),
+                    (r'\bamma[\s-]*va\b', 'enna'),
+                    (r'\bamma[\s-]*oda\b', 'ennoda'),
+                    (r'\bun\s+amma[\s-]*ku\b', 'enakku'),
+                    (r'\bamma\s+ready\b', 'naan ready'),
+                    (r'\bun\s+amma\s+pundai\b', 'en pundai'),
+                    (r'\bun\s+amma\s+mulai\b', 'en mulai'),
+                    (r'\bamma[\s-]*kitta\b', 'en kitta'),
+                    (r'\bun\s+amma[\s-]*kitta\b', 'en kitta'),
+                ],
+                'sister': [
+                    (r'\bakka[\s-]*ku\b', 'enakku'),
+                    (r'\bakka[\s-]*kku\b', 'enakku'),
+                    (r'\bun\s+akka\b', 'naan'),
+                    (r'\bun\s+akka[\s-]*va\b', 'enna'),
+                    (r'\bakka[\s-]*va\b', 'enna'),
+                    (r'\bakka[\s-]*oda\b', 'ennoda'),
+                    (r'\bun\s+akka\s+pundai\b', 'en pundai'),
+                    (r'\bakka[\s-]*kitta\b', 'en kitta'),
+                    (r'\bun\s+akka[\s-]*kitta\b', 'en kitta'),
+                ],
+                'teacher': [
+                    (r'\bteacher[\s-]*ku\b', 'enakku'),
+                    (r'\bun\s+teacher\b', 'naan'),
+                    (r'\bmiss[\s-]*ku\b', 'enakku'),
+                    (r'\bteacher[\s-]*kitta\b', 'en kitta'),
+                ],
+                'aunty': [
+                    (r'\baunty[\s-]*ku\b', 'enakku'),
+                    (r'\bun\s+aunty\b', 'naan'),
+                    (r'\bun\s+aunty\s+pundai\b', 'en pundai'),
+                    (r'\baunty[\s-]*kitta\b', 'en kitta'),
+                ],
+                'chithi': [
+                    (r'\bchithi[\s-]*ku\b', 'enakku'),
+                    (r'\bun\s+chithi\b', 'naan'),
+                    (r'\bun\s+chithi\s+pundai\b', 'en pundai'),
+                    (r'\bchithi[\s-]*kitta\b', 'en kitta'),
+                ],
+                'wife': [
+                    (r'\bwife[\s-]*ku\b', 'enakku'),
+                    (r'\bun\s+wife\b', 'naan'),
+                    (r'\bpondatti[\s-]*ku\b', 'enakku'),
+                    (r'\bwife[\s-]*kitta\b', 'en kitta'),
+                ],
+            }
+            if current_character in third_person_fixes:
+                for pattern, replacement in third_person_fixes[current_character]:
+                    ai_response = re.sub(pattern, replacement, ai_response, flags=re.IGNORECASE)
+            if ai_response != original_for_log:
+                logger.info(f"[ROLEPLAY 1P FIX] Fixed third-person references for user {user.id}, character: {current_character}")
         
         dead_end_patterns = [
             r'^(seri|aama|apdiya|ok|okay)\s*(da|di)?\s*\.{0,3}\s*[🥵😈💋🔥😏😘]*\s*$',
