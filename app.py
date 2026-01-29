@@ -5517,6 +5517,9 @@ DASHBOARD_HTML = '''
         .credits { color: #ffd700; font-weight: bold; }
         .result-count { color: #888; margin-bottom: 10px; font-size: 0.9em; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        .controls { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin-bottom: 15px; }
+        .sort-select { padding: 10px 15px; font-size: 14px; border: 2px solid #0f3460; border-radius: 10px; background: #16213e; color: #eee; cursor: pointer; }
+        .sort-select:focus { outline: none; border-color: #ff6b9d; }
         
         /* Tablet */
         @media (max-width: 1024px) {
@@ -5534,7 +5537,9 @@ DASHBOARD_HTML = '''
             .stat-card { padding: 15px 10px; }
             .stat-value { font-size: 1.5em; }
             .stat-label { font-size: 0.8em; }
-            .search-box { padding: 10px 15px; font-size: 14px; }
+            .controls { flex-direction: column; gap: 10px; }
+            .search-box { padding: 10px 15px; font-size: 14px; width: 100% !important; min-width: unset !important; }
+            .sort-select { width: 100%; padding: 10px 12px; }
             .users-table th, .users-table td { padding: 8px 10px; font-size: 0.85em; }
             .btn { padding: 6px 10px; font-size: 0.8em; }
             .header { flex-direction: column; align-items: flex-start; }
@@ -5582,7 +5587,24 @@ DASHBOARD_HTML = '''
             </div>
         </div>
         <h2 style="margin-bottom: 15px;">Users</h2>
-        <input type="text" id="searchBox" class="search-box" placeholder="🔍 Search by name, username, or user ID...">
+        <div class="controls">
+            <input type="text" id="searchBox" class="search-box" style="flex: 1; min-width: 200px;" placeholder="🔍 Search by name, username, or user ID...">
+            <select id="sortSelect" class="sort-select">
+                <option value="default">Sort by: Default</option>
+                <option value="name-asc">Name (A-Z)</option>
+                <option value="name-desc">Name (Z-A)</option>
+                <option value="messages-desc">Messages (High-Low)</option>
+                <option value="messages-asc">Messages (Low-High)</option>
+                <option value="credits-desc">Credits (High-Low)</option>
+                <option value="credits-asc">Credits (Low-High)</option>
+                <option value="referrals-desc">Referrals (High-Low)</option>
+                <option value="referrals-asc">Referrals (Low-High)</option>
+                <option value="bonus-desc">Bonus (High-Low)</option>
+                <option value="bonus-asc">Bonus (Low-High)</option>
+                <option value="status-blocked">Status: Blocked First</option>
+                <option value="status-active">Status: Active First</option>
+            </select>
+        </div>
         <div id="resultCount" class="result-count">Showing {{ users|length }} users</div>
         <div class="table-wrapper">
             <table class="users-table" id="usersTable">
@@ -5602,7 +5624,13 @@ DASHBOARD_HTML = '''
                 </thead>
                 <tbody id="usersBody">
                     {% for user in users %}
-                    <tr data-search="{{ user.user_id }} {{ user.preferred_name or user.first_name or '' }} {{ user.username or '' }}">
+                    <tr data-search="{{ user.user_id }} {{ user.preferred_name or user.first_name or '' }} {{ user.username or '' }}"
+                        data-name="{{ (user.preferred_name or user.first_name or 'Unknown')|lower }}"
+                        data-messages="{{ user.message_count }}"
+                        data-credits="{{ user.purchased_credits or 0 }}"
+                        data-referrals="{{ user.referral_count }}"
+                        data-bonus="{{ user.bonus_messages }}"
+                        data-status="{{ 'blocked' if user.is_blocked else 'active' }}">
                         <td class="user-id">{{ user.user_id }}</td>
                         <td>{{ user.preferred_name or user.first_name or 'Unknown' }}</td>
                         <td>@{{ user.username or 'N/A' }}</td>
@@ -5658,6 +5686,55 @@ DASHBOARD_HTML = '''
             
             document.getElementById('resultCount').textContent = 
                 query ? `Found ${visibleCount} user(s) matching "${this.value}"` : `Showing ${rows.length} users`;
+        });
+        
+        // Sorting functionality
+        const originalOrder = Array.from(document.querySelectorAll('#usersBody tr'));
+        
+        document.getElementById('sortSelect').addEventListener('change', function() {
+            const tbody = document.getElementById('usersBody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const sortValue = this.value;
+            
+            if (sortValue === 'default') {
+                originalOrder.forEach(row => tbody.appendChild(row));
+                return;
+            }
+            
+            rows.sort((a, b) => {
+                let aVal, bVal;
+                
+                switch(sortValue) {
+                    case 'name-asc':
+                        return a.dataset.name.localeCompare(b.dataset.name);
+                    case 'name-desc':
+                        return b.dataset.name.localeCompare(a.dataset.name);
+                    case 'messages-desc':
+                        return parseInt(b.dataset.messages) - parseInt(a.dataset.messages);
+                    case 'messages-asc':
+                        return parseInt(a.dataset.messages) - parseInt(b.dataset.messages);
+                    case 'credits-desc':
+                        return parseInt(b.dataset.credits) - parseInt(a.dataset.credits);
+                    case 'credits-asc':
+                        return parseInt(a.dataset.credits) - parseInt(b.dataset.credits);
+                    case 'referrals-desc':
+                        return parseInt(b.dataset.referrals) - parseInt(a.dataset.referrals);
+                    case 'referrals-asc':
+                        return parseInt(a.dataset.referrals) - parseInt(b.dataset.referrals);
+                    case 'bonus-desc':
+                        return parseInt(b.dataset.bonus) - parseInt(a.dataset.bonus);
+                    case 'bonus-asc':
+                        return parseInt(a.dataset.bonus) - parseInt(b.dataset.bonus);
+                    case 'status-blocked':
+                        return (a.dataset.status === 'blocked' ? -1 : 1) - (b.dataset.status === 'blocked' ? -1 : 1);
+                    case 'status-active':
+                        return (a.dataset.status === 'active' ? -1 : 1) - (b.dataset.status === 'active' ? -1 : 1);
+                    default:
+                        return 0;
+                }
+            });
+            
+            rows.forEach(row => tbody.appendChild(row));
         });
     </script>
 </body>
