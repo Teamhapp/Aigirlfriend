@@ -582,14 +582,14 @@ def save_message(conn, user_id, role, content):
 def get_chat_history(conn, user_id, limit=20):
     cur = conn.cursor()
     cur.execute('''
-        SELECT role, content FROM chat_messages
+        SELECT role, content, created_at FROM chat_messages
         WHERE user_id = %s
         ORDER BY created_at DESC
         LIMIT %s
     ''', (user_id, limit))
     messages = cur.fetchall()
     cur.close()
-    return [{'role': msg[0], 'content': msg[1]} for msg in reversed(messages)]
+    return [{'role': msg[0], 'content': msg[1], 'created_at': msg[2]} for msg in reversed(messages)]
 
 @with_db_retry()
 def get_message_count(conn, user_id):

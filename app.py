@@ -5,6 +5,7 @@ import random
 import html
 import secrets
 import time
+import pytz
 from google import genai
 from google.genai import types
 from flask import Flask, render_template_string, request, redirect, url_for, session, Response
@@ -2513,6 +2514,33 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     is_returning_user = len(chat_history) > 2
     
+    is_new_day = False
+    is_greeting = False
+    greeting_patterns = [r'^hi\b', r'^hello\b', r'^hey\b', r'^hii+\b', r'^vanakkam', r'^good\s*(morning|evening|night|afternoon)']
+    if any(re.search(p, message_text.lower().strip()) for p in greeting_patterns):
+        is_greeting = True
+    
+    if chat_history and is_greeting:
+        last_msg = chat_history[-1]
+        last_timestamp = last_msg.get('created_at')
+        if last_timestamp:
+            from datetime import datetime
+            ist = pytz.timezone('Asia/Kolkata')
+            utc = pytz.UTC
+            now_ist = datetime.now(ist)
+            if hasattr(last_timestamp, 'tzinfo') and last_timestamp.tzinfo is None:
+                last_timestamp_utc = utc.localize(last_timestamp)
+            else:
+                last_timestamp_utc = last_timestamp.replace(tzinfo=utc) if hasattr(last_timestamp, 'replace') else last_timestamp
+            last_timestamp_ist = last_timestamp_utc.astimezone(ist) if hasattr(last_timestamp_utc, 'astimezone') else last_timestamp_utc
+            if hasattr(last_timestamp_ist, 'date'):
+                last_date = last_timestamp_ist.date()
+            else:
+                last_date = last_timestamp_ist
+            if last_date < now_ist.date():
+                is_new_day = True
+                logger.info(f"[NEW DAY] Detected new day greeting from user {user.id}")
+    
     save_message(user.id, 'user', message_text)
     
     logger.info(f"[USER {user.id}] {preferred_name}: {message_text}")
@@ -2520,7 +2548,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
         
-        user_status = "RETURNING USER - show familiarity, vary greetings" if is_returning_user else "NEW USER - first chat, introduce warmly"
+        if is_new_day and is_greeting:
+            user_memories = get_user_memories(user.id, limit=10)
+            memory_hints = ""
+            if user_memories:
+                memory_list = []
+                for m in user_memories:
+                    mem_key = m.get('key', '')
+                    mem_value = m.get('value', '')
+                    if mem_key and mem_value:
+                        memory_list.append(f"{mem_key}: {mem_value}")
+                if memory_list[:5]:
+                    memory_hints = f" You remember about them: {', '.join(memory_list[:5])}."
+            user_status = f"NEW DAY GREETING - It's a new day! User is saying hi after some time. Start fresh and warm, but casually reference something you remember about them.{memory_hints} Don't continue mid-conversation from yesterday. Ask how their day is going or share something sweet."
+            logger.info(f"[NEW DAY PROMPT] Fresh greeting for user {user.id} with memories: {memory_hints}")
+        elif is_returning_user:
+            user_status = "RETURNING USER - show familiarity, vary greetings"
+        else:
+            user_status = "NEW USER - first chat, introduce warmly"
         
         # Suffix preference overrides gender-based instruction
         if suffix_preference == 'di':
