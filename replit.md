@@ -36,6 +36,7 @@ Keerthana AI is a Telegram bot designed to serve as a romantic AI girlfriend, of
 - **Rich Text Formatting**: Employs bold, italic, and emojis for expressive messaging.
 - **Typing Indicator & Delays**: Simulates human-like interaction with typing indicators and varied response delays.
 - **Moderation Dashboard**: A password-protected web-based dashboard provides administrative tools for user statistics, chat history, and moderation.
+- **Responsive Design**: Dashboard, chat history, and login pages are fully responsive with CSS media queries for tablet (1024px), mobile (768px), and small mobile (480px) breakpoints. Features include auto-fit grid for stat cards, horizontal scroll for tables, and stacked action buttons on mobile.
 
 ### Technical Implementations
 - **Core Bot Logic**: Built with `python-telegram-bot` for Telegram API handling.

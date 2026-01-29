@@ -5516,11 +5516,50 @@ DASHBOARD_HTML = '''
         .user-id { font-family: monospace; font-size: 0.9em; color: #888; }
         .credits { color: #ffd700; font-weight: bold; }
         .result-count { color: #888; margin-bottom: 10px; font-size: 0.9em; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        
+        /* Tablet */
+        @media (max-width: 1024px) {
+            .container { padding: 15px; }
+            .stat-value { font-size: 2em; }
+            .users-table th, .users-table td { padding: 10px 12px; font-size: 0.9em; }
+        }
+        
+        /* Mobile */
+        @media (max-width: 768px) {
+            .container { padding: 10px; }
+            h1 { font-size: 1.3em; }
+            h2 { font-size: 1.1em; }
+            .stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .stat-card { padding: 15px 10px; }
+            .stat-value { font-size: 1.5em; }
+            .stat-label { font-size: 0.8em; }
+            .search-box { padding: 10px 15px; font-size: 14px; }
+            .users-table th, .users-table td { padding: 8px 10px; font-size: 0.85em; }
+            .btn { padding: 6px 10px; font-size: 0.8em; }
+            .header { flex-direction: column; align-items: flex-start; }
+            .action-cell { flex-direction: column; gap: 5px !important; }
+            .action-cell form { width: 100%; }
+            .action-cell .btn { width: 100%; text-align: center; }
+            .limit-form { flex-direction: column !important; }
+            .limit-form input { width: 100% !important; }
+        }
+        
+        /* Small Mobile */
+        @media (max-width: 480px) {
+            .stats { grid-template-columns: 1fr 1fr; gap: 8px; }
+            .stat-card { padding: 12px 8px; }
+            .stat-value { font-size: 1.3em; }
+            .stat-label { font-size: 0.75em; }
+            h1 { font-size: 1.1em; }
+            .users-table th, .users-table td { padding: 6px 8px; font-size: 0.8em; }
+            .user-id { font-size: 0.75em; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div class="header">
             <h1>💕 Keerthana Bot Dashboard</h1>
             <a href="/logout" class="btn">Logout</a>
         </div>
@@ -5579,7 +5618,7 @@ DASHBOARD_HTML = '''
                             <span style="color: #44ff44;">Active</span>
                             {% endif %}
                         </td>
-                        <td style="display: flex; gap: 5px; flex-wrap: wrap;">
+                        <td class="action-cell" style="display: flex; gap: 5px; flex-wrap: wrap;">
                             <a href="/chat/{{ user.user_id }}" class="btn">Chat</a>
                             {% if user.is_blocked %}
                             <form action="/unblock/{{ user.user_id }}" method="POST" style="display: inline;">
@@ -5590,7 +5629,7 @@ DASHBOARD_HTML = '''
                                 <button type="submit" class="btn" style="background: #aa4444;">Block</button>
                             </form>
                             {% endif %}
-                            <form action="/set_limit/{{ user.user_id }}" method="POST" style="display: inline-flex; gap: 5px;">
+                            <form action="/set_limit/{{ user.user_id }}" method="POST" class="limit-form" style="display: inline-flex; gap: 5px;">
                                 <input type="number" name="limit" placeholder="{{ user.custom_daily_limit or default_limit }}" style="width: 60px; padding: 5px; border-radius: 5px; border: none; background: #0f3460; color: white;">
                                 <button type="submit" class="btn" style="background: #4488ff;">Set</button>
                             </form>
@@ -5644,6 +5683,20 @@ CHAT_HTML = '''
         .bot-message { background: #1f4068; margin-right: auto; }
         .message-role { font-size: 0.8em; color: #ff6b9d; margin-bottom: 5px; }
         .message-time { font-size: 0.7em; color: #666; margin-top: 5px; }
+        
+        @media (max-width: 768px) {
+            .container { padding: 15px; }
+            h1 { font-size: 1.2em; }
+            .back-btn { padding: 8px 15px; font-size: 0.9em; }
+            .chat-container { padding: 15px; }
+            .message { max-width: 90%; padding: 8px 12px; font-size: 0.95em; }
+        }
+        
+        @media (max-width: 480px) {
+            .container { padding: 10px; }
+            h1 { font-size: 1em; }
+            .message { max-width: 95%; }
+        }
     </style>
 </head>
 <body>
@@ -5679,6 +5732,12 @@ LOGIN_HTML = '''
         button { width: 100%; padding: 12px; background: #ff6b9d; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
         button:hover { background: #e91e63; }
         .error { color: #ff4444; text-align: center; margin-bottom: 20px; }
+        
+        @media (max-width: 480px) {
+            .login-box { padding: 30px 20px; margin: 15px; }
+            h1 { font-size: 1.3em; }
+            input, button { padding: 10px; font-size: 14px; }
+        }
     </style>
 </head>
 <body>
