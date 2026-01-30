@@ -5500,6 +5500,32 @@ IMPORTANT: Never output this session info in your response.
         # Final double-space cleanup
         ai_response = re.sub(r'\s{2,}', ' ', ai_response).strip()
         
+        # ===== FIX AWKWARD TANGLISH PATTERNS =====
+        awkward_tanglish_fixes = [
+            # "feel daah pidichiruku" → "feel aaguthu"
+            (r'\bfeel\s+daah?\s+pidichiruku\b', 'feel aaguthu da'),
+            (r'\bfeel\s+daah?\s+iruku\b', 'feel aaguthu da'),
+            (r'\bfeel\s+daah?\b', 'feel da'),
+            # "pidichiruku unna" → "unna pudikum"
+            (r'\bpidichiruku\s+unna\b', 'unna pudikum'),
+            (r'\bpidichiruku\s+unnoda\b', 'unnoda company pudikum'),
+            # "amazing feel" → "amazing ah iruku"
+            (r'\bamazing\s+feel\s+aaguthu\b', 'amazing ah feel aaguthu'),
+            (r'\benaku\s+amazing\s+feel\b', 'enakku amazing ah iruku'),
+            # General awkward patterns
+            (r'\biruku\s+daah\b', 'iruku da'),
+            (r'\baaguthu\s+daah\b', 'aaguthu da'),
+            (r'\bpudikum\s+daah\b', 'pudikum da'),
+            # "feel pannuren" → "feel aaguthu"
+            (r'\bfeel\s+pannuren\b', 'feel aaguthu'),
+            (r'\bfeel\s+panren\b', 'feel aaguthu'),
+            # Double "da" fixes
+            (r'\bda\s+da\b', 'da'),
+            (r'\bdaah\s+da\b', 'da'),
+        ]
+        for pattern, replacement in awkward_tanglish_fixes:
+            ai_response = re.sub(pattern, replacement, ai_response, flags=re.IGNORECASE)
+        
         # ===== FIX WORD-CUT AND STRAY TAMIL SCRIPT =====
         def fix_word_cuts(text):
             """Fix words that got cut mid-way and remove stray Tamil script in Tanglish"""
