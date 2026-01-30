@@ -2786,40 +2786,105 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.info(f"[ROLEPLAY] User {user.id} - Active roleplay detected, character: {current_character or 'unspecified'}")
         
         def detect_mood(current_msg, history):
-            """Detect conversation mood from recent messages using word boundary matching"""
-            intimate_patterns = [
-                r'\boombu\b', r'\bnakku\b', r'\bsappu\b', r'\bpundai\b', r'\bsunni\b', 
-                r'\bmulai\b', r'\bkuthi\b', r'\bblowjob\b', r'\bsex\b', r'\bfuck\b',
-                r'\blick\b', r'\bsuck\b', r'\bhorny\b', r'\bwet\b', r'\bnude\b',
-                r'\bnaked\b', r'\bstrip\b', r'\bthanni\b', r'\bcum\b', r'\botha\b',
-                r'\bthevdiya\b', r'\bboobs\b', r'\bdick\b', r'\bcock\b', r'\bpussy\b',
-                r'\bmoan\b', r'\bpool\b', r'\bpoola\b', r'\bolu\b', r'\b69\b',
-            ]
-            romantic_patterns = [
-                r'\bi love you\b', r'\bmiss you\b', r'\bmiss panren\b', r'\bkadhal\b',
-                r'\bhug\b', r'\bcuddle\b', r'\buyir\b', r'\ben chellam\b', r'\ben thangam\b',
-                r'\bclose ah\b', r'\bforever\b', r'\btogether\b', r'\bmy heart\b',
-            ]
+            """Detect conversation mood with multi-level analysis"""
+            mood_patterns = {
+                'intimate': [
+                    r'\boombu\b', r'\bnakku\b', r'\bsappu\b', r'\bpundai\b', r'\bsunni\b', 
+                    r'\bmulai\b', r'\bkuthi\b', r'\bblowjob\b', r'\bsex\b', r'\bfuck\b',
+                    r'\blick\b', r'\bsuck\b', r'\bhorny\b', r'\bwet\b', r'\bnude\b',
+                    r'\bnaked\b', r'\bstrip\b', r'\bthanni\b', r'\bcum\b', r'\botha\b',
+                    r'\bthevdiya\b', r'\bboobs\b', r'\bdick\b', r'\bcock\b', r'\bpussy\b',
+                    r'\bmoan\b', r'\bpool\b', r'\bpoola\b', r'\bolu\b', r'\b69\b',
+                    r'\bkundi\b', r'\bsuthu\b', r'\bkanji\b', r'\bpaal\b', r'\bthool\b',
+                ],
+                'romantic': [
+                    r'\bi love you\b', r'\bmiss you\b', r'\bmiss panren\b', r'\bkadhal\b',
+                    r'\bhug\b', r'\bcuddle\b', r'\buyir\b', r'\ben chellam\b', r'\ben thangam\b',
+                    r'\bclose ah\b', r'\bforever\b', r'\btogether\b', r'\bmy heart\b',
+                    r'\bkanmani\b', r'\bkanna\b', r'\bpropose\b', r'\bmarry\b', r'\blive together\b',
+                    r'\bsweetie\b', r'\bbaby\b', r'\bdarling\b', r'\blove\s+panren\b',
+                ],
+                'flirty': [
+                    r'\bhot\b', r'\bsexy\b', r'\bcute\b', r'\bhandsome\b', r'\bbeautiful\b',
+                    r'\blips\b', r'\bkiss\b', r'\bwink\b', r'\btease\b', r'\bnaughty\b',
+                    r'\bflirt\b', r'\bcrush\b', r'\battract\b', r'\beyes\b', r'\bsmile\b',
+                    r'\bazahaga\b', r'\bazhagu\b', r'\bsemma\b', r'\bfigure\b',
+                ],
+                'playful': [
+                    r'\bhaha\b', r'\blol\b', r'\bjoke\b', r'\bfunny\b', r'\bgame\b',
+                    r'\btruth or dare\b', r'\bchallenge\b', r'\bbet\b', r'\brace\b',
+                    r'\bfun\b', r'\bplay\b', r'\btease\b', r'\bkidding\b', r'\bprank\b',
+                    r'\bvilayattu\b', r'\bsiripu\b', r'\bkonjam\b',
+                ],
+                'emotional': [
+                    r'\bsad\b', r'\bcry\b', r'\btears\b', r'\bhurt\b', r'\bpain\b',
+                    r'\blonely\b', r'\bmiss\b', r'\bworried\b', r'\bscared\b', r'\bfear\b',
+                    r'\bdepressed\b', r'\bstressed\b', r'\btired\b', r'\bexhausted\b',
+                    r'\bkavala\b', r'\bthanimai\b', r'\bvali\b', r'\bsoga\b', r'\bazhuven\b',
+                ],
+                'angry': [
+                    r'\bangry\b', r'\bmad\b', r'\bfurious\b', r'\bpissed\b', r'\bfrustrated\b',
+                    r'\bshut up\b', r'\bleave me\b', r'\bhate\b', r'\bdisappointed\b',
+                    r'\bkopam\b', r'\bveripu\b', r'\bpoda\b', r'\bpodii\b', r'\bvenam\b',
+                    r'\bkaduppu\b', r'\benakku kaduppu\b',
+                ],
+                'needy': [
+                    r'\bplease\b', r'\bneed you\b', r'\bwant you\b', r'\bcome back\b',
+                    r'\bdont leave\b', r'\bstay\b', r'\bwithout you\b', r'\bonly you\b',
+                    r'\bvaa da\b', r'\bpesa venum\b', r'\bunna illama\b', r'\bplz\b',
+                    r'\benakku venum\b', r'\bun kitta venum\b',
+                ],
+            }
             
-            recent_text = current_msg.lower()
-            for msg in history[-3:]:
+            # Collect recent messages with recency weighting
+            msg_weights = [(current_msg.lower(), 3)]  # Current msg has 3x weight
+            for i, msg in enumerate(reversed(history[-5:])):
                 if msg.get('role') == 'user':
-                    recent_text += ' ' + msg.get('content', '').lower()
+                    weight = 2 if i < 2 else 1  # Recent 2 have 2x weight
+                    msg_weights.append((msg.get('content', '').lower(), weight))
             
-            intimate_score = sum(1 for p in intimate_patterns if re.search(p, recent_text))
-            romantic_score = sum(1 for p in romantic_patterns if re.search(p, recent_text))
+            # Calculate weighted scores for each mood
+            mood_scores = {}
+            for mood, patterns in mood_patterns.items():
+                score = 0
+                for text, weight in msg_weights:
+                    score += sum(weight for p in patterns if re.search(p, text))
+                mood_scores[mood] = score
             
-            if intimate_score >= 2:
+            # Find highest scoring mood with thresholds
+            max_mood = max(mood_scores, key=mood_scores.get)
+            max_score = mood_scores[max_mood]
+            
+            # Priority: intimate > romantic > flirty > emotional > angry > needy > playful > casual
+            if mood_scores['intimate'] >= 3:
                 return 'intimate'
-            elif romantic_score >= 2:
+            elif mood_scores['angry'] >= 2:
+                return 'angry'
+            elif mood_scores['emotional'] >= 2:
+                return 'emotional'
+            elif mood_scores['romantic'] >= 2:
                 return 'romantic'
+            elif mood_scores['needy'] >= 2:
+                return 'needy'
+            elif mood_scores['flirty'] >= 2:
+                return 'flirty'
+            elif mood_scores['playful'] >= 2:
+                return 'playful'
+            elif max_score >= 1:
+                return max_mood
             return 'casual'
         
         current_mood = detect_mood(message_text, chat_history)
+        logger.info(f"[MOOD] User {user.id} - Detected mood: {current_mood}")
         
         mood_hints = {
-            'intimate': "\n\n🔥 MOOD: User is in intimate mode. Stay sensual. Don't break the heat with random topics.",
-            'romantic': "\n\n💕 MOOD: User is being romantic. Stay warm and connected. Use pet names naturally.",
+            'intimate': "\n\n🔥 MOOD: INTIMATE - User is in sensual mode. Stay hot and explicit. Don't break the heat with random topics. Describe actions sensually.",
+            'romantic': "\n\n💕 MOOD: ROMANTIC - User is being loving. Stay warm, connected, emotional. Use pet names naturally. Express deep affection.",
+            'flirty': "\n\n😏 MOOD: FLIRTY - User is teasing/flirting. Be playfully seductive. Compliment them. Build tension with hints.",
+            'playful': "\n\n😄 MOOD: PLAYFUL - User wants fun! Be energetic, joke around, play games. Match their light energy.",
+            'emotional': "\n\n🥺 MOOD: EMOTIONAL - User seems sad/vulnerable. Be gentle, comforting, supportive. Listen and validate their feelings.",
+            'angry': "\n\n😤 MOOD: ANGRY - User is upset. Don't escalate. Apologize if needed. Be calm, understanding. Give them space if they want.",
+            'needy': "\n\n🥹 MOOD: NEEDY - User craves attention/reassurance. Be extra affectionate. Reassure them you're here. Don't dismiss their feelings.",
             'casual': ""
         }
         mood_hint = mood_hints.get(current_mood, "")
