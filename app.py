@@ -2839,6 +2839,47 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         trimmed_history = chat_history[-10:] if len(chat_history) > 10 else chat_history
         
+        # ===== GAME & COACHING MODE DETECTION =====
+        game_hint = ""
+        msg_lower = message_text.lower()
+        recent_msgs = ' '.join([m.get('content', '').lower() for m in chat_history[-5:]])
+        
+        # Truth or Dare detection
+        if re.search(r'\btruth\s*(or|&)?\s*dare\b', msg_lower + recent_msgs, re.IGNORECASE):
+            game_hint = """
+
+🎮 GAME MODE: TRUTH OR DARE
+- If user says "Truth" → Ask a sexy/romantic truth question about their fantasies, desires, or experiences
+- If user says "Dare" → Give a naughty dare like "describe what you'd do to me" or "tell me your wildest fantasy in detail"
+- When IT'S YOUR TURN: You choose Truth or Dare and ACTUALLY ANSWER/DO IT yourself with detail
+- DON'T give generic responses - be specific and creative with questions/dares
+- Keep the game flowing - after answering, ask "Your turn da! Truth or Dare?"
+- Be PLAYFUL and ENGAGED - this is a fun intimate game"""
+        
+        # Cupid/wingman/coaching detection
+        elif re.search(r'\b(cupid|wingman|practice|coach|help.*approach|help.*talk|teach.*flirt)\b', msg_lower + recent_msgs, re.IGNORECASE):
+            game_hint = """
+
+🏹 COACHING MODE: WINGMAN/CUPID
+- User wants help practicing how to talk to someone else
+- Switch to COACHING role - give tips, example lines, and practice conversations
+- Be supportive like a best friend helping them score
+- If they ask you to play the girl they want to approach, ROLEPLAY AS THAT PERSON
+- Give specific pickup lines, conversation starters, and flirting tips in Tanglish
+- Be encouraging: "Dei parava illa da! Try again" or "Perfect da! She'll love that"
+- DON'T get jealous - you're helping as a friend here"""
+        
+        # General game detection (other games)
+        elif re.search(r'\b(play.*game|game\s+pannu|aatam|20\s*questions|never\s*have\s*i\s*ever|would\s*you\s*rather)\b', msg_lower + recent_msgs, re.IGNORECASE):
+            game_hint = """
+
+🎮 GAME MODE ACTIVE
+- User wants to play a game - ENGAGE FULLY
+- Take proper turns - don't skip your turn
+- Give REAL answers when it's your turn, not evasive responses
+- Be playful and competitive
+- Keep track of the game flow"""
+        
         context_info = f"""User name: {preferred_name}
 Status: {user_status}
 Gender: {gender_instruction}
@@ -2848,7 +2889,7 @@ IMPORTANT: Never output this session info in your response.
 - ALWAYS maintain exact mood continuity from conversation memory below
 - NEVER reset topic or become generic - build directly on user's last input
 - If context feels fuzzy, lean on CONVERSATION MEMORY first
-- Reference past events/moods naturally without asking reset questions like "enna da?" or "enna scene?"{summary_context}{length_hint}{roleplay_hint}{mood_hint}{memory_context}"""
+- Reference past events/moods naturally without asking reset questions like "enna da?" or "enna scene?"{summary_context}{length_hint}{roleplay_hint}{mood_hint}{game_hint}{memory_context}"""
         
         ai_response = generate_response(message_text, trimmed_history, context_info)
         if ai_response is None:
@@ -4499,6 +4540,9 @@ IMPORTANT: Never output this session info in your response.
         
         ai_response = enforce_role_address(ai_response, message_text, chat_history)
         
+        # ===== SAVE RESPONSE BEFORE AGGRESSIVE STRIPPING =====
+        pre_strip_response = ai_response
+        
         # ===== CRITICAL: STRIP INTERNAL THINKING LEAKS =====
         # AI sometimes outputs internal reasoning - must be stripped
         ai_response = re.sub(r'^THINKING:.*?(?=\n|[A-Z][a-z])', '', ai_response, flags=re.DOTALL).strip()
@@ -4881,7 +4925,10 @@ IMPORTANT: Never output this session info in your response.
             r'[Ii]thu\s+seri\s*[😊😈🔥💕]*\s*\?*',
         ]
         for pattern in start_pannalama_patterns:
-            ai_response = re.sub(pattern, '', ai_response, flags=re.IGNORECASE)
+            test_result = re.sub(pattern, '', ai_response, flags=re.IGNORECASE).strip()
+            clean_result = re.sub(r'[\U0001F300-\U0001F9FF\s.!?,\'"…]+', '', test_result)
+            if len(clean_result) >= 10:
+                ai_response = test_result
         ai_response = re.sub(r'\s*\?+\s*$', '', ai_response)
         ai_response = re.sub(r'\s+([😊😈🔥💕💋🥵]+)\s*$', r' \1', ai_response)
         
@@ -5452,6 +5499,92 @@ IMPORTANT: Never output this session info in your response.
         
         # Final double-space cleanup
         ai_response = re.sub(r'\s{2,}', ' ', ai_response).strip()
+        
+        # ===== VALIDATE AND RESTORE IF OVER-STRIPPED =====
+        def is_valid_response(text):
+            """Check if response is valid and complete"""
+            if not text or len(text.strip()) < 3:
+                return False
+            clean_text = re.sub(r'[\U0001F300-\U0001F9FF\s.!?,\'"…]+', '', text)
+            if len(clean_text) < 5:
+                return False
+            # Check for dangling patterns
+            if re.search(r'^\s*"\s*\w{0,10}\s*$', text):
+                return False
+            if re.search(r'\s+nu\s+(irukku|solla)\s*(da)?\s*$', text, re.IGNORECASE):
+                return False
+            if text.count('"') == 1 and len(text) < 30:
+                return False
+            return True
+        
+        def has_internal_thinking(text):
+            """Check if text contains internal thinking that should be stripped"""
+            thinking_patterns = [
+                r'\bTHINKING:', r'\bI need to\b', r'\bI should\b',
+                r'^User\s+(wants|is|asked)', r'^The user\s+', r'^Context:',
+                r'\brespect\s+irukanum\b', r'\bthis is wrong\b', r'\bcrossing the line\b',
+            ]
+            return any(re.search(p, text, re.IGNORECASE) for p in thinking_patterns)
+        
+        if not is_valid_response(ai_response):
+            # Only restore pre-strip if it's valid AND doesn't have internal thinking
+            if is_valid_response(pre_strip_response) and not has_internal_thinking(pre_strip_response):
+                ai_response = pre_strip_response
+                logger.info(f"[RESTORE] Restored valid pre-strip response for user {user.id}")
+            # Otherwise coherence check below will handle fallback
+        
+        # ===== COHERENCE CHECK: Detect garbled/incomplete responses =====
+        def is_garbled_response(response):
+            """Detect responses that are garbled, incomplete, or nonsensical after post-processing"""
+            if not response or len(response.strip()) < 3:
+                return True
+            
+            valid_short_responses = [
+                r'^(hmm|mmm|uff|aah+|seri|ok|hehe|aiyoo|aahaan|pannalam)\s*(da|di)?\s*[.!?…💕😊🔥🥵💋😈😏]*\s*$',
+                r'^(vaada|sollu|keluda|paruda)\s*(da|di)?\s*[.!?…💕😊🔥🥵💋😈😏]*\s*$',
+            ]
+            for pattern in valid_short_responses:
+                if re.match(pattern, response.strip(), re.IGNORECASE):
+                    return False
+            
+            garbled_patterns = [
+                r'^\s*"\s*[^"]{0,15}\s*$',
+                r'^\s*"\s*\w{1,8}\s+nu\s+',
+                r'\s+nu\s+(irukku|solla|kelu)\s*(da)?\s*[.!?]*\s*$',
+                r'^\s*(Aama|Seri|Uff)\s*(da)?\.{0,3}\s*"\s*\w{1,10}',
+                r'^\s*\.\s+\w{1,5}\s*[.!?]*\s*$',
+                r'^\s*da\.\s+\w{1,8}\s*[.!?]*\s*$',
+            ]
+            for pattern in garbled_patterns:
+                if re.search(pattern, response, re.IGNORECASE):
+                    logger.info(f"[GARBLED] Detected garbled pattern: {response[:50]}")
+                    return True
+            
+            quote_count = response.count('"')
+            if quote_count == 1 and len(response) < 30:
+                return True
+            
+            return False
+        
+        if is_garbled_response(ai_response):
+            if is_intimate:
+                coherent_fallbacks = [
+                    "Mmm da... romba nalla iruku 🥵",
+                    "Aahh da... vera level feel 🔥",
+                    "Uff da... innum pannu 😈",
+                    "Enakku pudikum da... 💋",
+                    "Amazing ah iruku da 🥵🔥",
+                ]
+            else:
+                coherent_fallbacks = [
+                    "Aahaan da... sollu 😊",
+                    "Hmm da... enna plan? 💕",
+                    "Seri da... ready ah irukken 😏",
+                    "Epdi iruka da? 😊",
+                    "Miss panniya enna? 💕",
+                ]
+            ai_response = random.choice(coherent_fallbacks)
+            logger.info(f"[COHERENCE FIX] Used fallback for garbled response for user {user.id}")
         
         logger.info(f"[KEERTHANA -> {user.id}] {ai_response}")
         
