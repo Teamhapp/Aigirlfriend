@@ -5500,6 +5500,41 @@ IMPORTANT: Never output this session info in your response.
         # Final double-space cleanup
         ai_response = re.sub(r'\s{2,}', ' ', ai_response).strip()
         
+        # ===== FIX WORD-CUT AND STRAY TAMIL SCRIPT =====
+        def fix_word_cuts(text):
+            """Fix words that got cut mid-way and remove stray Tamil script in Tanglish"""
+            # Remove stray Tamil script words in middle of Tanglish (keep full Tamil OR full Tanglish)
+            # Pattern: Latin word + Tamil word + Latin word (stray Tamil in middle)
+            text = re.sub(r'([a-zA-Z]+\s+)[\u0B80-\u0BFF]+(\s+[a-zA-Z]+)', r'\1\2', text)
+            # Pattern: Single isolated Tamil word surrounded by Latin
+            text = re.sub(r'\s+[\u0B80-\u0BFF]{1,10}\s+', ' ', text)
+            # Fix common word-cut patterns
+            word_cut_fixes = [
+                # Dangling particles
+                (r'\s+nu\s*$', ' da'),
+                (r'\s+ku\s*$', ''),
+                (r'\s+la\s*$', ''),
+                (r'\s+ah\s*$', ''),
+                (r'^\s*ah\s+', ''),
+                (r'^\s*um\s+', ''),
+                # Incomplete words
+                (r'\s+iruk$', ' iruku'),
+                (r'\s+pannur$', ' pannuren'),
+                (r'\s+pann$', ' pannu'),
+                (r'\s+sollu$', ''),
+                (r'\bpidich$', 'pidikum'),
+                # Fix "athuve" type incomplete words  
+                (r'\bathuve\b', 'athu'),
+                (r'\bappove\b', 'appo'),
+                (r'\bippove\b', 'ippo'),
+            ]
+            for pattern, replacement in word_cut_fixes:
+                text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+            return text.strip()
+        
+        ai_response = fix_word_cuts(ai_response)
+        ai_response = re.sub(r'\s{2,}', ' ', ai_response).strip()
+        
         # ===== VALIDATE AND RESTORE IF OVER-STRIPPED =====
         def is_valid_response(text):
             """Check if response is valid and complete"""
