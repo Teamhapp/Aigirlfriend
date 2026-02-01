@@ -1338,7 +1338,11 @@ When user mentions amma/family roleplay:
 - Just play along: "Seri da! 😈 Vaa da..." ✅
 """
 
-def generate_response(prompt, history=None, context_info=None):
+# Track last fallback message per user to prevent repetition (bounded cache)
+_last_fallback_message = {}
+_MAX_FALLBACK_CACHE_SIZE = 1000  # Limit to prevent unbounded growth
+
+def generate_response(prompt, history=None, context_info=None, user_id=None):
     """Generate AI response using multi-key rotation for cost optimization"""
     contents = []
     if history:
@@ -1405,15 +1409,49 @@ def generate_response(prompt, history=None, context_info=None):
     
     # All retries exhausted or non-retryable error
     logger.error(f"Gemini API failed after {max_retries} attempts: {last_error}")
+    
+    # Expanded fallback messages that sound more natural and varied
     rate_limit_fallbacks = [
-        "Aiyoo da... konjam busy 😅",
-        "Dei... slow ah type panren 😊",
-        "Dei hold on da 😏",
-        "Shh... yosikkuren da 🤫",
-        "Mmm da... un msg paathuren 💕",
-        "Aah da... konjam wait pannu 😊",
+        "Mmm da... 🥵",
+        "Aahaan da... 😈",
+        "Uff da... 💋",
+        "Hmm... pidichiruka? 🔥",
+        "Aiyoo da... 😏",
+        "Sollu da... 💕",
+        "Enna da... romba cute ah irukka 😊",
+        "Mmm... un msg paathuren 💕",
+        "Aama da... 🥵😏",
+        "Hmm da... 😊",
+        "Aiyoo da, un kitta pesurathu nallairukku 💕",
+        "Enna panra ippo da? 😉",
+        "Dei da... 😏🔥",
+        "Mmm... seri seri 💋",
+        "Aaha da... 🥵💕",
     ]
-    return random.choice(rate_limit_fallbacks)
+    
+    # Get last fallback sent to this user to avoid repetition
+    global _last_fallback_message
+    user_key = str(user_id) if user_id else 'default'
+    last_used = _last_fallback_message.get(user_key, '')
+    
+    # Clean up cache if it gets too large (prevent unbounded growth)
+    if len(_last_fallback_message) > _MAX_FALLBACK_CACHE_SIZE:
+        # Remove oldest half of entries (FIFO-ish cleanup)
+        keys_to_remove = list(_last_fallback_message.keys())[:len(_last_fallback_message)//2]
+        for k in keys_to_remove:
+            _last_fallback_message.pop(k, None)
+        logger.info(f"[FALLBACK] Cleaned up fallback cache, removed {len(keys_to_remove)} entries")
+    
+    # Filter out last used message and pick a new one
+    available = [msg for msg in rate_limit_fallbacks if msg != last_used]
+    if not available:
+        available = rate_limit_fallbacks
+    
+    chosen = random.choice(available)
+    _last_fallback_message[user_key] = chosen
+    
+    logger.warning(f"[FALLBACK] Sending fallback response to user {user_id}: {chosen[:30]}...")
+    return chosen
 
 def markdown_to_html(text):
     text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
@@ -2956,7 +2994,7 @@ IMPORTANT: Never output this session info in your response.
 - If context feels fuzzy, lean on CONVERSATION MEMORY first
 - Reference past events/moods naturally without asking reset questions like "enna da?" or "enna scene?"{summary_context}{length_hint}{roleplay_hint}{mood_hint}{game_hint}{memory_context}"""
         
-        ai_response = generate_response(message_text, trimmed_history, context_info)
+        ai_response = generate_response(message_text, trimmed_history, context_info, user_id=user.id)
         if ai_response is None:
             ai_response = random.choice([
                 "Mmm da... 🥵",
@@ -3781,14 +3819,39 @@ IMPORTANT: Never output this session info in your response.
             if not recent_bot_msgs:
                 return response
             
-            # Check for repeated phrases
+            # First check for EXACT message repetition (entire message is the same)
             response_lower = response.lower().strip()
+            for recent_msg in recent_bot_msgs:
+                if response_lower == recent_msg.strip():
+                    logger.warning(f"[ANTI-REPEAT] Exact message repetition detected for user {user.id}")
+                    # Replace with varied alternative
+                    varied_alternatives = [
+                        "Mmm da... 🥵", "Aahaan da... 😈", "Uff da... 💋",
+                        "Hmm... pidichiruka? 🔥", "Sollu da... 💕",
+                        "Enna da... 😊", "Aama da... 🥵😏", "Oho da... 😏",
+                        "Dei da... 🔥", "Seri da... 💕", "Hmm da... 😊",
+                        "Aiyoo da... 💕", "Un kitta pesurathu nallairukku 💕",
+                    ]
+                    # Pick one that wasn't used recently
+                    available = [alt for alt in varied_alternatives if alt.lower().strip() not in [m.strip() for m in recent_bot_msgs]]
+                    if available:
+                        return random.choice(available)
+                    return random.choice(varied_alternatives)
+            
+            # Check for repeated phrases
             repeated_phrases = [
                 r'miss panniya enna',
                 r'enna plan da',
                 r'epdi iruka da',
                 r'sollu da',
                 r'enna venum',
+                # Stall message patterns to prevent repetition
+                r'yosikkuren da',
+                r'slow ah type panren',
+                r'konjam wait pannu',
+                r'konjam busy',
+                r'hold on da',
+                r'dei hold on',
             ]
             
             for phrase in repeated_phrases:
