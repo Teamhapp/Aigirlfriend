@@ -54,6 +54,7 @@ class GeminiKeyRotator:
         self.clients = []
         self.current_index = 0
         self.rate_limited_until = {}  # key_index -> timestamp when rate limit expires
+        self.daily_exhausted = {}  # key_index -> date string when exhausted (resets next day)
         
         # Load keys from environment (GEMINI_API_KEY, GEMINI_API_KEY_1, GEMINI_API_KEY_2, etc.)
         primary_key = os.environ.get('GEMINI_API_KEY')
@@ -70,16 +71,36 @@ class GeminiKeyRotator:
         
         logger.info(f"[GEMINI KEYS] Loaded {len(self.keys)} API key(s) for rotation")
     
+    def _get_today_date(self):
+        """Get today's date string in UTC for daily exhaustion tracking (API quotas reset at UTC midnight)"""
+        from datetime import datetime, timezone
+        return datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    
+    def _clear_expired_daily_exhausted(self):
+        """Clear keys that were exhausted on previous days"""
+        today = self._get_today_date()
+        expired = [k for k, date in self.daily_exhausted.items() if date != today]
+        for key_idx in expired:
+            del self.daily_exhausted[key_idx]
+            logger.info(f"[GEMINI ROTATE] Key #{key_idx + 1} daily quota reset (new day)")
+    
     def get_client(self):
-        """Get the next available client, skipping rate-limited ones"""
+        """Get the next available client, skipping rate-limited and daily-exhausted ones"""
         if not self.clients:
             raise ValueError("No Gemini API keys configured")
         
         current_time = time.time()
+        self._clear_expired_daily_exhausted()
         attempts = 0
         
         while attempts < len(self.clients):
-            # Check if current key is rate limited
+            # Check if current key is daily exhausted (skip entirely until day resets)
+            if self.current_index in self.daily_exhausted:
+                self.current_index = (self.current_index + 1) % len(self.clients)
+                attempts += 1
+                continue
+            
+            # Check if current key is temporarily rate limited
             if self.current_index in self.rate_limited_until:
                 if current_time < self.rate_limited_until[self.current_index]:
                     # Still rate limited, try next key
@@ -97,19 +118,43 @@ class GeminiKeyRotator:
             logger.debug(f"[GEMINI ROTATE] Using key #{key_num} of {len(self.keys)}")
             return client, key_num
         
-        # All keys are rate limited, use the one with shortest wait
-        self.current_index = min(self.rate_limited_until, key=lambda k: self.rate_limited_until[k])
-        wait_time = self.rate_limited_until[self.current_index] - current_time
-        logger.warning(f"[GEMINI ROTATE] All keys rate limited, using key #{self.current_index + 1} (wait {wait_time:.0f}s)")
-        return self.clients[self.current_index], self.current_index + 1
+        # Check if all keys are daily exhausted
+        if len(self.daily_exhausted) >= len(self.clients):
+            logger.error(f"[GEMINI ROTATE] ALL {len(self.clients)} keys exhausted for today!")
+            return None, 0
+        
+        # All available keys are rate limited, use the one with shortest wait
+        available_keys = [k for k in self.rate_limited_until if k not in self.daily_exhausted]
+        if available_keys:
+            self.current_index = min(available_keys, key=lambda k: self.rate_limited_until[k])
+            wait_time = self.rate_limited_until[self.current_index] - current_time
+            logger.warning(f"[GEMINI ROTATE] All keys rate limited, using key #{self.current_index + 1} (wait {wait_time:.0f}s)")
+            return self.clients[self.current_index], self.current_index + 1
+        
+        logger.error("[GEMINI ROTATE] No available keys!")
+        return None, 0
     
     def mark_rate_limited(self, key_index, retry_after=60):
-        """Mark a key as rate limited"""
+        """Mark a key as temporarily rate limited"""
         self.rate_limited_until[key_index - 1] = time.time() + retry_after
         logger.warning(f"[GEMINI ROTATE] Key #{key_index} rate limited for {retry_after}s")
     
+    def mark_daily_exhausted(self, key_index):
+        """Mark a key as exhausted for the entire day - won't be tried until day resets"""
+        self.daily_exhausted[key_index - 1] = self._get_today_date()
+        # Remove from rate_limited if present
+        if key_index - 1 in self.rate_limited_until:
+            del self.rate_limited_until[key_index - 1]
+        active_keys = len(self.clients) - len(self.daily_exhausted)
+        logger.error(f"[GEMINI ROTATE] Key #{key_index} EXHAUSTED for today! ({active_keys} keys remaining)")
+    
     def key_count(self):
         return len(self.keys)
+    
+    def active_key_count(self):
+        """Return number of keys not exhausted for today"""
+        self._clear_expired_daily_exhausted()
+        return len(self.keys) - len(self.daily_exhausted)
 
 gemini_rotator = GeminiKeyRotator()
 
@@ -1355,13 +1400,19 @@ def generate_response(prompt, history=None, context_info=None, user_id=None):
     if context_info:
         full_system_prompt = f"{GIRLFRIEND_SYSTEM_PROMPT}\n\n--- CURRENT SESSION INFO (DO NOT OUTPUT THIS) ---\n{context_info}"
     
-    # Try with key rotation - attempt up to 3 keys on rate limit
-    max_retries = min(3, gemini_rotator.key_count())
+    # Try with key rotation - attempt up to 3 active keys on rate limit
+    active_keys = gemini_rotator.active_key_count()
+    max_retries = min(3, active_keys) if active_keys > 0 else 1
     last_error = None
     
     for attempt in range(max_retries):
         try:
             client, key_num = gemini_rotator.get_client()
+            
+            # Check if all keys are exhausted
+            if client is None:
+                logger.error(f"[GEMINI] All API keys exhausted for today, using fallback")
+                break
             
             response = client.models.generate_content(
                 model='gemini-2.5-flash',
@@ -1399,8 +1450,21 @@ def generate_response(prompt, history=None, context_info=None, user_id=None):
             
             # Check for rate limit errors (429, quota, rate limit)
             if '429' in error_str or 'rate' in error_str or 'quota' in error_str or 'resource' in error_str:
-                logger.warning(f"[GEMINI] Key #{key_num} hit rate limit, trying next key (attempt {attempt + 1}/{max_retries})")
-                gemini_rotator.mark_rate_limited(key_num, retry_after=60)
+                # Check if this is a daily quota exhaustion vs temporary rate limit
+                # Daily quota: "exceeded your current quota" or "resource has been exhausted"
+                # Temporary rate: "rate limit" without quota indicators
+                is_daily_quota = ('quota' in error_str and 'exceeded' in error_str) or \
+                                 ('resource' in error_str and 'exhausted' in error_str) or \
+                                 'check your plan and billing' in error_str
+                
+                if is_daily_quota:
+                    # Daily quota exhausted - don't try this key again until day resets
+                    logger.warning(f"[GEMINI] Key #{key_num} DAILY QUOTA EXHAUSTED, marking for daily skip (attempt {attempt + 1}/{max_retries})")
+                    gemini_rotator.mark_daily_exhausted(key_num)
+                else:
+                    # Temporary rate limit - retry after cooldown
+                    logger.warning(f"[GEMINI] Key #{key_num} hit temporary rate limit, trying next key (attempt {attempt + 1}/{max_retries})")
+                    gemini_rotator.mark_rate_limited(key_num, retry_after=60)
                 continue
             else:
                 # Non-rate-limit error, don't retry
@@ -1492,6 +1556,12 @@ Chat history:
     
     try:
         client, key_num = gemini_rotator.get_client()
+        
+        # Check if all keys are exhausted
+        if client is None:
+            logger.error(f"[SUMMARY] All API keys exhausted, skipping summary generation")
+            return None
+        
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=[{"role": "user", "parts": [{"text": summary_prompt + history_text}]}],
