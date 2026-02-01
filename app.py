@@ -3005,6 +3005,40 @@ IMPORTANT: Never output this session info in your response.
             ])
         ai_response = ai_response.strip()
         
+        # ===== STRIP AI THINKING/REASONING LEAK =====
+        # Detect and remove internal AI reasoning using deterministic split approach
+        def strip_thinking_leak(response):
+            """Strip AI reasoning that leaked into response, keeping only user-facing content"""
+            # Reasoning markers that indicate start of AI thinking
+            reasoning_markers = [
+                '. This is a playful', '. This is a flirty', '. This is a romantic',
+                '. This is a teasing', '. This is a sexy', '. This is a continuation',
+                '. I can imply', '. I can suggest', '. I can continue', '. I can respond',
+                '. I will respond', '. I will say', '. I will continue', '. I should',
+                '. Option 1:', '. Option 2:', '. Option 3:',
+                '. Option 1 is', '. Option 2 is', '. Option 3 is',
+                '. The user wants', '. The user is', '. The response should',
+                '. Let me continue', '. Let me respond', '. My previous tease',
+                '. keeps the playful', '. simplest and',
+                'THINKING:', 'Context:', 'User wants',
+            ]
+            
+            response_lower = response.lower()
+            for marker in reasoning_markers:
+                marker_lower = marker.lower()
+                idx = response_lower.find(marker_lower)
+                if idx > 0:
+                    # Keep only the content before the marker
+                    cleaned = response[:idx].strip()
+                    # Remove trailing quotes or dots
+                    cleaned = re.sub(r'["\s.]+$', '', cleaned).strip()
+                    if len(cleaned) >= 5:
+                        logger.warning(f"[THINKING_LEAK] Stripped AI reasoning at marker '{marker}' for user {user.id}")
+                        return cleaned
+            return response
+        
+        ai_response = strip_thinking_leak(ai_response)
+        
         # ===== FIX LEADING TRUNCATION =====
         # Fix if response starts with dots (truncation indicator)
         if re.match(r'^\.{2,4}\s*', ai_response):
@@ -3808,12 +3842,12 @@ IMPORTANT: Never output this session info in your response.
             if not history or len(history) < 2:
                 return response
             
-            # Get last 3 bot messages
+            # Get last 5 bot messages (increased from 3 to prevent stall message loops)
             recent_bot_msgs = []
             for msg in reversed(history):
                 if msg.get('role') == 'assistant':
                     recent_bot_msgs.append(msg.get('content', '').lower())
-                    if len(recent_bot_msgs) >= 3:
+                    if len(recent_bot_msgs) >= 5:
                         break
             
             if not recent_bot_msgs:
@@ -5712,6 +5746,17 @@ IMPORTANT: Never output this session info in your response.
                 r'\bTHINKING:', r'\bI need to\b', r'\bI should\b',
                 r'^User\s+(wants|is|asked)', r'^The user\s+', r'^Context:',
                 r'\brespect\s+irukanum\b', r'\bthis is wrong\b', r'\bcrossing the line\b',
+                # New patterns for AI reasoning leak
+                r'\bThis is a\s+(playful|flirty|romantic|sexy|teasing)\b',
+                r'\bmy previous\s+(tease|message|response)\b',
+                r'\bI can (imply|suggest|continue|respond)\b',
+                r'\bOption\s+\d+:', r'\bOption\s+\d+\s+is\b',
+                r'\bkeeps the playful\b', r'\bsimplest and\b',
+                r'\bI will\s+(respond|say|write|continue)\b',
+                r'\bprevious tease\b', r'\bplayful continuation\b',
+                r'\bThe response\s+(should|can|will)\b',
+                r'\bLet me\s+(continue|respond|say)\b',
+                r'"\.\s*This is\s+', r'"\.\s*I\s+(can|will|should)\b',
             ]
             return any(re.search(p, text, re.IGNORECASE) for p in thinking_patterns)
         
