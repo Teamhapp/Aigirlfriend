@@ -102,6 +102,7 @@ Keerthana AI is a Telegram bot designed to serve as a romantic AI girlfriend, of
 - **"You Suggest" Handling**: When user asks bot to suggest, gives actual romantic activity suggestions instead of generic responses.
 - **Anti-Repetition Filter**: Checks last 3 bot messages and removes repeated phrases like "miss panniya enna?" to prevent loops. Now also detects exact message repetition and stall message patterns.
 - **Improved Fallback Messages**: When API fails, sends varied natural-sounding responses instead of repetitive stall messages. Uses bounded cache to track last fallback per user and prevent repetition.
+- **AI Thinking Leak Prevention**: Detects and strips internal AI reasoning that leaks into responses (e.g., "This is a playful continuation..."). Uses deterministic split approach to keep only user-facing content before reasoning markers.
 - **Context-Aware Response Rules**: System prompt enforces proper contextual responses matching what user actually said.
 - **Admin Commands**: Includes commands for managing user limits, blocking, viewing statistics, setting UPI ID (`/setupi`), and verifying payments (`/verify`).
 - **User Commands**: Provides commands like `/start`, `/buy`, `/credits`, `/referral`, `/stats`, `/reset`.
