@@ -733,12 +733,15 @@ def get_dashboard_stats(conn):
     active_today = cur.fetchone()[0]
     cur.execute("SELECT COALESCE(SUM(amount_paise), 0) FROM payment_orders WHERE status = 'SUCCESS'")
     total_revenue_paise = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM chat_messages WHERE role = 'assistant' AND DATE(created_at) = CURRENT_DATE")
+    messages_today = cur.fetchone()[0]
     cur.close()
     return {
         'total_users': total_users,
         'total_messages': total_messages,
         'active_today': active_today,
-        'total_revenue': total_revenue_paise // 100
+        'total_revenue': total_revenue_paise // 100,
+        'messages_today': messages_today
     }
 
 @with_db_retry()

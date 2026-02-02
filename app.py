@@ -155,6 +155,31 @@ class GeminiKeyRotator:
         """Return number of keys not exhausted for today"""
         self._clear_expired_daily_exhausted()
         return len(self.keys) - len(self.daily_exhausted)
+    
+    def get_key_status(self):
+        """Get status of all API keys for dashboard display"""
+        self._clear_expired_daily_exhausted()
+        current_time = time.time()
+        status_list = []
+        for i in range(len(self.keys)):
+            key_num = i + 1  # Display as 1-based
+            # Check using 0-based index (i) since dicts use 0-based keys
+            if i in self.daily_exhausted:
+                status = 'exhausted'
+                detail = 'Daily quota exceeded'
+            elif self.rate_limited_until.get(i, 0) > current_time:
+                status = 'rate_limited'
+                remaining = int(self.rate_limited_until[i] - current_time)
+                detail = f'Rate limited ({remaining}s)'
+            else:
+                status = 'active'
+                detail = 'Ready'
+            status_list.append({
+                'key_num': key_num,
+                'status': status,
+                'detail': detail
+            })
+        return status_list
 
 gemini_rotator = GeminiKeyRotator()
 
@@ -6060,12 +6085,37 @@ DASHBOARD_HTML = '''
                 <div class="stat-label">Total Messages</div>
             </div>
             <div class="stat-card">
+                <div class="stat-value" style="color: #4fc3f7;">{{ stats.messages_today or 0 }}</div>
+                <div class="stat-label">Messages Today</div>
+            </div>
+            <div class="stat-card">
                 <div class="stat-value">{{ stats.active_today }}</div>
                 <div class="stat-label">Active Today</div>
             </div>
             <div class="stat-card">
                 <div class="stat-value">{{ stats.total_revenue or 0 }}</div>
                 <div class="stat-label">Revenue (₹)</div>
+            </div>
+        </div>
+        
+        <div class="api-keys-panel" style="background: #16213e; padding: 20px; border-radius: 10px; margin-bottom: 30px;">
+            <h3 style="color: #ff6b9d; margin-bottom: 15px;">🔑 Gemini API Keys Status</h3>
+            <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                {% for key in key_status %}
+                <div style="background: #0f3460; padding: 12px 20px; border-radius: 8px; min-width: 120px; text-align: center;">
+                    <div style="font-weight: bold; margin-bottom: 5px;">Key #{{ key.key_num }}</div>
+                    {% if key.status == 'active' %}
+                    <div style="color: #44ff44; font-size: 0.9em;">✅ {{ key.detail }}</div>
+                    {% elif key.status == 'exhausted' %}
+                    <div style="color: #ff4444; font-size: 0.9em;">❌ {{ key.detail }}</div>
+                    {% else %}
+                    <div style="color: #ffaa00; font-size: 0.9em;">⏳ {{ key.detail }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            <div style="margin-top: 10px; color: #888; font-size: 0.85em;">
+                Active: {{ key_status|selectattr('status', 'equalto', 'active')|list|length }}/{{ key_status|length }} keys | Resets at UTC midnight
             </div>
         </div>
         <h2 style="margin-bottom: 15px;">Users</h2>
@@ -6452,7 +6502,8 @@ def logout():
 def dashboard():
     users = get_all_users()
     stats_data = get_dashboard_stats()
-    return render_template_string(DASHBOARD_HTML, users=users, stats=stats_data, default_limit=DAILY_MESSAGE_LIMIT)
+    key_status = gemini_rotator.get_key_status()
+    return render_template_string(DASHBOARD_HTML, users=users, stats=stats_data, default_limit=DAILY_MESSAGE_LIMIT, key_status=key_status)
 
 @app.route('/chat/<int:user_id>')
 @login_required
