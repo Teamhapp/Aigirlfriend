@@ -62,8 +62,8 @@ class GeminiKeyRotator:
             self.keys.append(primary_key)
             self.clients.append(genai.Client(api_key=primary_key))
         
-        # Load additional keys
-        for i in range(1, 10):
+        # Load additional keys (supports up to 20 keys for higher quota)
+        for i in range(1, 21):
             key = os.environ.get(f'GEMINI_API_KEY_{i}')
             if key:
                 self.keys.append(key)
