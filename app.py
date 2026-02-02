@@ -1488,19 +1488,26 @@ def generate_response(prompt, history=None, context_info=None, user_id=None):
             # Check for rate limit errors (429, quota, rate limit)
             if '429' in error_str or 'rate' in error_str or 'quota' in error_str or 'resource' in error_str:
                 # Check if this is a daily quota exhaustion vs temporary rate limit
-                # Daily quota: "exceeded your current quota" or "resource has been exhausted"
-                # Temporary rate: "rate limit" without quota indicators
-                is_daily_quota = ('quota' in error_str and 'exceeded' in error_str) or \
-                                 ('resource' in error_str and 'exhausted' in error_str) or \
-                                 'check your plan and billing' in error_str
+                # Daily quota indicators: "per-day", "perday", "daily", "GenerateRequestsPerDayPerProject"
+                # Per-minute rate limit: "per-minute", "perminute", "GenerateRequestsPerMinutePerProject"
+                is_daily_quota = ('per-day' in error_str or 'perday' in error_str or 
+                                 'daily' in error_str or 
+                                 'check your plan and billing' in error_str or
+                                 'generatecontentreqsperdayperprojpermodel' in error_str)
                 
-                if is_daily_quota:
+                is_per_minute = ('per-minute' in error_str or 'perminute' in error_str or
+                                'generatecontentreqsperminuteperprojpermodel' in error_str)
+                
+                # Log the actual error for debugging
+                logger.debug(f"[GEMINI] 429 error details: {error_str[:200]}")
+                
+                if is_daily_quota and not is_per_minute:
                     # Daily quota exhausted - don't try this key again until day resets
                     logger.warning(f"[GEMINI] Key #{key_num} DAILY QUOTA EXHAUSTED, marking for daily skip (attempt {attempt + 1}/{max_retries})")
                     gemini_rotator.mark_daily_exhausted(key_num)
                 else:
-                    # Temporary rate limit - retry after cooldown
-                    logger.warning(f"[GEMINI] Key #{key_num} hit temporary rate limit, trying next key (attempt {attempt + 1}/{max_retries})")
+                    # Temporary rate limit (per-minute or unknown) - retry after cooldown
+                    logger.warning(f"[GEMINI] Key #{key_num} hit per-minute rate limit, trying next key (attempt {attempt + 1}/{max_retries})")
                     gemini_rotator.mark_rate_limited(key_num, retry_after=60)
                 continue
             else:
