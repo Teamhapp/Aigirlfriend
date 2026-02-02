@@ -1425,6 +1425,18 @@ def generate_response(prompt, history=None, context_info=None, user_id=None):
     if context_info:
         full_system_prompt = f"{GIRLFRIEND_SYSTEM_PROMPT}\n\n--- CURRENT SESSION INFO (DO NOT OUTPUT THIS) ---\n{context_info}"
     
+    # Select model based on user's paid status
+    # Paid users (purchased_credits > 0) get premium 2.5 Flash
+    # Free users get 2.0 Flash (experimental, higher daily limits)
+    model_name = 'gemini-2.0-flash'  # Default for free users
+    if user_id:
+        user_credits = get_purchased_credits(user_id) or 0
+        if user_credits > 0:
+            model_name = 'gemini-2.5-flash'  # Premium model for paid users
+            logger.info(f"[MODEL] User {user_id} is PAID ({user_credits} credits), using {model_name}")
+        else:
+            logger.info(f"[MODEL] User {user_id} is FREE, using {model_name}")
+    
     # Try with key rotation - attempt up to 3 active keys on rate limit
     active_keys = gemini_rotator.active_key_count()
     max_retries = min(3, active_keys) if active_keys > 0 else 1
@@ -1440,7 +1452,7 @@ def generate_response(prompt, history=None, context_info=None, user_id=None):
                 break
             
             response = client.models.generate_content(
-                model='gemini-2.5-flash',
+                model=model_name,
                 contents=contents,
                 config=types.GenerateContentConfig(
                     system_instruction=full_system_prompt,
@@ -1588,7 +1600,7 @@ Chat history:
             return None
         
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-2.0-flash',
             contents=[{"role": "user", "parts": [{"text": summary_prompt + history_text}]}],
             config=types.GenerateContentConfig(
                 temperature=0.3,
