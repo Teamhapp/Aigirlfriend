@@ -723,6 +723,34 @@ def get_user_chat_history(conn, user_id, limit=100):
     return [{'role': m[0], 'content': m[1], 'created_at': m[2]} for m in reversed(messages)]
 
 @with_db_retry()
+def get_chats_by_date_range(conn, start_date, end_date):
+    """Get all chat messages within a date range for export"""
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT 
+            cm.user_id,
+            COALESCE(u.preferred_name, u.first_name, 'Unknown') as user_name,
+            u.username,
+            cm.role,
+            cm.content,
+            cm.created_at
+        FROM chat_messages cm
+        LEFT JOIN users u ON cm.user_id = u.user_id
+        WHERE DATE(cm.created_at) >= %s AND DATE(cm.created_at) <= %s
+        ORDER BY cm.user_id, cm.created_at
+    ''', (start_date, end_date))
+    messages = cur.fetchall()
+    cur.close()
+    return [{
+        'user_id': m[0],
+        'user_name': m[1],
+        'username': m[2] or 'N/A',
+        'role': 'Keerthana' if m[3] == 'assistant' else 'User',
+        'content': m[4],
+        'timestamp': m[5]
+    } for m in messages]
+
+@with_db_retry()
 def get_dashboard_stats(conn):
     cur = conn.cursor()
     cur.execute('SELECT COUNT(*) FROM users')

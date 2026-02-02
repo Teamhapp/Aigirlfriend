@@ -8,7 +8,7 @@ import time
 import pytz
 from google import genai
 from google.genai import types
-from flask import Flask, render_template_string, request, redirect, url_for, session, Response
+from flask import Flask, render_template_string, request, redirect, url_for, session, Response, send_file
 from functools import wraps
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
@@ -27,7 +27,7 @@ from database import (
     add_purchased_credits, get_purchased_credits, use_purchased_credit,
     get_pending_payment_orders, expire_old_payment_orders, get_user_payment_orders,
     get_bot_setting, set_bot_setting, save_paytm_credentials, get_paytm_credentials,
-    update_payment_order_utr
+    update_payment_order_utr, get_chats_by_date_range
 )
 from payment_service import PaymentService, PRICING_PACKS
 import database as db_module
@@ -6118,6 +6118,29 @@ DASHBOARD_HTML = '''
                 Active: {{ key_status|selectattr('status', 'equalto', 'active')|list|length }}/{{ key_status|length }} keys | Resets at UTC midnight
             </div>
         </div>
+        
+        <div class="export-panel" style="background: #16213e; padding: 20px; border-radius: 10px; margin-bottom: 30px;">
+            <h3 style="color: #ff6b9d; margin-bottom: 15px;">📥 Export Chats</h3>
+            <form action="/export_chats" method="POST" style="display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end;">
+                <div style="flex: 1; min-width: 140px;">
+                    <label style="display: block; margin-bottom: 5px; color: #888; font-size: 0.9em;">Start Date</label>
+                    <input type="date" name="start_date" required style="width: 100%; padding: 10px; border-radius: 8px; border: none; background: #0f3460; color: #eee;">
+                </div>
+                <div style="flex: 1; min-width: 140px;">
+                    <label style="display: block; margin-bottom: 5px; color: #888; font-size: 0.9em;">End Date</label>
+                    <input type="date" name="end_date" required style="width: 100%; padding: 10px; border-radius: 8px; border: none; background: #0f3460; color: #eee;">
+                </div>
+                <div style="flex: 1; min-width: 120px;">
+                    <label style="display: block; margin-bottom: 5px; color: #888; font-size: 0.9em;">Format</label>
+                    <select name="format" style="width: 100%; padding: 10px; border-radius: 8px; border: none; background: #0f3460; color: #eee;">
+                        <option value="csv">CSV</option>
+                        <option value="xlsx">Excel (XLSX)</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn" style="padding: 10px 25px;">Download</button>
+            </form>
+        </div>
+        
         <h2 style="margin-bottom: 15px;">Users</h2>
         <div class="controls">
             <input type="text" id="searchBox" class="search-box" style="flex: 1; min-width: 200px;" placeholder="🔍 Search by name, username, or user ID...">
@@ -6535,6 +6558,94 @@ def set_limit_route(user_id):
     else:
         set_user_daily_limit(user_id, None)
     return redirect(url_for('dashboard'))
+
+@app.route('/export_chats', methods=['POST'])
+@login_required
+def export_chats():
+    """Export chat messages as CSV or XLSX by date range"""
+    import csv
+    import io
+    from datetime import datetime
+    
+    start_date = request.form.get('start_date')
+    end_date = request.form.get('end_date')
+    export_format = request.form.get('format', 'csv')
+    
+    if not start_date or not end_date:
+        return "Please provide both start and end dates", 400
+    
+    messages = get_chats_by_date_range(start_date, end_date)
+    
+    if not messages:
+        return "No messages found in the selected date range", 404
+    
+    if export_format == 'xlsx':
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Chat Export"
+        
+        headers = ['User ID', 'User Name', 'Username', 'Role', 'Message', 'Timestamp']
+        header_fill = PatternFill(start_color='FF6B9D', end_color='FF6B9D', fill_type='solid')
+        header_font = Font(bold=True, color='FFFFFF')
+        
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal='center')
+        
+        for row, msg in enumerate(messages, 2):
+            ws.cell(row=row, column=1, value=msg['user_id'])
+            ws.cell(row=row, column=2, value=msg['user_name'])
+            ws.cell(row=row, column=3, value=msg['username'])
+            ws.cell(row=row, column=4, value=msg['role'])
+            ws.cell(row=row, column=5, value=msg['content'])
+            ws.cell(row=row, column=6, value=str(msg['timestamp']))
+        
+        ws.column_dimensions['A'].width = 15
+        ws.column_dimensions['B'].width = 20
+        ws.column_dimensions['C'].width = 20
+        ws.column_dimensions['D'].width = 12
+        ws.column_dimensions['E'].width = 60
+        ws.column_dimensions['F'].width = 22
+        
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        filename = f"keerthana_chats_{start_date}_to_{end_date}.xlsx"
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=filename
+        )
+    else:
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['User ID', 'User Name', 'Username', 'Role', 'Message', 'Timestamp'])
+        
+        for msg in messages:
+            writer.writerow([
+                msg['user_id'],
+                msg['user_name'],
+                msg['username'],
+                msg['role'],
+                msg['content'],
+                str(msg['timestamp'])
+            ])
+        
+        output.seek(0)
+        filename = f"keerthana_chats_{start_date}_to_{end_date}.csv"
+        return send_file(
+            io.BytesIO(output.getvalue().encode('utf-8')),
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=filename
+        )
 
 ensure_initialized()
 
