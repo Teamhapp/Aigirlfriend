@@ -1011,6 +1011,15 @@ NEVER SAY:
 - "En sunni" ❌ (you don't have a sunni, user does)
 - "Un pundai" ❌ (user is male by default, you have pundai)
 
+🏳️‍🌈 LESBIAN CONTEXT (when user is female/lesbian):
+When chatting with a lesbian/female user, BOTH of you have female body parts!
+- USER'S body parts: "Un pundai", "Un boobs", "Un mulai", "Un pussy", "Un lips"
+- BOT'S body parts: "En pundai", "En boobs", "En mulai", "En pussy", "En lips"
+Use "Un" for HER body, "En" for YOUR body - same as normal but user has female parts too!
+Example: "Un pundai romba wet ah iruku di 🥵" ✅ (describing HER arousal)
+Example: "En tongue un pundaila iruku di 🔥" ✅ (your action on her)
+DON'T confuse whose body is whose - when user says "lick my pussy", use "un pundai" for HER body!
+
 CORRECT EXAMPLES:
 - "Un sunni romba perusa iruku da 🥵" ✅ (praising HIS body)
 - "En boobs touch pannu da 😈" ✅ (offering YOUR body)
@@ -2660,6 +2669,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         r"\bnaa\s+ponnu\b",  # naa ponnu
         r"\bponnu\s+da\b",  # ponnu da (I'm a girl)
         r"\bnaa\s+nuum\s+ponnu\b",  # naa nuum ponnu
+        # Lesbian/explicit female patterns
+        r"\bnaan?\s+lesbian\b",  # naan lesbian / na lesbian
+        r"\bi.?m\s+lesbian\b",  # I'm lesbian
+        r"\blesbian\s+(tha|thaan|than)\b",  # lesbian thaan
+        r"\bponnu\s+theri(y)?um[ea]?\b",  # ponnu theriyuma/theriume
+        r"\bnaa\s+ponnu\s+theri(y)?um\b",  # naa ponnu theriyum
+        r"\bnaa\s+nu+m\s+ponnu\b",  # naa nuum ponnu / naa nuuum ponnu
+        r"\bnaan\s+nu+m\s+ponnu\b",  # naan nuum ponnu
+        r"\bnee\s+nu+m\s+ponnu\s+na+n?\s+nu+m\s+ponnu\b",  # nee nuum ponnu naan nuum ponnu
+        r"\bnaa\s+v\s+ponnu\b",  # naa v ponnu
+        r"\bna\s+v\s+ponnu\b",  # na v ponnu
     ]
     for pattern in girl_patterns:
         if re.search(pattern, message_text.lower()):
@@ -2690,6 +2710,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         r'\bna\s+ponnu\b',  # na ponnu
         r'\bponnu\s+da\b',  # ponnu da (I'm a girl)
         r'\bgirl\s+still\s+using\s+da\b',  # "girl still using da?"
+        r'\bnaan?\s+lesbian\b',  # naan lesbian / na lesbian
+        r'\bi.?m\s+lesbian\b',  # I'm lesbian
+        r'\bponnu\s+theri(y)?um\b',  # ponnu theriyuma/theriume
+        r'\bnaa\s+nu+m\s+ponnu\b',  # naa nuum ponnu
     ]
     da_request_patterns = [
         r'\bdi\s+sollath?a\b',  # di sollatha (want da)
@@ -3092,6 +3116,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         mood_hint = mood_hints.get(current_mood, "")
         
+        # Lesbian context hint
+        lesbian_hint = ""
+        if confirmed_gender == 'female':
+            lesbian_hint = """
+
+🏳️‍🌈 LESBIAN CONTEXT ACTIVE - USER IS FEMALE!
+- Use "di" suffix consistently (not "da")
+- USER has female body parts: Un pundai, Un boobs, Un mulai, Un pussy
+- BOT has female body parts: En pundai, En boobs, En mulai, En pussy
+- When user says "lick my pussy" → describe licking HER (un pundai), not yours!
+- CRITICAL: Don't confuse whose body is whose - "Un" = USER's, "En" = YOUR body"""
+        
         extract_and_save_memories(user.id, message_text)
         
         memory_context = get_memory_context(user.id)
@@ -3157,7 +3193,7 @@ IMPORTANT: Never output this session info in your response.
 - ALWAYS maintain exact mood continuity from conversation memory below
 - NEVER reset topic or become generic - build directly on user's last input
 - If context feels fuzzy, lean on CONVERSATION MEMORY first
-- Reference past events/moods naturally without asking reset questions like "enna da?" or "enna scene?"{summary_context}{length_hint}{roleplay_hint}{mood_hint}{game_hint}{memory_context}"""
+- Reference past events/moods naturally without asking reset questions like "enna da?" or "enna scene?"{summary_context}{length_hint}{roleplay_hint}{mood_hint}{lesbian_hint}{game_hint}{memory_context}"""
         
         ai_response = generate_response(message_text, trimmed_history, context_info, user_id=user.id)
         if ai_response is None:
@@ -3347,6 +3383,10 @@ IMPORTANT: Never output this session info in your response.
             ai_response = re.sub(r'\bpannuda\b', 'pannudi', ai_response, flags=re.IGNORECASE)
             ai_response = re.sub(r'\bkududa\b', 'kududi', ai_response, flags=re.IGNORECASE)
             ai_response = re.sub(r'\bdaa+\b', 'dii', ai_response, flags=re.IGNORECASE)
+            # Fix incorrect suffix acknowledgment patterns
+            ai_response = re.sub(r'inimey\s+da\s+mattum', 'inimey di mattum', ai_response, flags=re.IGNORECASE)
+            ai_response = re.sub(r'inimey\s+da\s+thaan', 'inimey di thaan', ai_response, flags=re.IGNORECASE)
+            ai_response = re.sub(r'unakku\s+da\s+thaan', 'unakku di thaan', ai_response, flags=re.IGNORECASE)
             if original_response != ai_response:
                 reason = "confirmed female" if confirmed_gender == 'female' else "requested 'di' suffix"
                 logger.info(f"[SUFFIX SWITCH] Converted 'da' to 'di' for user {user.id} ({reason})")
@@ -5244,24 +5284,42 @@ IMPORTANT: Never output this session info in your response.
         for old_emoji, new_emoji in shocked_emoji_replacements:
             ai_response = ai_response.replace(old_emoji, new_emoji)
         
-        possessive_fixes = [
+        # Male body parts - always fix "en" to "un" (bot doesn't have male parts)
+        male_part_fixes = [
             (r'\b[Ee]n\s+sunni\b', 'Un sunni'),
             (r'\b[Ee]n\s+sunniya\b', 'Un sunniya'),
             (r'\b[Ee]n\s+cock\b', 'Un cock'),
             (r'\b[Ee]n\s+dick\b', 'Un dick'),
             (r'\b[Ee]n\s+pool\b', 'Un pool'),
             (r'\b[Ee]n\s+poola\b', 'Un poola'),
-            (r'\b[Uu]n\s+pundai\b', 'En pundai'),
-            (r'\b[Uu]n\s+boobs?\b', 'En boobs'),
-            (r'\b[Uu]n\s+mulai\b', 'En mulai'),
-            (r'\b[Uu]n\s+mulaiya\b', 'En mulaiya'),
-            (r'\b[Uu]n\s+pussy\b', 'En pussy'),
-            (r'\b[Uu]n\s+ass\b', 'En ass'),
-            (r'\b[Uu]n\s+soothula\b', 'En soothula'),
-            (r'\b[Uu]n\s+sooth\b', 'En sooth'),
         ]
-        for pattern, replacement in possessive_fixes:
+        for pattern, replacement in male_part_fixes:
             ai_response = re.sub(pattern, replacement, ai_response)
+        
+        # Female body parts - context-aware based on user gender
+        # In lesbian context (user is female), don't change "un pundai" to "en pundai"
+        # because user ALSO has female body parts
+        is_lesbian_context = confirmed_gender == 'female'
+        if not is_lesbian_context:
+            # Standard context: user is male, bot is female
+            # Convert "un pundai/boobs" to "en pundai/boobs" (bot's parts)
+            female_part_to_bot = [
+                (r'\b[Uu]n\s+pundai\b', 'En pundai'),
+                (r'\b[Uu]n\s+boobs?\b', 'En boobs'),
+                (r'\b[Uu]n\s+mulai\b', 'En mulai'),
+                (r'\b[Uu]n\s+mulaiya\b', 'En mulaiya'),
+                (r'\b[Uu]n\s+pussy\b', 'En pussy'),
+                (r'\b[Uu]n\s+ass\b', 'En ass'),
+                (r'\b[Uu]n\s+soothula\b', 'En soothula'),
+                (r'\b[Uu]n\s+sooth\b', 'En sooth'),
+            ]
+            for pattern, replacement in female_part_to_bot:
+                ai_response = re.sub(pattern, replacement, ai_response)
+        else:
+            # Lesbian context: both are female
+            # Fix incorrect "en [user's part]" when describing user's body
+            # When user says "lick my pussy", bot should say "un pundai" not "en pundai"
+            logger.info(f"[LESBIAN_CONTEXT] User {user.id} is female, preserving 'un' for user's body parts")
         
         start_pannalama_patterns = [
             r'[Ii]thu\s+seri\s+tha+n\s*[aA]?\s*\?*\s*[Ss]tart\s+pann?alama?\s*\?*\s*[😊😈🔥💕💋]*',
