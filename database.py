@@ -988,17 +988,20 @@ def update_payment_order_status(conn, order_id, status, verified_by=None):
 
 @with_db_retry()
 def add_purchased_credits(conn, user_id, credits):
-    """Add purchased credits to user account"""
+    """Add purchased credits to user account (creates user if not exists)"""
     try:
         cur = conn.cursor()
+        # Use UPSERT to handle users who haven't started the bot yet
         cur.execute('''
-            UPDATE users 
-            SET purchased_credits = COALESCE(purchased_credits, 0) + %s
-            WHERE user_id = %s
-        ''', (credits, user_id))
+            INSERT INTO users (user_id, username, first_name, purchased_credits, created_at)
+            VALUES (%s, 'admin_added', 'Premium User', %s, NOW())
+            ON CONFLICT (user_id) DO UPDATE 
+            SET purchased_credits = COALESCE(users.purchased_credits, 0) + %s
+        ''', (user_id, credits, credits))
+        rows_affected = cur.rowcount
         conn.commit()
         cur.close()
-        logger.info(f"Added {credits} purchased credits to user {user_id}")
+        logger.info(f"Added {credits} purchased credits to user {user_id} (rows affected: {rows_affected})")
         return True
     except Exception as e:
         logger.error(f"Error adding purchased credits: {e}")
