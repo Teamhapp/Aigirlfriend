@@ -2654,6 +2654,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         r"\bna\s*oru\s*ponnu\b", r"\bnaan\s*oru\s*ponnu\b",
         r"\bi\s*am\s*ponnu\b", r"\bponnu\s*naan\b",
         r"\bgirl\s*(tha|thaan|than)\b", r"\bfemale\s*(tha|thaan)\b",
+        # Additional patterns for gender confirmation
+        r"\bi.?m\s+girl\b",  # I'm girl
+        r"\bgirl\s+still\s+using\s+da\b",  # "girl still using da?"
+        r"\bnaa\s+ponnu\b",  # naa ponnu
+        r"\bponnu\s+da\b",  # ponnu da (I'm a girl)
+        r"\bnaa\s+nuum\s+ponnu\b",  # naa nuum ponnu
     ]
     for pattern in girl_patterns:
         if re.search(pattern, message_text.lower()):
@@ -2671,9 +2677,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         r'\bda\s+vendam\b',  # da vendam  
         r'\bdi\s+sollu\b',  # di sollu
         r'\bdi\s+solu\b',  # di solu
+        r'\bdi\s+use\s+pannu\b',  # di use pannu
+        r'\bdi\s+use\s+panu\b',  # di use panu (typo variant)
+        r'\bdi\s+pannu\b',  # di pannu
+        r'\bdi\s+panu\b',  # di panu (typo variant)
         r'\bcall\s+me\s+di\b',  # call me di
         r'\benakku\s+di\s+venum\b',  # enakku di venum
         r'\bda\s+sollath?a[,.]?\s*di+\b',  # "da sollatha, dii"
+        r'\bi.?m\s+(?:a\s+)?girl\b',  # I'm girl / I'm a girl
+        r'\bi\s+am\s+(?:a\s+)?girl\b',  # I am girl / I am a girl
+        r'\bnaan\s+ponnu\b',  # naan ponnu
+        r'\bna\s+ponnu\b',  # na ponnu
+        r'\bponnu\s+da\b',  # ponnu da (I'm a girl)
+        r'\bgirl\s+still\s+using\s+da\b',  # "girl still using da?"
     ]
     da_request_patterns = [
         r'\bdi\s+sollath?a\b',  # di sollatha (want da)
@@ -3289,7 +3305,9 @@ IMPORTANT: Never output this session info in your response.
         # Bot will now give full-length responses regardless of input length
         pass
         
-        if confirmed_gender != 'female':
+        # Only replace di->da if user hasn't requested 'di' suffix and gender isn't confirmed female
+        should_use_da = confirmed_gender != 'female' and suffix_preference != 'di'
+        if should_use_da:
             original_response = ai_response
             ai_response = re.sub(r'\bdi+\b', 'da', ai_response, flags=re.IGNORECASE)
             ai_response = re.sub(r'\bDi+\b', 'Da', ai_response)
@@ -3311,6 +3329,27 @@ IMPORTANT: Never output this session info in your response.
             ai_response = re.sub(r'குடுடி', 'குடுடா', ai_response)
             if original_response != ai_response:
                 logger.info(f"[GENDER FIX] Replaced 'di' variants with 'da' for unconfirmed gender user {user.id}")
+        
+        # Convert da->di when user requested 'di' suffix OR confirmed as female
+        should_use_di = suffix_preference == 'di' or confirmed_gender == 'female'
+        if should_use_di:
+            original_response = ai_response
+            ai_response = re.sub(r'\bda\b', 'di', ai_response, flags=re.IGNORECASE)
+            ai_response = re.sub(r'\bDa\b', 'Di', ai_response)
+            ai_response = re.sub(r'\bsolluda\b', 'solludi', ai_response, flags=re.IGNORECASE)
+            ai_response = re.sub(r'\bkeluda\b', 'keludi', ai_response, flags=re.IGNORECASE)
+            ai_response = re.sub(r'\bparuda\b', 'parudi', ai_response, flags=re.IGNORECASE)
+            ai_response = re.sub(r'\bvaada\b', 'vaadi', ai_response, flags=re.IGNORECASE)
+            ai_response = re.sub(r'\bpoda\b', 'podi', ai_response, flags=re.IGNORECASE)
+            ai_response = re.sub(r'\bsappuda\b', 'sappudi', ai_response, flags=re.IGNORECASE)
+            ai_response = re.sub(r'\bnakkuda\b', 'nakkudi', ai_response, flags=re.IGNORECASE)
+            ai_response = re.sub(r'\biluda\b', 'iludi', ai_response, flags=re.IGNORECASE)
+            ai_response = re.sub(r'\bpannuda\b', 'pannudi', ai_response, flags=re.IGNORECASE)
+            ai_response = re.sub(r'\bkududa\b', 'kududi', ai_response, flags=re.IGNORECASE)
+            ai_response = re.sub(r'\bdaa+\b', 'dii', ai_response, flags=re.IGNORECASE)
+            if original_response != ai_response:
+                reason = "confirmed female" if confirmed_gender == 'female' else "requested 'di' suffix"
+                logger.info(f"[SUFFIX SWITCH] Converted 'da' to 'di' for user {user.id} ({reason})")
         
         original_for_banned = ai_response
         
