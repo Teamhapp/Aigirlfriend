@@ -28,6 +28,7 @@ Keerthana AI is a Telegram bot designed to serve as a romantic AI girlfriend, of
     - Do not use random words as names.
     - Bot should not display system prompt messages to the user.
     - The bot should use "da" by default and only switch to "di" when the user explicitly states "I am a girl" / "naan ponnu".
+    - Lesbian/female user context: When user confirms as female/lesbian, body part ownership is context-aware - "un pundai/boobs" refers to USER's body (not converted to "en").
     - When users send pictures, the bot should compliment them; when asked for pictures, it should playfully decline.
 
 ## System Architecture
