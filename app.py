@@ -2447,6 +2447,41 @@ async def admin_totalreferrals(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.message.reply_text(message, parse_mode=ParseMode.HTML)
     logger.info(f"[ADMIN] User {user.id} viewed total referral stats")
 
+async def admin_addcredits(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to manually add premium credits to a user"""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        logger.warning(f"[ADMIN] Unauthorized /addcredits attempt by user {user.id} ({user.username})")
+        return
+    
+    if len(context.args) < 2:
+        await update.message.reply_text(
+            "Usage: /addcredits [user_id] [amount]\n"
+            "Example: /addcredits 123456789 500\n\n"
+            "This gives the user premium credits and access to the premium AI model (gemini-2.5-flash)."
+        )
+        return
+    
+    try:
+        target_user_id = int(context.args[0])
+        credits_to_add = int(context.args[1])
+        
+        if credits_to_add <= 0:
+            await update.message.reply_text("Credits must be a positive number.")
+            return
+        
+        add_purchased_credits(target_user_id, credits_to_add)
+        new_balance = get_purchased_credits(target_user_id) or 0
+        
+        logger.info(f"[ADMIN] User {user.id} added {credits_to_add} credits to user {target_user_id}. New balance: {new_balance}")
+        await update.message.reply_text(
+            f"✅ Added {credits_to_add} premium credits to user {target_user_id}\n"
+            f"New balance: {new_balance} credits\n"
+            f"User now has premium model access (gemini-2.5-flash)"
+        )
+    except ValueError:
+        await update.message.reply_text("Invalid user ID or amount. Both must be numbers.")
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     message_text = update.message.text
@@ -6461,6 +6496,7 @@ def ensure_initialized():
             application.add_handler(CommandHandler("setupi", admin_setupi))
             application.add_handler(CommandHandler("setpaytm", admin_setpaytm))
             application.add_handler(CommandHandler("verify", admin_verify_payment))
+            application.add_handler(CommandHandler("addcredits", admin_addcredits))
             application.add_handler(CommandHandler("buy", buy_command))
             application.add_handler(CommandHandler("credits", credits_command))
             application.add_handler(CallbackQueryHandler(check_subscription_callback, pattern="^check_sub$"))
