@@ -4114,6 +4114,14 @@ IMPORTANT: Never output this session info in your response.
                 r'konjam busy',
                 r'hold on da',
                 r'dei hold on',
+                r'control panna mudiyala',
+                r'control panniko',
+                r'aiyoo paa semma da',
+                r'ready ah irukken',
+                r'innum pannu',
+                r'un kitta konjam vera feel',
+                r'vera level',
+                r'enna pannalam',
             ]
             
             for phrase in repeated_phrases:
@@ -5101,6 +5109,19 @@ IMPORTANT: Never output this session info in your response.
         ai_response = re.sub(r'why are you acting like this[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'treating with dignity[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         ai_response = re.sub(r'personal details pathi[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
+        # Additional banned phrase removals
+        additional_banned = [
+            r'\bsolluda\b[!?.]*',
+            r'\benna\s+venum\s*(da|di)?\s*\??',
+            r'\benna\s+venumo\s*(da|di)?\s*\??',
+            r'\bwhat\s+do\s+you\s+want\b[!?.]*',
+            r'\btell\s+me\s+what\b[!?.]*',
+            r'\bjust\s+tell\s+me\b[!?.]*',
+            r'\bsollu\s*(da|di)\s*[!?.]*\s*$',
+            r'\benna\s+pannanum\s*(da|di)?\s*\??\s*$',
+        ]
+        for pattern in additional_banned:
+            ai_response = re.sub(pattern, '', ai_response, flags=re.IGNORECASE).strip()
         # Fix body count avoidance - only when user actually asked about body count
         if re.search(r'\bbody\s*count\b', message_text, re.IGNORECASE):
             ai_response = re.sub(r'\bathu\s*konjam\s*personal\b[^.!?]*[.!?]*', 'Aiyoo da... 2 da 😏 Jealous aa?', ai_response, flags=re.IGNORECASE).strip()
@@ -5288,10 +5309,16 @@ IMPORTANT: Never output this session info in your response.
         male_part_fixes = [
             (r'\b[Ee]n\s+sunni\b', 'Un sunni'),
             (r'\b[Ee]n\s+sunniya\b', 'Un sunniya'),
+            (r'\b[Ee]n\s+sunniku\b', 'Un sunniku'),
+            (r'\b[Ee]n\s+sunnila\b', 'Un sunnila'),
+            (r'\bEN\s+sunni', 'Un sunni'),
+            (r'\bEN\s+sunniya', 'Un sunniya'),
             (r'\b[Ee]n\s+cock\b', 'Un cock'),
             (r'\b[Ee]n\s+dick\b', 'Un dick'),
             (r'\b[Ee]n\s+pool\b', 'Un pool'),
             (r'\b[Ee]n\s+poola\b', 'Un poola'),
+            (r'\b[Ee]n\s+poolai\b', 'Un poolai'),
+            (r'\bEN\s+pool', 'Un pool'),
         ]
         for pattern, replacement in male_part_fixes:
             ai_response = re.sub(pattern, replacement, ai_response)
@@ -5357,6 +5384,23 @@ IMPORTANT: Never output this session info in your response.
             (r'^Aiyoo\s*da\s*\.{0,3}\s*enna\s+solrathu', 'Ufff da... '),
         ]
         for pattern, replacement in repetitive_starters:
+            ai_response = re.sub(pattern, replacement, ai_response, flags=re.IGNORECASE)
+        
+        # Fix formal/respectful language - bot should be casual
+        formal_to_casual = [
+            (r'\bkelunga\b', 'kelu'),
+            (r'\bsollunga\b', 'sollu'),
+            (r'\bpannunga\b', 'pannu'),
+            (r'\bpannungaa?\b', 'pannu'),
+            (r'\bparunga\b', 'paru'),
+            (r'\bvaanga\b', 'vaa'),
+            (r'\bkodunga\b', 'kudu'),
+            (r'\birungal?\b', 'iru'),
+            (r'\bpesungal?\b', 'pesu'),
+            (r'\bsonneenga\b', 'sonna'),
+            (r'\bpanneenga\b', 'panna'),
+        ]
+        for pattern, replacement in formal_to_casual:
             ai_response = re.sub(pattern, replacement, ai_response, flags=re.IGNORECASE)
         
         ai_response = re.sub(r'\s{2,}', ' ', ai_response).strip()
@@ -6065,6 +6109,28 @@ IMPORTANT: Never output this session info in your response.
                 ]
             ai_response = random.choice(coherent_fallbacks)
             logger.info(f"[COHERENCE FIX] Used fallback for garbled response for user {user.id}")
+        
+        # Enforce max 1 question per response
+        question_marks = [m.start() for m in re.finditer(r'\?', ai_response)]
+        if len(question_marks) > 1:
+            # Keep only the LAST question mark, remove earlier ones
+            for pos in reversed(question_marks[:-1]):
+                # Replace question mark with period or remove the question
+                ai_response = ai_response[:pos] + '.' + ai_response[pos+1:]
+            logger.info(f"[QUESTION FIX] Reduced questions from {len(question_marks)} to 1 for user {user.id}")
+        
+        # Enforce max 2 emojis at end of message
+        emoji_pattern = re.compile(r'[\U0001F300-\U0001F9FF\U0001FA00-\U0001FA6F\U0001FA70-\U0001FAFF\U00002702-\U000027B0\U0000FE00-\U0000FE0F\U0001F000-\U0001F02F]')
+        all_emojis = emoji_pattern.findall(ai_response)
+        if len(all_emojis) > 2:
+            # Keep only last 2 emojis, remove the rest
+            emoji_positions = [(m.start(), m.end(), m.group()) for m in emoji_pattern.finditer(ai_response)]
+            if len(emoji_positions) > 2:
+                # Keep the last 2, remove earlier ones
+                to_remove = emoji_positions[:-2]
+                for start, end, emoji_char in reversed(to_remove):
+                    ai_response = ai_response[:start] + ai_response[end:]
+                ai_response = re.sub(r'\s{2,}', ' ', ai_response).strip()
         
         logger.info(f"[KEERTHANA -> {user.id}] {ai_response}")
         
