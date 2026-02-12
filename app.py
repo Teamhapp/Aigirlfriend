@@ -873,6 +873,7 @@ KEY STYLE RULES FROM EXAMPLES:
 6. NATURAL INVITATIONS - "vaa closer ah", "door close pannu", "nighty lift pannu"
 7. NO ASTERISK ACTIONS - NEVER use *action* format, keep it natural texting style
 8. EMOJIS AT END ONLY - max 1-2 emojis at the END of response, NEVER in the middle
+9. USE PUNCTUATION NATURALLY - add commas after "da/di" before new clauses, use "..." for pauses/tension, use "!" for excitement. Example: "Aah da... amma vekkama irukku, aana un asai enakku theriyudhu... 💋"
 
 GOOD (clear, simple):
 - "Aamaa kanna... naan un bitch thaan 😈🔥" ✅
@@ -5895,8 +5896,46 @@ IMPORTANT: Never output this session info in your response.
         ai_response = fix_affirmation_topic_change(ai_response, message_text)
         
         # ===== DOUBLE-SPACE CLEANUP =====
-        # Fix double/triple spaces left after phrase stripping
         ai_response = re.sub(r'\s{2,}', ' ', ai_response).strip()
+        
+        # ===== PUNCTUATION ENHANCEMENT =====
+        def enhance_punctuation(text):
+            """Add natural punctuation for better readability"""
+            if len(text) < 10:
+                return text
+            
+            exclamation_starters = [
+                r'^(Aah+)', r'^(Mmm+)', r'^(Uff+)', r'^(Oho+)',
+                r'^(Aiyoo+)', r'^(Hyy+)', r'^(Hii+)', r'^(Hey+)',
+                r'^(Aww+)', r'^(Shh+)', r'^(Hmm+)',
+            ]
+            for pat in exclamation_starters:
+                m = re.match(pat, text, re.IGNORECASE)
+                if m:
+                    after_excl = text[m.end():]
+                    if after_excl and after_excl.lstrip() and after_excl.lstrip()[0] not in '.,!?…':
+                        rest = after_excl.lstrip()
+                        if rest[:2] in ('da', 'di'):
+                            next_after_suffix = rest[2:].lstrip()
+                            if next_after_suffix and next_after_suffix[0] not in '.,!?…':
+                                text = text[:m.end()] + ' ' + rest[:2] + '... ' + next_after_suffix
+                            break
+                        else:
+                            text = text[:m.end()] + '... ' + rest
+                    break
+            
+            text = re.sub(r'\b(da|di)\s+(?![.,!?…])(?=(amma|enna|naan|idhu|adhu|ippo|appo|romba|vera|innum|konjam)\b)', r'\1, ', text, flags=re.IGNORECASE)
+            
+            text = re.sub(r'(?<![.,!?…])\s+(aana)\s+(?![.,!?…])', r'... \1 ', text, flags=re.IGNORECASE)
+            
+            text = re.sub(r'\.{4,}', '...', text)
+            text = re.sub(r'\.\.\.\s*\.\.\.', '...', text)
+            text = re.sub(r',\s*,', ',', text)
+            text = re.sub(r'\s{2,}', ' ', text).strip()
+            
+            return text
+        
+        ai_response = enhance_punctuation(ai_response)
         
         bare_responses = {
             'hey da': "Hey da! Epdi iruka? 😊",
