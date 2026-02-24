@@ -1524,6 +1524,8 @@ def generate_response(prompt, history=None, context_info=None, user_id=None):
                 is_daily_quota = ('per-day' in error_str or 'perday' in error_str or 
                                  'daily' in error_str or 
                                  'check your plan and billing' in error_str or
+                                 'limit: 0' in error_str or
+                                 'free_tier' in error_str or
                                  'generatecontentreqsperdayperprojpermodel' in error_str)
                 
                 is_per_minute = ('per-minute' in error_str or 'perminute' in error_str or
@@ -2549,6 +2551,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = get_or_create_user(user.id, user.username, user.first_name)
     preferred_name = user_data.get('preferred_name') or user.first_name
     
+    inappropriate_names = {
+        'undressing', 'fucking', 'sucking', 'licking', 'naked', 'nude', 'horny',
+        'sexy', 'dick', 'cock', 'pussy', 'boobs', 'ass', 'cum', 'slut', 'bitch',
+        'whore', 'porn', 'sex', 'hot', 'wet', 'hard', 'strip', 'blowjob',
+        'masturbat', 'orgasm', 'erotic', 'nsfw', 'xxx', 'adult', 'kinky',
+        'fetish', 'dildo', 'vibrator', 'thot', 'onlyfans', 'nudes',
+    }
+    name_lower = preferred_name.lower() if preferred_name else ''
+    if any(bad in name_lower for bad in inappropriate_names) or len(name_lower) > 20 or not re.match(r'^[a-zA-Z\u0B80-\u0BFF\s]+$', preferred_name or ''):
+        preferred_name = "da"
+    
     msg_status = get_message_status(user.id)
     can_send, remaining = use_message(user.id)
     if not can_send:
@@ -3262,13 +3275,23 @@ IMPORTANT: Never output this session info in your response.
         
         ai_response = generate_response(message_text, trimmed_history, context_info, user_id=user.id)
         if ai_response is None:
-            ai_response = random.choice([
-                "Mmm da... 🥵",
-                "Aahaan da... 😈",
-                "Uff da... 💋",
-                "Hmm... pidichiruka? 🔥",
-                "Aiyoo da... 😏"
-            ])
+            suffix = 'di' if should_use_di else 'da'
+            if is_pure_greeting:
+                ai_response = random.choice([
+                    f"Hiii {suffix} 💕 eppadi irukka?",
+                    f"Heyyy {suffix} 😊 enna panra?",
+                    f"Hi {suffix} 💕 eppo vanthe?",
+                    f"Hey {suffix}! Nalla irukka? 😊",
+                    f"Hii {suffix} 💕 enna vishayam?",
+                ])
+            else:
+                ai_response = random.choice([
+                    f"Mmm {suffix}... 🥵",
+                    f"Aahaan {suffix}... 😈",
+                    f"Uff {suffix}... 💋",
+                    f"Hmm... pidichiruka? 🔥",
+                    f"Aiyoo {suffix}... 😏"
+                ])
         ai_response = ai_response.strip()
         
         # ===== STRIP AI THINKING/REASONING LEAK =====
