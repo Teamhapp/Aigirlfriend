@@ -4789,6 +4789,61 @@ IMPORTANT: Never output this session info in your response.
         
         ai_response = fix_truncated_roleplay(ai_response)
         
+        # ===== FIX INTRA-RESPONSE STUTTERING/REPETITION =====
+        def fix_stuttering(response):
+            """Fix repeated adjacent phrases and doubled words within a single response"""
+            original = response
+            
+            response = re.sub(r'\b(\w{3,})\s+\1\b', r'\1', response)
+            
+            response = re.sub(r'\b(naan)\s+\1\b', r'\1', response, flags=re.IGNORECASE)
+            response = re.sub(r'\b(va)\s+\1\b', r'\1', response, flags=re.IGNORECASE)
+            
+            response = re.sub(
+                r'((?:\w+\s+){1,4}\w+)([.!?,\s]+\.{2,3}\s*)\1',
+                r'\1\2',
+                response, flags=re.IGNORECASE
+            )
+            
+            response = re.sub(
+                r'([A-Za-z\u0B80-\u0BFF]+\s+da)\s*[.,]+\s*\.{0,3}\s*\1',
+                r'\1',
+                response, flags=re.IGNORECASE
+            )
+            
+            response = re.sub(r'\s*\.{2,3}\s*\.{2,3}', '...', response)
+            response = re.sub(r'\s{2,}', ' ', response).strip()
+            
+            if response != original:
+                logger.info(f"[STUTTER_FIX] Fixed stuttering in response for user {user.id}")
+            
+            return response if len(response) >= 5 else original
+        
+        ai_response = fix_stuttering(ai_response)
+        
+        # ===== FIX RANDOM CAPITALIZED ENGLISH MID-TANGLISH =====
+        def fix_random_english(response):
+            """Strip random capitalized English conjunctions/words that break Tanglish flow"""
+            original = response
+            
+            conjunctions = ['But', 'However', 'Although', 'Though', 'Because', 
+                          'Therefore', 'Moreover', 'Furthermore', 'Nevertheless',
+                          'Meanwhile', 'Instead', 'Otherwise']
+            
+            for word in conjunctions:
+                response = re.sub(r'(?<=[a-z\u0B80-\u0BFF])\s+' + word + r'[,]?\s+', '... ', response)
+                response = re.sub(r'\.{2,3}\s*' + word + r'[,]?\s+', '... ', response)
+            
+            response = re.sub(r'\.{3,}', '...', response)
+            response = re.sub(r'\s{2,}', ' ', response).strip()
+            
+            if response != original:
+                logger.info(f"[ENGLISH_FIX] Fixed random English conjunction for user {user.id}")
+            
+            return response
+        
+        ai_response = fix_random_english(ai_response)
+        
         # ===== FIX INCOMPLETE SENTENCE ENDINGS =====
         def fix_incomplete_endings(response):
             """Fix responses that end with incomplete words or cut-off thoughts"""
@@ -5988,9 +6043,19 @@ IMPORTANT: Never output this session info in your response.
                 break
         
         character_prefix_pattern = r'^(Amma|Sister|Akka|Chithi|Aunty|Teacher|Nurse|Boss|Maid|Stranger|Friend|Wife|Sunitha|Lincy|Keerthana)\s*:\s*'
-        if re.match(character_prefix_pattern, ai_response, re.IGNORECASE):
-            ai_response = re.sub(character_prefix_pattern, '', ai_response, flags=re.IGNORECASE).strip()
-            logger.info(f"[PREFIX STRIP] Removed character prefix for user {user.id}")
+        char_names_list = ['amma', 'sister', 'akka', 'chithi', 'aunty', 'teacher', 'nurse', 'boss', 'maid', 'stranger', 'friend', 'wife', 'sunitha', 'lincy', 'keerthana']
+        char_prefixes_found = re.findall(r'\b(' + '|'.join(char_names_list) + r')\s*:', ai_response, re.IGNORECASE)
+        unique_chars_in_response = set(p.lower() for p in char_prefixes_found)
+        is_multichar_response = len(unique_chars_in_response) >= 2
+        
+        if not is_multichar_response:
+            line_start_prefix = r'(?:^|\n)\s*(Amma|Sister|Akka|Chithi|Aunty|Teacher|Nurse|Boss|Maid|Stranger|Friend|Wife|Sunitha|Lincy|Keerthana)\s*:\s*'
+            mid_sentence_prefix = r'(?<=[\s.!?,])(Amma|Sister|Akka|Chithi|Aunty|Teacher|Nurse|Boss|Maid|Stranger|Friend|Wife|Sunitha|Lincy|Keerthana)\s*:\s*'
+            if re.search(line_start_prefix, ai_response, re.IGNORECASE) or re.search(mid_sentence_prefix, ai_response, re.IGNORECASE):
+                ai_response = re.sub(line_start_prefix, '\n', ai_response, flags=re.IGNORECASE).strip()
+                ai_response = re.sub(mid_sentence_prefix, '', ai_response, flags=re.IGNORECASE).strip()
+                ai_response = re.sub(r'\s{2,}', ' ', ai_response)
+                logger.info(f"[PREFIX STRIP] Removed character prefix(es) from single-char roleplay for user {user.id}")
         
         # NOTE: Generic truncation handling disabled - fix_incomplete_endings() handles known patterns
         # The existing pattern-based approach in fix_incomplete_endings is safer than generic detection
