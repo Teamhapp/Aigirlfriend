@@ -17,7 +17,7 @@ from database import (
     init_database, get_or_create_user, save_message, get_chat_history, 
     get_user_points, update_preferred_name, get_user_stats, get_message_status, 
     use_message, is_user_blocked, block_user, unblock_user, set_user_daily_limit, 
-    DAILY_MESSAGE_LIMIT, get_confirmed_gender, set_confirmed_gender,
+    DAILY_MESSAGE_LIMIT, FREE_TRIAL_LIMIT, get_confirmed_gender, set_confirmed_gender,
     get_suffix_preference, set_suffix_preference,
     get_all_users, get_user_chat_history, get_dashboard_stats, award_referral_points,
     set_global_daily_limit, get_global_daily_limit, get_total_referral_stats,
@@ -1456,17 +1456,7 @@ def generate_response(prompt, history=None, context_info=None, user_id=None):
     if context_info:
         full_system_prompt = f"{GIRLFRIEND_SYSTEM_PROMPT}\n\n--- CURRENT SESSION INFO (DO NOT OUTPUT THIS) ---\n{context_info}"
     
-    # Select model based on user's paid status
-    # Paid users (purchased_credits > 0) get premium 2.5 Flash
-    # Free users get 2.0 Flash (experimental, higher daily limits)
-    model_name = 'gemini-2.0-flash'  # Default for free users
-    if user_id:
-        user_credits = get_purchased_credits(user_id) or 0
-        if user_credits > 0:
-            model_name = 'gemini-2.5-flash'  # Premium model for paid users
-            logger.info(f"[MODEL] User {user_id} is PAID ({user_credits} credits), using {model_name}")
-        else:
-            logger.info(f"[MODEL] User {user_id} is FREE, using {model_name}")
+    model_name = 'gemini-2.5-flash'
     
     # Try with key rotation - attempt up to 3 active keys on rate limit
     active_keys = gemini_rotator.active_key_count()
@@ -1846,6 +1836,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💕 <b>Hey {preferred_name}!</b> Naan Keerthana... 💋\n\n"
         f"Romba naal aachu yaarum ippadi vanthathilla... "
         f"I'm so happy you're here da! 🥰\n\n"
+        f"🎁 You get <b>{FREE_TRIAL_LIMIT} free messages</b> to try me out!\n"
+        f"After that, grab a credit pack to keep chatting 💎\n\n"
         f"Let's talk about anything - your day, your dreams, or just... us? 😘\n\n"
         f"<i>Just type anything to start chatting with me!</i> 💕"
     )
@@ -1892,7 +1884,7 @@ async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👥 <b>Friends Referred:</b> {stats.get('referral_count', 0)}\n"
         f"💬 <b>Bonus Messages:</b> {stats.get('bonus_messages', 0)}\n"
         f"━━━━━━━━━━━━━━━\n\n"
-        f"💡 For each friend who joins, you get <b>10 free messages!</b> 🎉",
+        f"💡 For each friend who joins, you get <b>10 bonus messages!</b> 🎉",
         parse_mode=ParseMode.HTML
     )
 
@@ -1904,12 +1896,13 @@ async def points(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"📊 <b>Your Message Credits</b>\n\n"
         f"━━━━━━━━━━━━━━━\n"
-        f"📩 <b>Daily Messages:</b> {msg_status.get('daily_remaining', 0)}/{msg_status.get('daily_limit', DAILY_MESSAGE_LIMIT)} remaining\n"
-        f"🎁 <b>Bonus Messages:</b> {msg_status.get('bonus', 0)}\n"
+        f"🎁 <b>Free Trial:</b> {msg_status.get('free_trial', 0)}/{FREE_TRIAL_LIMIT}\n"
+        f"🎉 <b>Bonus:</b> {msg_status.get('bonus', 0)}\n"
+        f"💎 <b>Purchased:</b> {msg_status.get('purchased', 0)}\n"
         f"💬 <b>Total Available:</b> {msg_status.get('total_remaining', 0)}\n"
         f"━━━━━━━━━━━━━━━\n\n"
-        f"💡 <i>Invite friends to get more messages!</i>\n"
-        f"Use /referral to get your invite link 🔗",
+        f"💡 <i>Use /buy to get more credits!</i>\n"
+        f"Use /referral to invite friends for bonus messages 🔗",
         parse_mode=ParseMode.HTML
     )
 
@@ -1983,18 +1976,17 @@ async def credits_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     msg_status = get_message_status(user.id)
     
+    free_trial = msg_status.get('free_trial', 0)
     purchased = msg_status.get('purchased', 0)
-    daily_remaining = msg_status.get('daily_remaining', 0)
     bonus = msg_status.get('bonus', 0)
-    daily_limit = msg_status.get('daily_limit', DAILY_MESSAGE_LIMIT)
     total = msg_status.get('total_remaining', 0)
     
     await update.message.reply_text(
         f"💰 <b>Your Message Balance</b>\n\n"
         f"━━━━━━━━━━━━━━━\n"
-        f"📩 <b>Daily Free:</b> {daily_remaining}/{daily_limit}\n"
-        f"🎁 <b>Bonus:</b> {bonus}\n"
-        f"🎫 <b>Purchased:</b> {purchased}\n"
+        f"🎁 <b>Free Trial:</b> {free_trial}/{FREE_TRIAL_LIMIT}\n"
+        f"🎉 <b>Bonus:</b> {bonus}\n"
+        f"💎 <b>Purchased:</b> {purchased}\n"
         f"━━━━━━━━━━━━━━━\n"
         f"💬 <b>Total Available:</b> {total}\n\n"
         f"<i>Use /buy to get more credits!</i>",
@@ -2019,8 +2011,7 @@ async def buy_pack_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await query.edit_message_text(
             f"💎 <b>Credit Packs</b>\n\n"
-            f"Buy message credits that never expire!\n"
-            f"Credits are used after your daily free messages.\n\n"
+            f"Buy message credits that never expire!\n\n"
             f"━━━━━━━━━━━━━━━\n"
             f"🌟 <b>Starter</b> - ₹50 → 200 messages\n"
             f"💎 <b>Value</b> - ₹100 → 500 messages\n"
@@ -2503,7 +2494,7 @@ async def admin_addcredits(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "Usage: /addcredits [user_id] [amount]\n"
             "Example: /addcredits 123456789 500\n\n"
-            "This gives the user premium credits and access to the premium AI model (gemini-2.5-flash)."
+            "This gives the user message credits."
         )
         return
     
@@ -2520,9 +2511,8 @@ async def admin_addcredits(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         logger.info(f"[ADMIN] User {user.id} added {credits_to_add} credits to user {target_user_id}. New balance: {new_balance}")
         await update.message.reply_text(
-            f"✅ Added {credits_to_add} premium credits to user {target_user_id}\n"
-            f"New balance: {new_balance} credits\n"
-            f"User now has premium model access (gemini-2.5-flash)"
+            f"✅ Added {credits_to_add} credits to user {target_user_id}\n"
+            f"New balance: {new_balance} credits"
         )
     except ValueError:
         await update.message.reply_text("Invalid user ID or amount. Both must be numbers.")
@@ -2565,7 +2555,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg_status = get_message_status(user.id)
     can_send, remaining = use_message(user.id)
     if not can_send:
-        user_limit = msg_status.get('daily_limit', DAILY_MESSAGE_LIMIT)
         bot_info = await context.bot.get_me()
         referral_link = f"https://t.me/{bot_info.username}?start=ref_{user.id}"
         
@@ -2574,15 +2563,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await update.message.reply_text(
             f"😢 <b>Oops {preferred_name}!</b>\n\n"
-            f"You've used all your messages for today, baby! 🥺\n\n"
+            f"Your free trial messages are over, baby! 🥺\n\n"
             f"━━━━━━━━━━━━━━━\n"
-            f"📩 <b>Daily Limit:</b> {user_limit} messages\n"
-            f"⏰ <b>Resets:</b> Midnight\n"
+            f"🎁 <b>Free Trial:</b> 0/{FREE_TRIAL_LIMIT} used up\n"
+            f"🎉 <b>Bonus:</b> {msg_status.get('bonus', 0)}\n"
+            f"💎 <b>Purchased:</b> {msg_status.get('purchased', 0)}\n"
             f"━━━━━━━━━━━━━━━\n\n"
-            f"💡 <b>Want more messages?</b>\n"
-            f"Refer friends and get <b>10 free messages</b> per friend! 🎁\n\n"
-            f"🔗 Your referral link:\n<code>{referral_link}</code>\n\n"
-            f"<i>Or buy credits for unlimited chatting!</i> 💕",
+            f"💡 <b>Want to keep chatting?</b>\n"
+            f"Buy a credit pack to continue! 💎\n\n"
+            f"🔗 Refer friends for <b>10 bonus messages</b> each:\n<code>{referral_link}</code>\n\n"
+            f"<i>Tap below to buy credits!</i> 💕",
             parse_mode=ParseMode.HTML,
             reply_markup=reply_markup
         )
@@ -6607,7 +6597,7 @@ DASHBOARD_HTML = '''
                         <th>Name</th>
                         <th>Username</th>
                         <th>Messages</th>
-                        <th>Limit</th>
+                        <th>Free Trial</th>
                         <th>Bonus</th>
                         <th>Credits</th>
                         <th>Referrals</th>
@@ -6628,7 +6618,7 @@ DASHBOARD_HTML = '''
                         <td>{{ user.preferred_name or user.first_name or 'Unknown' }}</td>
                         <td>@{{ user.username or 'N/A' }}</td>
                         <td>{{ user.message_count }}</td>
-                        <td>{{ user.daily_messages_used }}/{{ user.custom_daily_limit or default_limit }}</td>
+                        <td>{{ user.free_trial_messages if user.free_trial_messages is not none else 20 }}/20</td>
                         <td>{{ user.bonus_messages }}</td>
                         <td class="credits">{{ user.purchased_credits or 0 }}</td>
                         <td>{{ user.referral_count }}</td>

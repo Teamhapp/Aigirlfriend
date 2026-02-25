@@ -79,6 +79,7 @@ def init_database():
             cur.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_daily_limit INTEGER DEFAULT NULL')
             cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS confirmed_gender VARCHAR(20) DEFAULT NULL")
             cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS suffix_preference VARCHAR(10) DEFAULT 'da'")
+            cur.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS free_trial_messages INTEGER DEFAULT 20')
         except Exception:
             pass
         
@@ -357,7 +358,8 @@ def award_referral_points(conn, referrer_id, referred_id):
         conn.rollback()
         return False
 
-DEFAULT_DAILY_MESSAGE_LIMIT = 20
+DEFAULT_DAILY_MESSAGE_LIMIT = 0
+FREE_TRIAL_LIMIT = 20
 
 def get_global_daily_limit():
     """Get the global daily message limit from settings"""
@@ -445,35 +447,25 @@ def set_bot_setting(conn, key, value):
 
 @with_db_retry()
 def get_message_status(conn, user_id):
-    global_limit = _get_global_limit_from_conn(conn)
     cur = conn.cursor()
     cur.execute('''
-        SELECT daily_messages_used, bonus_messages, last_reset_date, custom_daily_limit, COALESCE(purchased_credits, 0)
+        SELECT bonus_messages, COALESCE(purchased_credits, 0), COALESCE(free_trial_messages, 0)
         FROM users WHERE user_id = %s
     ''', (user_id,))
     result = cur.fetchone()
     cur.close()
     
     if not result:
-        return {'daily_used': 0, 'daily_remaining': global_limit, 'bonus': 0, 'purchased': 0, 'total_remaining': global_limit}
+        return {'free_trial': FREE_TRIAL_LIMIT, 'bonus': 0, 'purchased': 0, 'total_remaining': FREE_TRIAL_LIMIT}
     
-    daily_used, bonus, last_reset, custom_limit, purchased = result[0] or 0, result[1] or 0, result[2], result[3], result[4] or 0
-    user_limit = custom_limit if custom_limit else global_limit
-    today = date.today()
-    
-    if last_reset is None or last_reset < today:
-        daily_used = 0
-    
-    daily_remaining = max(0, user_limit - daily_used)
-    total_remaining = daily_remaining + bonus + purchased
+    bonus, purchased, free_trial = result[0] or 0, result[1] or 0, result[2]
+    total_remaining = free_trial + bonus + purchased
     
     return {
-        'daily_used': daily_used,
-        'daily_remaining': daily_remaining,
+        'free_trial': free_trial,
         'bonus': bonus,
         'purchased': purchased,
-        'total_remaining': total_remaining,
-        'daily_limit': user_limit
+        'total_remaining': total_remaining
     }
 
 @with_db_retry()
@@ -481,7 +473,7 @@ def use_message(conn, user_id):
     try:
         cur = conn.cursor()
         cur.execute('''
-            SELECT daily_messages_used, bonus_messages, last_reset_date, custom_daily_limit, COALESCE(purchased_credits, 0)
+            SELECT bonus_messages, COALESCE(purchased_credits, 0), COALESCE(free_trial_messages, 0)
             FROM users WHERE user_id = %s
         ''', (user_id,))
         result = cur.fetchone()
@@ -490,31 +482,16 @@ def use_message(conn, user_id):
             cur.close()
             return False, 0
         
-        daily_used, bonus, last_reset, custom_limit, purchased = result[0] or 0, result[1] or 0, result[2], result[3], result[4] or 0
-        global_limit = _get_global_limit_from_conn(conn)
-        user_limit = custom_limit if custom_limit else global_limit
-        today = date.today()
+        bonus, purchased, free_trial = result[0] or 0, result[1] or 0, result[2]
         
-        if last_reset is None or last_reset < today:
+        if free_trial > 0:
             cur.execute('''
-                UPDATE users SET daily_messages_used = 1, last_reset_date = %s
-                WHERE user_id = %s
-            ''', (today, user_id))
-            conn.commit()
-            cur.close()
-            remaining = user_limit - 1 + bonus + purchased
-            return True, remaining
-        
-        daily_remaining = user_limit - daily_used
-        
-        if daily_remaining > 0:
-            cur.execute('''
-                UPDATE users SET daily_messages_used = daily_messages_used + 1
+                UPDATE users SET free_trial_messages = free_trial_messages - 1
                 WHERE user_id = %s
             ''', (user_id,))
             conn.commit()
             cur.close()
-            remaining = daily_remaining - 1 + bonus + purchased
+            remaining = (free_trial - 1) + bonus + purchased
             return True, remaining
         elif bonus > 0:
             cur.execute('''
@@ -687,7 +664,8 @@ def get_all_users(conn):
                u.daily_messages_used, u.bonus_messages, u.referral_count,
                u.created_at, u.last_active, u.is_blocked, u.custom_daily_limit,
                u.purchased_credits,
-               (SELECT COUNT(*) FROM chat_messages WHERE user_id = u.user_id) as message_count
+               (SELECT COUNT(*) FROM chat_messages WHERE user_id = u.user_id) as message_count,
+               COALESCE(u.free_trial_messages, 20) as free_trial_messages
         FROM users u
         ORDER BY u.last_active DESC
     ''')
@@ -706,7 +684,8 @@ def get_all_users(conn):
         'is_blocked': u[9] or False,
         'custom_daily_limit': u[10],
         'purchased_credits': u[11] or 0,
-        'message_count': u[12]
+        'message_count': u[12],
+        'free_trial_messages': u[13]
     } for u in users]
 
 @with_db_retry()

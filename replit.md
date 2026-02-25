@@ -44,8 +44,9 @@ Keerthana AI is a Telegram bot designed to serve as a romantic AI girlfriend, of
 - **Database**: PostgreSQL is used for persistent storage of user profiles, chat history, referral data, and bot settings.
 - **Application Structure**: A unified `app.py` combines the webhook-based Telegram bot and Flask dashboard for scalability.
 - **Gender Detection**: Server-side logic dynamically adjusts "da" or "di" usage based on user declarations.
-- **Message Limits & Referral System**: Implements a daily free message limit and rewards bonus messages for successful referrals.
-- **Credit Pack Monetization System**: Users can purchase message credits via UPI QR code payments with various pack options.
+- **Free Trial & Paid Model**: New users get 20 one-time free trial messages (no daily reset). After trial, users must purchase credits. All users get premium gemini-2.5-flash model.
+- **Referral System**: Rewards 10 bonus messages for successful referrals.
+- **Credit Pack Monetization System**: Users can purchase message credits via UPI QR code payments with various pack options (Starter ₹50/200msg, Value ₹100/500msg, Pro ₹200/1200msg).
 - **Payment Verification**: Supports both auto-verification for Paytm app payments (using Paytm v3 API) and manual verification for other UPI apps, ensuring atomic crediting and an audit trail.
 - **Force Subscription**: Requires users to join a specified Telegram channel.
 - **Context Awareness & Memory**: Stores conversation history and extracts user facts for personalized interactions, supported by a rolling memory summary system to manage context.
