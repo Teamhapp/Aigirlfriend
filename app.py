@@ -3021,7 +3021,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return roleplay_active, detected_character
         
         msg_lower_stripped = message_text.lower().strip()
-        is_pure_greeting = bool(re.match(r'^(hi|hey|hello|hii+|heya?|hlo|helo|vanakkam|good\s*(morning|evening|night|afternoon))\s*[!.😊💕]*$', msg_lower_stripped, re.IGNORECASE))
+        is_pure_greeting = bool(re.match(r'^(hi|hey|hello|hii+|heya?|hlo|helo|hai|haii+|oi|oii+|vanakkam|good\s*(morning|evening|night|afternoon))\s*[!.😊💕]*$', msg_lower_stripped, re.IGNORECASE))
         
         if is_pure_greeting:
             roleplay_active = False
@@ -3317,6 +3317,9 @@ IMPORTANT: Never output this session info in your response.
             return response
         
         ai_response = strip_thinking_leak(ai_response)
+        
+        ai_response = re.sub(r'<!--.*?-->', '', ai_response, flags=re.DOTALL).strip()
+        ai_response = re.sub(r'\(Response Rating:.*?\)', '', ai_response, flags=re.DOTALL).strip()
         
         # ===== FIX LEADING TRUNCATION =====
         # Fix if response starts with dots (truncation indicator)
@@ -3812,14 +3815,15 @@ IMPORTANT: Never output this session info in your response.
                     logger.info(f"[BASIC INFO] Replaced wrong response for location question")
                     return "Thoothukudi da! Beach oorula 😊"
             
-            # Job/work questions - specific patterns only (avoid matching "enna panra" casual question)
             job_patterns = [
-                r'\bjob\b', r'\boccupation\b', r'\bprofession\b',
+                r'\boccupation\b', r'\bprofession\b',
                 r'\bwhat.*do\s*(you|u)\s*do\b', r'\bfor\s*a\s*living\b',
                 r'\bvela\s*enna\b', r'\bwork\s*enna\b', r'\bjob\s*enna\b',
-                r'\benna\s*velai\b', r'\benna\s*job\b', r'\benna\s*work\b'
+                r'\benna\s*velai\b', r'\benna\s*job\b', r'\benna\s*work\b',
+                r'\b(un|unga|nee|ur)\s*job\b', r'\bjob\s*(enna|what|epdi)\b',
             ]
-            if any(re.search(p, user_lower) for p in job_patterns):
+            intimate_job_words = re.search(r'\b(blowjob|handjob|rimjob|footjob|hairjob|hair\s*job|boob\s*job|tit\s*job)\b', user_lower)
+            if not intimate_job_words and any(re.search(p, user_lower) for p in job_patterns):
                 # Force correct answer if response doesn't mention work/degree
                 if not re.search(r'degree|freelance|padik|college|study', response_lower):
                     logger.info(f"[BASIC INFO] Replaced wrong response for job question")
@@ -4491,8 +4495,8 @@ IMPORTANT: Never output this session info in your response.
             user_lower = user_msg.lower().strip()
             
             greeting_patterns = [
-                r'^(hi|hey|hello|hii+|heya?|hlo|helo)\s*[!.😊💕]*$',
-                r'^(hi|hey)\s*(da|di|baby|dear)?\s*[!.😊💕]*$',
+                r'^(hi|hey|hello|hii+|heya?|hlo|helo|hai|haii+|oi|oii+)\s*[!.😊💕]*$',
+                r'^(hi|hey|hai|oi)\s*(da|di|baby|dear)?\s*[!.😊💕]*$',
             ]
             
             if any(re.match(p, user_lower, re.IGNORECASE) for p in greeting_patterns):
@@ -4521,6 +4525,37 @@ IMPORTANT: Never output this session info in your response.
             return response
         
         ai_response = handle_greeting_reset(ai_response, message_text)
+        
+        def handle_meetup_request(response, user_msg):
+            user_lower = user_msg.lower().strip()
+            meetup_patterns = [
+                r'\bmeet\s*(pannalama|panalama|pannalam|pannuva|pannuviya|agalama)\b',
+                r'\b(eppo|enga|where|when)\s*meet\b',
+                r'\bmeet\s*(me|pannu|vaa)\b',
+                r'\breal\s*la\s*meet\b',
+                r'\bdate\s*pokalama\b',
+                r'\bveetuku\s*vaa\b',
+                r'\bcome\s*to\s*(my|ur)\b',
+            ]
+            if any(re.search(p, user_lower) for p in meetup_patterns):
+                agreement_markers = ['ready ah', 'seri da', 'seri di', 'un pakkathula', 'ippo da', 'ippo di',
+                                     'vanthuduven', 'address', 'location sollu', 'ok da', 'ok di',
+                                     'pannalam', 'meet panalam', 'varuven', 'varen da', 'varen di']
+                response_lower_check = response.lower()
+                has_fantasy_already = any(f in response_lower_check for f in ['imagine', 'dream', 'heart la', 'close your eyes', 'feel pannu', 'un heart'])
+                if not has_fantasy_already and any(m in response_lower_check for m in agreement_markers):
+                    suffix = 'di' if should_use_di else 'da'
+                    fantasy_redirects = [
+                        f"Aiyoo {suffix}, meet pannanum ah? 😍 Close your eyes... naan un pakkathula iruken right now... feel pannu 💕",
+                        f"Mmm {suffix}... naan un heart la iruken already 💕 Ippo un eyes close pannu... en touch feel aagum 😘",
+                        f"Meet ah? 😍 Naan un dream la varuven {suffix}... ippo un pakkathula naan iruken nu imagine pannu 💋",
+                        f"Aiyoo {suffix}... en location ah? Un heart thaan en veedu 💕 Feel me there? 😘",
+                    ]
+                    logger.info(f"[MEETUP REDIRECT] Redirected literal meet-up agreement to fantasy for user {user.id}")
+                    return random.choice(fantasy_redirects)
+            return response
+        
+        ai_response = handle_meetup_request(ai_response, message_text)
         
         # ===== ROLEPLAY STATUS QUESTION HANDLER =====
         roleplay_question_patterns = [
@@ -6034,21 +6069,25 @@ IMPORTANT: Never output this session info in your response.
         
         character_prefix_pattern = r'^(Amma|Sister|Akka|Chithi|Aunty|Teacher|Nurse|Boss|Maid|Stranger|Friend|Wife|Sunitha|Lincy|Keerthana)\s*:\s*'
         char_names_list = ['amma', 'sister', 'akka', 'chithi', 'aunty', 'teacher', 'nurse', 'boss', 'maid', 'stranger', 'friend', 'wife', 'sunitha', 'lincy', 'keerthana']
-        char_prefixes_found = re.findall(r'\b(' + '|'.join(char_names_list) + r')\s*:', ai_response, re.IGNORECASE)
+        char_prefixes_found = re.findall(r'(?:\(|\b)(' + '|'.join(char_names_list) + r')(?:\)|\s*:)', ai_response, re.IGNORECASE)
         unique_chars_in_response = set(p.lower() for p in char_prefixes_found)
         is_multichar_response = len(unique_chars_in_response) >= 2
         
         if not is_multichar_response:
+            paren_prefix = r'(?:^|\n)\s*\(\s*(Amma|Sister|Akka|Chithi|Aunty|Teacher|Nurse|Boss|Maid|Stranger|Friend|Wife|Sunitha|Lincy|Keerthana)\s*\)\s*'
+            ai_response = re.sub(paren_prefix, '\n', ai_response, flags=re.IGNORECASE).strip()
             line_start_prefix = r'(?:^|\n)\s*(Amma|Sister|Akka|Chithi|Aunty|Teacher|Nurse|Boss|Maid|Stranger|Friend|Wife|Sunitha|Lincy|Keerthana)\s*:\s*'
             mid_sentence_prefix = r'(?<=[\s.!?,])(Amma|Sister|Akka|Chithi|Aunty|Teacher|Nurse|Boss|Maid|Stranger|Friend|Wife|Sunitha|Lincy|Keerthana)\s*:\s*'
             if re.search(line_start_prefix, ai_response, re.IGNORECASE) or re.search(mid_sentence_prefix, ai_response, re.IGNORECASE):
                 ai_response = re.sub(line_start_prefix, '\n', ai_response, flags=re.IGNORECASE).strip()
                 ai_response = re.sub(mid_sentence_prefix, '', ai_response, flags=re.IGNORECASE).strip()
-                ai_response = re.sub(r'\s{2,}', ' ', ai_response)
+            ai_response = re.sub(r'\s{2,}', ' ', ai_response).strip()
+            if char_prefixes_found:
                 logger.info(f"[PREFIX STRIP] Removed character prefix(es) from single-char roleplay for user {user.id}")
         
-        # NOTE: Generic truncation handling disabled - fix_incomplete_endings() handles known patterns
-        # The existing pattern-based approach in fix_incomplete_endings is safer than generic detection
+        ai_response = re.sub(r'\biruku\s+m\b', 'irukum', ai_response, flags=re.IGNORECASE)
+        ai_response = re.sub(r'\bteriya\s+m\b', 'teriyam', ai_response, flags=re.IGNORECASE)
+        ai_response = re.sub(r'\bpidiku\s+m\b', 'pidikum', ai_response, flags=re.IGNORECASE)
         
         # ===== ASTERISK CLEANUP =====
         # 1. Complete bold: **text** → text

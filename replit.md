@@ -50,16 +50,16 @@ Keerthana AI is a Telegram bot designed to serve as a romantic AI girlfriend, of
 - **Payment Verification**: Supports both auto-verification for Paytm app payments (using Paytm v3 API) and manual verification for other UPI apps, ensuring atomic crediting and an audit trail.
 - **Force Subscription**: Requires users to join a specified Telegram channel.
 - **Context Awareness & Memory**: Stores conversation history and extracts user facts for personalized interactions, supported by a rolling memory summary system to manage context.
-- **Post-processing**: Extensive rules ensure responses adhere to user preferences, including stripping unwanted phrases, managing questions and emojis, enforcing conversational styles, and preventing AI reasoning leaks.
+- **Post-processing**: Extensive rules ensure responses adhere to user preferences, including stripping unwanted phrases, managing questions and emojis, enforcing conversational styles, preventing AI reasoning leaks, HTML comment/metadata leak stripping, mid-word truncation fixes (e.g. "iruku m" → "irukum"), and meetup request fantasy redirection.
 - **Grok-Style Conversation Flow**: System prompt includes detailed roleplay conversation examples demonstrating natural Tanglish flow and character-specific behaviors.
 - **Advanced Conversational Controls**: Includes echo detection, degradation roleplay support, gibberish English stripping, intimate command playbook, proactive suggestion system, deflection prevention, and jailbreak protection.
 - **Emotional & Behavioral Modeling**: Incorporates mood tracking, conflict/argument behavior, signature quirks, and concrete backstory elements to deepen character realism.
 - **Cultural Context**: Adds Thoothukudi/Chennai sensory flavor and cultural tension depth.
-- **Roleplay Management**: Supports character-specific roleplay, context tracking, confusion prevention, and character correction detection, including dynamic third-person to first-person fixes.
+- **Roleplay Management**: Supports character-specific roleplay, context tracking, confusion prevention, and character correction detection, including dynamic third-person to first-person fixes. Character prefix stripping handles both `Name:` and `(Name)` formats.
 - **Response Refinements**: Employs smart history trimming, context awareness reinforcement, mood and sensory vocabulary banks, natural texting style, and anti-repetition filters.
 - **Contextual Accuracy**: Includes possessive auto-correction, multi-character body part fixer, length override detection, and gender confusion prevention.
 - **Specific Interaction Handling**: Manages compliment handling, VC/call request handling, and "You Suggest" prompts.
-- **Robust Fallback System**: Provides greeting-aware and improved fallback messages for API failures.
+- **Robust Fallback System**: Provides greeting-aware and improved fallback messages for API failures. Greeting detection covers hi/hey/hello/hai/oi variants with da/di/baby/dear suffixes.
 - **Admin and User Commands**: Provides a suite of commands for bot management and user interaction.
 
 ## External Dependencies
