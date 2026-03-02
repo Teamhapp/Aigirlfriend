@@ -1,0 +1,76 @@
+{
+  "name": "Keerthana AI - Telegram Girlfriend Bot",
+  "description": "Telegram AI girlfriend bot powered by Google Gemini with Tanglish conversation, referral system, and UPI payments.",
+  "keywords": ["telegram", "bot", "ai", "gemini", "python"],
+  "repository": "https://github.com/Teamhapp/Aigirlfriend",
+  "logo": "",
+  "success_url": "/",
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "addons": [
+    {
+      "plan": "heroku-postgresql:essential-0",
+      "as": "DATABASE"
+    }
+  ],
+  "env": {
+    "TELEGRAM_BOT_TOKEN": {
+      "description": "Your Telegram Bot token from @BotFather",
+      "required": true
+    },
+    "GEMINI_API_KEY": {
+      "description": "Primary Google Gemini API key (get free at aistudio.google.com)",
+      "required": true
+    },
+    "GEMINI_API_KEY_1": {
+      "description": "Optional: 2nd Gemini key for rotation (leave blank if not needed)",
+      "required": false
+    },
+    "GEMINI_API_KEY_2": {
+      "description": "Optional: 3rd Gemini key for rotation",
+      "required": false
+    },
+    "GEMINI_API_KEY_3": {
+      "description": "Optional: 4th Gemini key for rotation",
+      "required": false
+    },
+    "HEROKU_APP_NAME": {
+      "description": "Your Heroku app name exactly as shown in the URL (e.g. my-app-name). Used to auto-register the Telegram webhook.",
+      "required": true
+    },
+    "DASHBOARD_PASSWORD": {
+      "description": "Password to access the admin dashboard at /dashboard",
+      "required": true
+    },
+    "SESSION_SECRET": {
+      "description": "Random secret for Flask session encryption (any long random string)",
+      "generator": "secret",
+      "required": true
+    },
+    "FORCE_SUB_CHANNEL": {
+      "description": "Optional: Telegram channel username (without @) users must join before chatting",
+      "required": false
+    },
+    "PAYTM_MERCHANT_ID": {
+      "description": "Optional: Paytm merchant ID for UPI payment auto-verification",
+      "required": false
+    },
+    "PAYTM_MERCHANT_KEY": {
+      "description": "Optional: Paytm merchant key",
+      "required": false
+    },
+    "PAYTM_UPI_ID": {
+      "description": "Optional: Your UPI ID for receiving payments (e.g. yourname@paytm)",
+      "required": false
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "eco"
+    }
+  }
+}
