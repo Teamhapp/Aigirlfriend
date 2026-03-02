@@ -22,11 +22,11 @@
       "required": true
     },
     "GEMINI_API_KEY": {
-      "description": "Primary Google Gemini API key (get free at aistudio.google.com)",
+      "description": "Primary Google Gemini API key — get free at aistudio.google.com",
       "required": true
     },
     "GEMINI_API_KEY_1": {
-      "description": "Optional: 2nd Gemini key for rotation (leave blank if not needed)",
+      "description": "Optional: 2nd Gemini key for rotation (higher quota)",
       "required": false
     },
     "GEMINI_API_KEY_2": {
@@ -35,6 +35,74 @@
     },
     "GEMINI_API_KEY_3": {
       "description": "Optional: 4th Gemini key for rotation",
+      "required": false
+    },
+    "GEMINI_API_KEY_4": {
+      "description": "Optional: 5th Gemini key for rotation",
+      "required": false
+    },
+    "GEMINI_API_KEY_5": {
+      "description": "Optional: 6th Gemini key for rotation",
+      "required": false
+    },
+    "GEMINI_API_KEY_6": {
+      "description": "Optional: 7th Gemini key for rotation",
+      "required": false
+    },
+    "GEMINI_API_KEY_7": {
+      "description": "Optional: 8th Gemini key for rotation",
+      "required": false
+    },
+    "GEMINI_API_KEY_8": {
+      "description": "Optional: 9th Gemini key for rotation",
+      "required": false
+    },
+    "GEMINI_API_KEY_9": {
+      "description": "Optional: 10th Gemini key for rotation",
+      "required": false
+    },
+    "GEMINI_API_KEY_10": {
+      "description": "Optional: 11th Gemini key for rotation",
+      "required": false
+    },
+    "GEMINI_API_KEY_11": {
+      "description": "Optional: 12th Gemini key for rotation",
+      "required": false
+    },
+    "GEMINI_API_KEY_12": {
+      "description": "Optional: 13th Gemini key for rotation",
+      "required": false
+    },
+    "GEMINI_API_KEY_13": {
+      "description": "Optional: 14th Gemini key for rotation",
+      "required": false
+    },
+    "GEMINI_API_KEY_14": {
+      "description": "Optional: 15th Gemini key for rotation",
+      "required": false
+    },
+    "GEMINI_API_KEY_15": {
+      "description": "Optional: 16th Gemini key for rotation",
+      "required": false
+    },
+    "GEMINI_API_KEY_16": {
+      "description": "Optional: 17th Gemini key for rotation",
+      "required": false
+    },
+    "GEMINI_API_KEY_17": {
+      "description": "Optional: 18th Gemini key for rotation",
+      "required": false
+    },
+    "GEMINI_API_KEY_18": {
+      "description": "Optional: 19th Gemini key for rotation",
+      "required": false
+    },
+    "GEMINI_API_KEY_19": {
+      "description": "Optional: 20th Gemini key for rotation",
+      "required": false
+    },
+    "GEMINI_API_KEY_20": {
+      "description": "Optional: 21st Gemini key for rotation",
       "required": false
     },
     "HEROKU_APP_NAME": {
@@ -46,7 +114,7 @@
       "required": true
     },
     "SESSION_SECRET": {
-      "description": "Random secret for Flask session encryption (any long random string)",
+      "description": "Random secret for Flask session encryption",
       "generator": "secret",
       "required": true
     },
