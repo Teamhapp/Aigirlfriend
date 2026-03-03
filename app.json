@@ -21,6 +21,14 @@
       "description": "Your Telegram Bot token from @BotFather",
       "required": true
     },
+    "ADMIN_USER_ID": {
+      "description": "Your Telegram user ID — the admin who can run /adminhelp, /broadcast, /block, etc. Get your ID from @userinfobot",
+      "required": true
+    },
+    "FORCE_SUB_CHANNEL": {
+      "description": "Optional: Force users to join a channel before chatting. Set to @yourchannel (bot must be admin there). Can also be set at runtime via /setforcesub.",
+      "required": false
+    },
     "GEMINI_API_KEY": {
       "description": "Primary Google Gemini API key — get free at aistudio.google.com",
       "required": true
@@ -117,10 +125,6 @@
       "description": "Random secret for Flask session encryption",
       "generator": "secret",
       "required": true
-    },
-    "FORCE_SUB_CHANNEL": {
-      "description": "Optional: Telegram channel username (without @) users must join before chatting",
-      "required": false
     },
     "PAYTM_MERCHANT_ID": {
       "description": "Paytm Merchant ID (MID) — required with PAYTM_MERCHANT_KEY to enable auto-payment verification. Find it in your Paytm Business dashboard.",

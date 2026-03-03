@@ -27,7 +27,8 @@ from database import (
     add_purchased_credits, get_purchased_credits, use_purchased_credit,
     get_pending_payment_orders, expire_old_payment_orders, get_user_payment_orders,
     get_bot_setting, set_bot_setting, save_paytm_credentials, get_paytm_credentials,
-    update_payment_order_utr, get_chats_by_date_range
+    update_payment_order_utr, get_chats_by_date_range,
+    get_user_info, give_trial_messages, get_active_user_ids
 )
 from payment_service import PaymentService, PRICING_PACKS
 import database as db_module
@@ -42,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 FORCE_SUB_CHANNEL = os.environ.get('FORCE_SUB_CHANNEL', '')
-ADMIN_USER_ID = 6474452917
+ADMIN_USER_ID = int(os.environ.get('ADMIN_USER_ID', '6474452917'))
 ADMIN_PASSWORD = os.environ.get('DASHBOARD_PASSWORD')
 
 # Multi-key Gemini API rotation for cost optimization
@@ -964,25 +965,28 @@ def calculate_typing_delay(text):
     return max(1.5, base_delay)
 
 def get_force_sub_keyboard():
+    channel = get_force_sub_channel()
+    slug = channel.replace('@', '')
     keyboard = [
-        [InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{FORCE_SUB_CHANNEL.replace('@', '')}")],
-        [InlineKeyboardButton("✅ I've Joined", callback_data="check_sub")]
+        [InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{slug}")],
+        [InlineKeyboardButton("✅ I've Joined — Check Now", callback_data="check_sub")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
 async def check_subscription(user_id, context):
-    if not FORCE_SUB_CHANNEL:
+    channel = get_force_sub_channel()
+    if not channel:
         return True
     try:
-        channel_id = FORCE_SUB_CHANNEL if FORCE_SUB_CHANNEL.startswith('@') else f"@{FORCE_SUB_CHANNEL}"
+        channel_id = channel if channel.startswith('@') else f"@{channel}"
         member = await context.bot.get_chat_member(chat_id=channel_id, user_id=user_id)
         return member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]
     except Exception as e:
         error_msg = str(e).lower()
-        if "user not found" in error_msg:
+        if "user not found" in error_msg or "member list is inaccessible" in error_msg:
             return False
-        logger.error(f"Error checking subscription: {e}")
-        return True
+        logger.error(f"[FORCESUB] Error checking subscription for {user_id}: {e}")
+        return True  # fail-open on unexpected errors
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -1004,10 +1008,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_data.get('is_new') and user_data.get('referred_by'):
         award_referral_points(user_data['referred_by'], user.id)
     
-    if FORCE_SUB_CHANNEL and not await check_subscription(user.id, context):
+    fsc = get_force_sub_channel()
+    if fsc and not await check_subscription(user.id, context):
         await update.message.reply_text(
-            f"🥺 Hey {preferred_name}! Before we can chat, you need to join my channel first!\n\n"
-            f"Join ➡️ {FORCE_SUB_CHANNEL}\n\n"
+            f"🥺 Hey {preferred_name}! Before we can chat, join my channel first!\n\n"
+            f"👉 {fsc}\n\n"
             "Once you've joined, click the button below! 💕",
             reply_markup=get_force_sub_keyboard()
         )
@@ -1042,9 +1047,10 @@ async def check_subscription_callback(update: Update, context: ContextTypes.DEFA
             parse_mode=ParseMode.HTML
         )
     else:
+        fsc = get_force_sub_channel()
         await query.edit_message_text(
-            "😢 You haven't joined yet, baby!\n\n"
-            f"Please join {FORCE_SUB_CHANNEL} first, then click the button again! 💕",
+            f"😢 Looks like you haven't joined yet, baby!\n\n"
+            f"Please join {fsc} and then click the button again! 💕",
             reply_markup=get_force_sub_keyboard()
         )
 
@@ -1698,6 +1704,220 @@ async def admin_addcredits(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("Invalid user ID or amount. Both must be numbers.")
 
+
+# ─── Dynamic force-subscribe channel ─────────────────────────────────────────
+
+def get_force_sub_channel():
+    """Return the active force-subscribe channel (DB setting takes priority over env var)."""
+    db_val = get_bot_setting('force_sub_channel')
+    if db_val:
+        return db_val.strip()
+    return FORCE_SUB_CHANNEL.strip()
+
+
+# ─── New admin commands ───────────────────────────────────────────────────────
+
+async def admin_botinfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: show bot-wide statistics."""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        return
+    stats = get_dashboard_stats()
+    fsc = get_force_sub_channel() or '❌ Not set'
+    await update.message.reply_text(
+        f"📊 <b>Bot Statistics</b>\n\n"
+        f"👥 Total Users: <b>{stats['total_users']}</b>\n"
+        f"🟢 Active Today: <b>{stats['active_today']}</b>\n"
+        f"💬 Total Messages: <b>{stats['total_messages']}</b>\n"
+        f"📨 Messages Today: <b>{stats['messages_today']}</b>\n"
+        f"💰 Total Revenue: <b>₹{stats['total_revenue']}</b>\n"
+        f"📢 Force Sub: <b>{fsc}</b>",
+        parse_mode=ParseMode.HTML
+    )
+    logger.info(f"[ADMIN] {user.id} viewed /botinfo")
+
+
+async def admin_userinfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: detailed info on a specific user."""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        return
+    if not context.args:
+        await update.message.reply_text("Usage: /userinfo [user_id]\nExample: /userinfo 123456789")
+        return
+    try:
+        target_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("Invalid user ID.")
+        return
+    info = get_user_info(target_id)
+    if not info:
+        await update.message.reply_text(f"❌ User {target_id} not found in database.")
+        return
+    name = info['preferred_name'] or info['first_name'] or 'Unknown'
+    uname = f"@{info['username']}" if info['username'] else 'No username'
+    status = "🚫 Blocked" if info['is_blocked'] else "✅ Active"
+    total = info['free_trial'] + info['bonus'] + info['purchased']
+    joined = info['created_at'].strftime('%d %b %Y') if info['created_at'] else 'N/A'
+    active = info['last_active'].strftime('%d %b %Y %H:%M') if info['last_active'] else 'N/A'
+    await update.message.reply_text(
+        f"👤 <b>User Info</b>\n\n"
+        f"🆔 ID: <code>{info['user_id']}</code>\n"
+        f"📛 Name: {name} ({uname})\n"
+        f"📅 Joined: {joined}\n"
+        f"🕐 Last Active: {active}\n"
+        f"🚦 Status: {status}\n\n"
+        f"💬 Total Messages: {info['total_msgs']}\n"
+        f"🎟 Free Trial Left: {info['free_trial']}\n"
+        f"🎁 Bonus Messages: {info['bonus']}\n"
+        f"💎 Purchased Credits: {info['purchased']}\n"
+        f"📦 Total Remaining: {total}\n"
+        f"🔗 Referrals Made: {info['referrals']}\n"
+        f"⚧ Gender: {info['gender'] or 'Not set'} | Suffix: {info['suffix'] or 'da'}",
+        parse_mode=ParseMode.HTML
+    )
+    logger.info(f"[ADMIN] {user.id} viewed /userinfo for {target_id}")
+
+
+async def admin_resetuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: clear a user's conversation history and summary."""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        return
+    if not context.args:
+        await update.message.reply_text("Usage: /resetuser [user_id]\nExample: /resetuser 123456789")
+        return
+    try:
+        target_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("Invalid user ID.")
+        return
+    clear_chat_history(target_id)
+    clear_conversation_summary(target_id)
+    logger.info(f"[ADMIN] {user.id} reset conversation for user {target_id}")
+    await update.message.reply_text(f"✅ Conversation and summary reset for user <code>{target_id}</code>", parse_mode=ParseMode.HTML)
+
+
+async def admin_givetrials(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: give free trial messages to a user."""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        return
+    if len(context.args) < 2:
+        await update.message.reply_text(
+            "Usage: /givetrials [user_id] [amount]\nExample: /givetrials 123456789 50"
+        )
+        return
+    try:
+        target_id = int(context.args[0])
+        amount = int(context.args[1])
+        if amount <= 0:
+            await update.message.reply_text("Amount must be a positive number.")
+            return
+        give_trial_messages(target_id, amount)
+        logger.info(f"[ADMIN] {user.id} gave {amount} trial msgs to user {target_id}")
+        await update.message.reply_text(f"✅ Gave <b>{amount}</b> free trial messages to user <code>{target_id}</code>", parse_mode=ParseMode.HTML)
+    except ValueError:
+        await update.message.reply_text("Invalid user ID or amount.")
+
+
+async def admin_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: broadcast a message to all non-blocked users."""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        return
+    if not context.args:
+        await update.message.reply_text(
+            "Usage: /broadcast <message>\nExample: /broadcast Hey! New update 💕\n\n"
+            "Sends the message to ALL non-blocked users."
+        )
+        return
+    broadcast_text = ' '.join(context.args)
+    user_ids = get_active_user_ids()
+    if not user_ids:
+        await update.message.reply_text("No active users found.")
+        return
+    status_msg = await update.message.reply_text(f"📢 Broadcasting to {len(user_ids)} users...")
+    sent = 0
+    failed = 0
+    for uid in user_ids:
+        try:
+            await context.bot.send_message(chat_id=uid, text=broadcast_text)
+            sent += 1
+        except Exception:
+            failed += 1
+        if (sent + failed) % 30 == 0:
+            await asyncio.sleep(1)  # Respect Telegram rate limits
+    logger.info(f"[ADMIN] Broadcast by {user.id}: sent={sent}, failed={failed}")
+    await status_msg.edit_text(
+        f"✅ <b>Broadcast complete!</b>\n\n"
+        f"✅ Sent: {sent}\n❌ Failed (blocked/deleted): {failed}",
+        parse_mode=ParseMode.HTML
+    )
+
+
+async def admin_setforcesub(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: set or clear the force-subscribe channel at runtime."""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        return
+    current = get_force_sub_channel() or '❌ Not set'
+    if not context.args:
+        await update.message.reply_text(
+            f"📢 <b>Force Subscribe Settings</b>\n\n"
+            f"Current channel: <b>{current}</b>\n\n"
+            f"<b>Set channel:</b> /setforcesub @channelname\n"
+            f"<b>Disable:</b> /setforcesub off\n\n"
+            f"Bot must be admin in the channel for membership checks to work.",
+            parse_mode=ParseMode.HTML
+        )
+        return
+    value = context.args[0].strip()
+    if value.lower() == 'off':
+        set_bot_setting('force_sub_channel', '')
+        await update.message.reply_text("✅ Force subscribe <b>disabled</b>.", parse_mode=ParseMode.HTML)
+    else:
+        channel = value if value.startswith('@') else f"@{value}"
+        set_bot_setting('force_sub_channel', channel)
+        await update.message.reply_text(
+            f"✅ Force subscribe set to <b>{channel}</b>\n\n"
+            f"Make sure the bot is an <b>admin</b> in that channel, otherwise membership checks will fail.",
+            parse_mode=ParseMode.HTML
+        )
+    logger.info(f"[ADMIN] {user.id} set force_sub_channel to '{value}'")
+
+
+async def admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: list all admin commands."""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        return
+    await update.message.reply_text(
+        "🛠 <b>Admin Commands</b>\n\n"
+        "<b>── User Management ──</b>\n"
+        "/userinfo [id] — Detailed user info\n"
+        "/block [id] — Block a user\n"
+        "/unblock [id] — Unblock a user\n"
+        "/resetuser [id] — Clear user conversation\n"
+        "/setlimit [id] [n] — Set custom daily limit\n\n"
+        "<b>── Credits & Messages ──</b>\n"
+        "/addcredits [id] [n] — Add purchased credits\n"
+        "/givetrials [id] [n] — Give free trial messages\n"
+        "/setdailylimit [n] — Set global daily limit\n\n"
+        "<b>── Payments ──</b>\n"
+        "/verify [order_id] — Verify payment (no args = list pending)\n"
+        "/setupi [upi] — Set simple UPI ID\n"
+        "/setpaytm [mid] [upi] — Set Paytm credentials\n\n"
+        "<b>── Bot Management ──</b>\n"
+        "/botinfo — Bot-wide stats\n"
+        "/broadcast <msg> — Send to all users\n"
+        "/setforcesub [@ch|off] — Set/disable force subscribe\n"
+        "/totalreferrals — Referral leaderboard\n"
+        "/adminhelp — This menu",
+        parse_mode=ParseMode.HTML
+    )
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     message_text = update.message.text
@@ -1705,10 +1925,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not message_text:
         return
     
-    if FORCE_SUB_CHANNEL and not await check_subscription(user.id, context):
+    if get_force_sub_channel() and not await check_subscription(user.id, context):
         await update.message.reply_text(
-            "🥺 Baby, you need to join the channel first to chat with me!\n\n"
-            "I really want to talk to you, but please join first! 💕",
+            "🥺 Baby, join the channel first — then we can chat freely! 💕",
             reply_markup=get_force_sub_keyboard()
         )
         return
@@ -5619,10 +5838,9 @@ IMPORTANT: Never output this session info in your response.{summary_context}{len
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
-    if FORCE_SUB_CHANNEL and not await check_subscription(user.id, context):
+    if get_force_sub_channel() and not await check_subscription(user.id, context):
         await update.message.reply_text(
-            "🥺 Baby, you need to join the channel first to chat with me!\n\n"
-            "I really want to talk to you, but please join first! 💕",
+            "🥺 Baby, join the channel first — then we can chat freely! 💕",
             reply_markup=get_force_sub_keyboard()
         )
         return
@@ -6111,6 +6329,15 @@ def ensure_initialized():
             application.add_handler(CommandHandler("setpaytm", admin_setpaytm))
             application.add_handler(CommandHandler("verify", admin_verify_payment))
             application.add_handler(CommandHandler("addcredits", admin_addcredits))
+            # New admin commands
+            application.add_handler(CommandHandler("botinfo", admin_botinfo))
+            application.add_handler(CommandHandler("userinfo", admin_userinfo))
+            application.add_handler(CommandHandler("resetuser", admin_resetuser))
+            application.add_handler(CommandHandler("givetrials", admin_givetrials))
+            application.add_handler(CommandHandler("broadcast", admin_broadcast))
+            application.add_handler(CommandHandler("setforcesub", admin_setforcesub))
+            application.add_handler(CommandHandler("adminhelp", admin_help))
+            # User commands
             application.add_handler(CommandHandler("buy", buy_command))
             application.add_handler(CommandHandler("credits", credits_command))
             application.add_handler(CallbackQueryHandler(check_subscription_callback, pattern="^check_sub$"))

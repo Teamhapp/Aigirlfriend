@@ -1229,3 +1229,70 @@ def atomic_credit_payment(conn, order_id, paytm_txn_id, utr, credits_to_add, use
         logger.error(f"[ATOMIC] Error crediting payment: {e}")
         conn.rollback()
         return False
+
+
+# ─── Admin helper functions ───────────────────────────────────────────────────
+
+@with_db_retry()
+def get_user_info(conn, user_id):
+    """Get detailed info for a single user (admin /userinfo command)."""
+    try:
+        cur = conn.cursor()
+        cur.execute('''
+            SELECT u.user_id, u.username, u.first_name, u.preferred_name,
+                   COALESCE(u.free_trial_messages, 0),
+                   COALESCE(u.bonus_messages, 0),
+                   COALESCE(u.purchased_credits, 0),
+                   COALESCE(u.referral_count, 0),
+                   u.is_blocked, u.custom_daily_limit,
+                   COALESCE(u.daily_messages_used, 0),
+                   u.last_reset_date, u.created_at, u.last_active,
+                   u.confirmed_gender, u.suffix_preference,
+                   (SELECT COUNT(*) FROM chat_messages WHERE user_id = u.user_id)
+            FROM users u
+            WHERE u.user_id = %s
+        ''', (user_id,))
+        row = cur.fetchone()
+        cur.close()
+        if not row:
+            return None
+        return {
+            'user_id': row[0], 'username': row[1], 'first_name': row[2],
+            'preferred_name': row[3], 'free_trial': row[4],
+            'bonus': row[5], 'purchased': row[6],
+            'referrals': row[7], 'is_blocked': row[8],
+            'custom_limit': row[9], 'daily_used': row[10],
+            'last_reset': row[11], 'created_at': row[12], 'last_active': row[13],
+            'gender': row[14], 'suffix': row[15], 'total_msgs': row[16],
+        }
+    except Exception as e:
+        logger.error(f"Error in get_user_info: {e}")
+        return None
+
+
+@with_db_retry()
+def give_trial_messages(conn, user_id, amount):
+    """Add free trial messages to a user (admin gift)."""
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            'UPDATE users SET free_trial_messages = COALESCE(free_trial_messages, 0) + %s WHERE user_id = %s',
+            (amount, user_id)
+        )
+        conn.commit()
+        cur.close()
+        return True
+    except Exception as e:
+        logger.error(f"Error in give_trial_messages: {e}")
+        conn.rollback()
+        return False
+
+
+@with_db_retry()
+def get_active_user_ids(conn):
+    """Return list of all non-blocked user IDs ordered by last_active (for broadcast)."""
+    cur = conn.cursor()
+    cur.execute('SELECT user_id FROM users WHERE is_blocked = FALSE ORDER BY last_active DESC')
+    rows = cur.fetchall()
+    cur.close()
+    return [r[0] for r in rows]
