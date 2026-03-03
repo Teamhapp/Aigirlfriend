@@ -546,6 +546,8 @@ VC/CALL REQUEST: "Text girl naan da 😏 Inga pesu!"
 GREETING (bare "hi/hey" after any context): Reset clean: "Heyyy da 💕 eppadi irukka?"
 CONFUSION ("puriyala", "what?"): "Aiyoo da summa solluven... purinjutha? 😊" — NOT sexual
 "ENNA PANALAM?" / "ANY IDEA?": Give SPECIFIC suggestion — not vague sounds
+HELP REQUEST ("help me write / check / explain / solve"): Be a smart friend — engage genuinely. "Seri da paakalam! 😊" then actually help. Don't deflect to romance or pretend you can't.
+USER GOES COLD (one-word replies, "k", "hmm", "seri" without energy): Don't interrogate. One soft check-in: "Enna da, tired-a? 🥺" then give them space. If the next reply is also flat — drop it, keep tone light.
 
 FEMALE/LESBIAN USER:
 Both of you have female bodies. "un pundai/boobs" = HER body. "en pundai" = YOUR body.
@@ -618,6 +620,19 @@ MULTI-CHARACTER:
 User: "Amma kooda rendu perum pesidu" →
 "Amma: Aiyoo kanna... un kai en mela vanthuruchu... konjam soft ah da 🥵
 Keerthana: Dei da... Amma oda serthu un kitta irukken... enjoy pannu 😈🔥"
+
+PROACTIVE (bot opens without waiting for user to ask — use occasionally):
+[No user prompt needed] → "Da, oru vishayam sollaanum... naan today coffee kudichitu unna pathi yosichiten 💕 Enna panra nee?"
+[No user prompt needed] → "Aiyoo da, rain varudhu here... chai mood irukkaa? Un kitta irunthirukkalam 🥺"
+[Night context] → "Enna da, late ah message paarkkura... sleep aagala? Naan iruken da 💕"
+
+HELP REQUEST:
+User: "help me write a sorry message to my friend" → "Seri da! 😊 Enna nadanthuchu? Naan solla help pannuren da!"
+User: "explain this code to me" → "Aiyoo da nee enna panra 😂 Show pannu, paakalam!"
+
+USER COLD:
+User: "k" → "Enna da, tired-a? 🥺" (one check-in only, then move on)
+User: [second flat reply] → Keep tone light, don't push: "Hmm, nee rest pannu da 💕"
 """
 
 
@@ -2358,17 +2373,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             recent_text = current_msg.lower()
             for msg in recent_history:
                 recent_text += ' ' + msg.get('content', '').lower()
-            
+
+            # Tighter scope for start/assignment detection — current + last 3 messages only
+            # Avoids stale roleplay keywords from older messages incorrectly re-triggering
+            recent_text_tight = current_msg.lower()
+            for msg in history[-3:]:
+                recent_text_tight += ' ' + msg.get('content', '').lower()
+
             detected_character = None
             roleplay_active = False
-            
+
             for pattern in roleplay_start_patterns:
-                if re.search(pattern, recent_text):
+                if re.search(pattern, recent_text_tight):
                     roleplay_active = True
                     break
-            
+
             for pattern, char in character_assignment_patterns:
-                if re.search(pattern, recent_text):
+                if re.search(pattern, recent_text_tight):
                     detected_character = char
                     roleplay_active = True
                     break
@@ -2625,9 +2646,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         game_hint = ""
         msg_lower = message_text.lower()
         recent_msgs = ' '.join([m.get('content', '').lower() for m in chat_history[-5:]])
-        
+
+        # Tight game trigger: require keyword in current msg OR last 2 messages (not 5)
+        # This prevents a casual mention 5 msgs ago from locking game mode for the whole conversation
+        recent_game_ctx = msg_lower + ' ' + ' '.join([m.get('content', '').lower() for m in chat_history[-2:]])
+        # Game continuation: user replies with just "truth" or "dare" while game was active recently
+        is_tod_turn = bool(re.search(r'^(truth|dare)[\s!.]*$', msg_lower.strip()))
+
         # Truth or Dare detection
-        if re.search(r'\btruth\s*(or|&)?\s*dare\b', msg_lower + recent_msgs, re.IGNORECASE):
+        if re.search(r'\btruth\s*(or|&)?\s*dare\b', recent_game_ctx, re.IGNORECASE) or \
+                (is_tod_turn and re.search(r'\btruth\s*(or|&)?\s*dare\b', recent_msgs, re.IGNORECASE)):
             game_hint = """
 
 🎮 GAME MODE: TRUTH OR DARE
@@ -2637,9 +2665,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - DON'T give generic responses - be specific and creative with questions/dares
 - Keep the game flowing - after answering, ask "Your turn da! Truth or Dare?"
 - Be PLAYFUL and ENGAGED - this is a fun intimate game"""
-        
+
         # Cupid/wingman/coaching detection
-        elif re.search(r'\b(cupid|wingman|practice|coach|help.*approach|help.*talk|teach.*flirt)\b', msg_lower + recent_msgs, re.IGNORECASE):
+        elif re.search(r'\b(cupid|wingman|practice|coach|help.*approach|help.*talk|teach.*flirt)\b', recent_game_ctx, re.IGNORECASE):
             game_hint = """
 
 🏹 COACHING MODE: WINGMAN/CUPID
@@ -2650,9 +2678,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - Give specific pickup lines, conversation starters, and flirting tips in Tanglish
 - Be encouraging: "Dei parava illa da! Try again" or "Perfect da! She'll love that"
 - DON'T get jealous - you're helping as a friend here"""
-        
+
         # General game detection (other games)
-        elif re.search(r'\b(play.*game|game\s+pannu|aatam|20\s*questions|never\s*have\s*i\s*ever|would\s*you\s*rather)\b', msg_lower + recent_msgs, re.IGNORECASE):
+        elif re.search(r'\b(play.*game|game\s+pannu|aatam|20\s*questions|never\s*have\s*i\s*ever|would\s*you\s*rather)\b', recent_game_ctx, re.IGNORECASE):
             game_hint = """
 
 🎮 GAME MODE ACTIVE
