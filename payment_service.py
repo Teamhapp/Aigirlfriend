@@ -59,18 +59,25 @@ class PaymentService:
                 return self._credentials_cache
         
         mid = os.environ.get('PAYTM_MERCHANT_ID')
+        merchant_key = os.environ.get('PAYTM_MERCHANT_KEY')
         upi_id = os.environ.get('PAYTM_UPI_ID')
-        
+
+        # Warn if only one of the pair is set — both are required for v3 API
+        if mid and not merchant_key:
+            logger.warning("[PAYTM] PAYTM_MERCHANT_ID set but PAYTM_MERCHANT_KEY missing — auto-verification will fall back to legacy API or manual")
+        if merchant_key and not mid:
+            logger.warning("[PAYTM] PAYTM_MERCHANT_KEY set but PAYTM_MERCHANT_ID missing — auto-verification disabled")
+
         if mid and upi_id:
             creds = {
                 'mid': mid,
                 'upi_id': upi_id,
-                'merchant_key': os.environ.get('PAYTM_MERCHANT_KEY')
+                'merchant_key': merchant_key
             }
             self._credentials_cache = creds
             self._cache_time = now
             return creds
-        
+
         return None
 
     def generate_transaction_id(self, length: int = 10) -> str:

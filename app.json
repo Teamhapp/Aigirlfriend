@@ -123,15 +123,15 @@
       "required": false
     },
     "PAYTM_MERCHANT_ID": {
-      "description": "Optional: Paytm merchant ID for UPI payment auto-verification",
+      "description": "Paytm Merchant ID (MID) — required with PAYTM_MERCHANT_KEY to enable auto-payment verification. Find it in your Paytm Business dashboard.",
       "required": false
     },
     "PAYTM_MERCHANT_KEY": {
-      "description": "Optional: Paytm merchant key",
+      "description": "Paytm Merchant Key — required with PAYTM_MERCHANT_ID. Both must be set together for Paytm v3 API auto-verification to work.",
       "required": false
     },
     "PAYTM_UPI_ID": {
-      "description": "Optional: Your UPI ID for receiving payments (e.g. yourname@paytm)",
+      "description": "Your Paytm UPI VPA where users send payments (e.g. yourname@paytm). Required for QR code generation.",
       "required": false
     }
   },
