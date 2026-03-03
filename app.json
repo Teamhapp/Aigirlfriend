@@ -10,15 +10,14 @@
       "url": "heroku/python"
     }
   ],
-  "addons": [
-    {
-      "plan": "heroku-postgresql:essential-0",
-      "as": "DATABASE"
-    }
-  ],
+  "addons": [],
   "env": {
     "TELEGRAM_BOT_TOKEN": {
       "description": "Your Telegram Bot token from @BotFather",
+      "required": true
+    },
+    "MONGODB_URI": {
+      "description": "MongoDB connection string — get a free cluster at mongodb.com/atlas. Format: mongodb+srv://user:pass@cluster.mongodb.net/keerthana_bot",
       "required": true
     },
     "ADMIN_USER_ID": {
