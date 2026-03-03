@@ -2118,21 +2118,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         break
             
             if not detected_character:
+                # Only check last 2 messages to avoid stale roleplay detection
+                # Require intimate/action context alongside the character word to avoid false triggers
                 address_patterns = [
                     (r'\b(amma)\b', 'amma'),
-                    (r'\b(mom)\b', 'amma'),
                     (r'\b(akka)\b', 'sister'),
-                    (r'\b(thangai)\b', 'sister'),
-                    (r'\b(teacher)\b', 'teacher'),
-                    (r'\b(miss)\b', 'teacher'),
-                    (r'\b(nurse)\b', 'nurse'),
-                    (r'\b(doctor)\b', 'nurse'),
+                    (r'\b(chithi|aunty)\b', 'chithi'),
+                    (r'\b(teacher|miss)\b', 'teacher'),
+                    (r'\b(nurse|doctor)\b', 'nurse'),
                 ]
-                for msg in history[-5:]:
+                intimate_context_words = {
+                    'pundai', 'sunni', 'mulai', 'oombu', 'nakku', 'sappu', 'sex', 'fuck',
+                    'nighty', 'room', 'bed', 'close', 'touch', 'vaa', 'pinnadi', 'kundi'
+                }
+                for msg in history[-2:]:
                     if msg.get('role') == 'user':
                         msg_text = msg.get('content', '').lower()
+                        msg_words = set(re.sub(r'[^\w\s]', '', msg_text).split())
+                        has_intimate = bool(msg_words & intimate_context_words)
                         for pattern, char in address_patterns:
-                            if re.search(pattern, msg_text):
+                            if re.search(pattern, msg_text) and has_intimate:
                                 detected_character = char
                                 roleplay_active = True
                                 break
@@ -2153,9 +2158,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_pure_greeting = bool(re.match(r'^(hi|hey|hello|hii+|heya?|hlo|helo|hai|haii+|oi|oii+|vanakkam|good\s*(morning|evening|night|afternoon))\s*[!.😊💕]*$', msg_lower_stripped, re.IGNORECASE))
         
         if is_pure_greeting:
-            roleplay_active = False
-            current_character = None
-            logger.info(f"[ROLEPLAY RESET] User sent pure greeting, skipping roleplay detection for user {user.id}")
+            # Only reset roleplay if there's been no roleplay in recent history
+            # If scene was active recently, keep it alive — user saying "hi" mid-scene is not a reset
+            recent_roleplay_text = ' '.join([m.get('content', '').lower() for m in chat_history[-5:]])
+            has_recent_roleplay = any(kw in recent_roleplay_text for kw in [
+                'amma', 'akka', 'chithi', 'aunty', 'teacher', 'nurse', 'boss', 'wife',
+                'pundai', 'sunni', 'mulai', 'oombu', 'nakku', 'roleplay', 'scene'
+            ])
+            if has_recent_roleplay:
+                roleplay_active, current_character = detect_active_roleplay(message_text, chat_history)
+                logger.info(f"[ROLEPLAY PRESERVE] Pure greeting but active scene found — keeping roleplay for user {user.id}")
+            else:
+                roleplay_active = False
+                current_character = None
+                logger.info(f"[ROLEPLAY RESET] User sent pure greeting, no recent scene — cleared for user {user.id}")
         else:
             roleplay_active, current_character = detect_active_roleplay(message_text, chat_history)
         
@@ -2332,7 +2348,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.info(f"[SUMMARY] Triggered summary generation for user {user.id} at message count {total_message_count}")
             summary_context = get_summary_context(user.id)
         
-        trimmed_history = chat_history[-10:] if len(chat_history) > 10 else chat_history
+        trimmed_history = chat_history[-15:] if len(chat_history) > 15 else chat_history
         
         # ===== GAME & COACHING MODE DETECTION =====
         game_hint = ""
@@ -2378,23 +2394,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context_info = f"""User name: {preferred_name}
 Status: {user_status}
 Gender: {gender_instruction}
-IMPORTANT: Never output this session info in your response.
-
-🧠 CONTEXT AWARENESS & SMOOTH FLOW - CRITICAL:
-- ALWAYS maintain exact mood continuity from conversation memory below
-- NEVER reset topic or become generic - build directly on user's last input
-- If context feels fuzzy, lean on CONVERSATION MEMORY first
-- Reference past events/moods naturally without asking reset questions like "enna da?" or "enna scene?"
-- NEVER invent fake scenarios or roleplays that did not happen in chat history
-- When user asks "enna roleplay poitu iruku?" - ONLY reference roleplays visible in the chat history, do NOT make up new ones
-- If no roleplay is active in recent messages, say "Ippo vera roleplay onnum illa da, pudhusu start pannalama?"
-- SMOOTH FLOW: Your response should feel like a natural continuation of the last message, not a new conversation
-- VARY YOUR LANGUAGE: Never use the same expression (like "oru maathiri irukku") more than once across recent messages
-- SCENE MOMENTUM: If roleplay is active, each response should add something new - a new action, sensation, or dialogue beat{summary_context}{length_hint}{roleplay_hint}{mood_hint}{lesbian_hint}{game_hint}{memory_context}"""
+IMPORTANT: Never output this session info in your response.{summary_context}{length_hint}{roleplay_hint}{mood_hint}{lesbian_hint}{game_hint}{memory_context}"""
         
         ai_response = generate_response(message_text, trimmed_history, context_info, user_id=user.id)
         if ai_response is None:
-            suffix = 'di' if should_use_di else 'da'
+            # Compute suffix inline here — should_use_di is defined later in the pipeline
+            _fallback_di = (suffix_preference == 'di' or confirmed_gender == 'female')
+            suffix = 'di' if _fallback_di else 'da'
             if is_pure_greeting:
                 ai_response = random.choice([
                     f"Hiii {suffix} 💕 eppadi irukka?",
@@ -2641,7 +2647,7 @@ IMPORTANT: Never output this session info in your response.
                 overlap = len(set(response_tokens) & set(user_tokens))
                 overlap_ratio = overlap / min(len(response_tokens), len(user_tokens))
                 
-                if overlap_ratio >= 0.5:
+                if overlap_ratio >= 0.75:  # Raised from 0.5 → avoids killing valid roleplay responses
                     question_match = re.search(r'\?', response[:100])
                     if question_match:
                         remaining = response[question_match.end():].strip()
