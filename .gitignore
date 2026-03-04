@@ -70,3 +70,8 @@ Thumbs.db
 # Local data
 *.db
 *.sqlite3
+
+# Private assets — chat logs, exports, debug pastes
+attached_assets/
+*.csv
+*.json
