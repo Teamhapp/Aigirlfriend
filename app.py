@@ -1558,7 +1558,7 @@ Chat history:
                 return None
             
             response = client.models.generate_content(
-                model='gemini-2.0-flash',
+                model='gemini-2.5-flash',
                 contents=[{"role": "user", "parts": [{"text": summary_prompt + history_text}]}],
                 config=types.GenerateContentConfig(
                     temperature=0.3,
