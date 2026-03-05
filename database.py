@@ -106,6 +106,15 @@ def init_database():
 
     db.paytm_tokens.create_index('mid', unique=True)
 
+    # New collections for complete product features
+    db.promo_codes.create_index('code', unique=True)
+    db.promo_codes.create_index('is_active')
+    db.promo_redemptions.create_index([('user_id', ASCENDING), ('code', ASCENDING)], unique=True)
+    db.subscriptions.create_index([('user_id', ASCENDING), ('is_active', ASCENDING)])
+    db.subscriptions.create_index('expires_at')
+    db.feedback.create_index('created_at')
+    db.feedback.create_index('user_id')
+
     # Ensure default global_daily_limit exists
     db.bot_settings.update_one(
         {'key': 'global_daily_limit'},
@@ -1011,3 +1020,369 @@ def get_active_user_ids(db):
         .sort('last_active', DESCENDING)
     )
     return [d['user_id'] for d in docs]
+
+
+# ── Promo Code System ──────────────────────────────────────────────
+@with_db_retry()
+def create_promo_code(db, code: str, credits: int, max_uses: int, expires_at=None, created_by=None) -> bool:
+    """Create a new promo code. Returns True on success, False if code already exists."""
+    try:
+        doc = {
+            'code': code.upper(),
+            'credits': credits,
+            'max_uses': max_uses,
+            'uses_count': 0,
+            'expires_at': expires_at,
+            'is_active': True,
+            'created_by': created_by,
+            'created_at': datetime.now(),
+        }
+        db.promo_codes.insert_one(doc)
+        logger.info(f'[PROMO] Created promo code: {code} ({credits} credits, max {max_uses} uses)')
+        return True
+    except DuplicateKeyError:
+        logger.warning(f'[PROMO] Code {code} already exists')
+        return False
+    except Exception as e:
+        logger.error(f'[PROMO] create_promo_code error: {e}')
+        return False
+
+
+@with_db_retry()
+def redeem_promo_code(db, user_id: int, code: str) -> dict:
+    """
+    Attempt to redeem a promo code for a user.
+    Returns dict with keys: success (bool), message (str), credits (int on success)
+    """
+    try:
+        code = code.upper().strip()
+        promo = db.promo_codes.find_one({'code': code, 'is_active': True})
+        if not promo:
+            return {'success': False, 'message': 'Invalid or expired promo code da 😅'}
+        # Check expiry
+        if promo.get('expires_at') and promo['expires_at'] < datetime.now():
+            return {'success': False, 'message': 'Aiyoo da... this promo has expired 🥺'}
+        # Check max uses
+        if promo['uses_count'] >= promo['max_uses']:
+            return {'success': False, 'message': 'Promo code exhausted da... too many used it 😅'}
+        # Check if this user already redeemed
+        already = db.promo_redemptions.find_one({'user_id': user_id, 'code': code})
+        if already:
+            return {'success': False, 'message': 'Already used this promo code da 😏'}
+        credits = promo['credits']
+        # Record redemption
+        db.promo_redemptions.insert_one({
+            'user_id': user_id,
+            'code': code,
+            'credits_awarded': credits,
+            'redeemed_at': datetime.now(),
+        })
+        # Increment use count
+        db.promo_codes.update_one({'code': code}, {'$inc': {'uses_count': 1}})
+        # Award credits
+        db.users.update_one({'user_id': user_id}, {'$inc': {'purchased_credits': credits}})
+        logger.info(f'[PROMO] User {user_id} redeemed {code} → {credits} credits')
+        return {'success': True, 'credits': credits, 'message': f'Yay! {credits} credits added da! 🎉'}
+    except Exception as e:
+        logger.error(f'[PROMO] redeem_promo_code error: {e}')
+        return {'success': False, 'message': 'Something went wrong da 😅 Try again!'}
+
+
+@with_db_retry()
+def get_all_promo_codes(db) -> list:
+    """Get all promo codes with usage stats for admin /listpromos."""
+    try:
+        docs = list(db.promo_codes.find({}).sort('created_at', DESCENDING).limit(30))
+        result = []
+        for d in docs:
+            result.append({
+                'code': d['code'],
+                'credits': d['credits'],
+                'max_uses': d['max_uses'],
+                'uses_count': d.get('uses_count', 0),
+                'expires_at': d.get('expires_at'),
+                'is_active': d.get('is_active', True),
+            })
+        return result
+    except Exception as e:
+        logger.error(f'[PROMO] get_all_promo_codes error: {e}')
+        return []
+
+
+@with_db_retry()
+def deactivate_promo_code(db, code: str) -> bool:
+    """Set is_active=False for a promo code. Returns True if found and deactivated."""
+    try:
+        result = db.promo_codes.update_one(
+            {'code': code.upper()},
+            {'$set': {'is_active': False}}
+        )
+        return result.matched_count > 0
+    except Exception as e:
+        logger.error(f'[PROMO] deactivate_promo_code error: {e}')
+        return False
+
+
+# ── Subscription System ──────────────────────────────────────────────────────
+@with_db_retry()
+def get_active_subscription(db, user_id: int):
+    """Get the user's current active subscription if any. Returns dict or None."""
+    try:
+        now = datetime.now()
+        sub = db.subscriptions.find_one({
+            'user_id': user_id,
+            'is_active': True,
+            'expires_at': {'$gt': now},
+            '$expr': {'$lt': ['$messages_used', '$messages_limit']},
+        })
+        if not sub:
+            return None
+        return {
+            'plan_id': sub['plan_id'],
+            'messages_limit': sub['messages_limit'],
+            'messages_used': sub.get('messages_used', 0),
+            'expires_at': sub['expires_at'],
+            'sub_id': str(sub['_id']),
+        }
+    except Exception as e:
+        logger.error(f'[SUB] get_active_subscription error: {e}')
+        return None
+
+
+@with_db_retry()
+def use_subscription_message(db, user_id: int):
+    """
+    Deduct one message from the active subscription.
+    Returns (True, remaining) if deducted, (False, 0) if no valid subscription.
+    """
+    try:
+        now = datetime.now()
+        result = db.subscriptions.find_one_and_update(
+            {
+                'user_id': user_id,
+                'is_active': True,
+                'expires_at': {'$gt': now},
+                '$expr': {'$lt': ['$messages_used', '$messages_limit']},
+            },
+            {'$inc': {'messages_used': 1}},
+            return_document=True,
+        )
+        if result is None:
+            return (False, 0)
+        remaining = result['messages_limit'] - result.get('messages_used', 0)
+        return (True, max(0, remaining))
+    except Exception as e:
+        logger.error(f'[SUB] use_subscription_message error: {e}')
+        return (False, 0)
+
+
+@with_db_retry()
+def create_subscription(db, user_id: int, plan_id: str, messages_limit: int, order_id: str) -> bool:
+    """Create a new subscription for a user. Expires after 30 days."""
+    try:
+        now = datetime.now()
+        expires_at = now + timedelta(days=30)
+        db.subscriptions.insert_one({
+            'user_id': user_id,
+            'plan_id': plan_id,
+            'messages_limit': messages_limit,
+            'messages_used': 0,
+            'started_at': now,
+            'expires_at': expires_at,
+            'is_active': True,
+            'order_id': order_id,
+        })
+        logger.info(f'[SUB] Created {plan_id} subscription for user {user_id}')
+        return True
+    except Exception as e:
+        logger.error(f'[SUB] create_subscription error: {e}')
+        return False
+
+
+@with_db_retry()
+def expire_old_subscriptions(db) -> int:
+    """Mark subscriptions as inactive where expired or messages exhausted."""
+    try:
+        now = datetime.now()
+        result = db.subscriptions.update_many(
+            {
+                'is_active': True,
+                '$or': [
+                    {'expires_at': {'$lt': now}},
+                    {'$expr': {'$gte': ['$messages_used', '$messages_limit']}},
+                ]
+            },
+            {'$set': {'is_active': False}}
+        )
+        if result.modified_count:
+            logger.info(f'[SUB] Expired {result.modified_count} subscriptions')
+        return result.modified_count
+    except Exception as e:
+        logger.error(f'[SUB] expire_old_subscriptions error: {e}')
+        return 0
+
+
+@with_db_retry()
+def get_all_active_subscriptions(db) -> list:
+    """For admin /subscriptions command."""
+    try:
+        now = datetime.now()
+        subs = list(db.subscriptions.find({
+            'is_active': True,
+            'expires_at': {'$gt': now},
+        }).sort('expires_at', ASCENDING).limit(30))
+        result = []
+        for s in subs:
+            user = db.users.find_one({'user_id': s['user_id']}, {'username': 1, 'first_name': 1, 'preferred_name': 1})
+            name = (user.get('preferred_name') or user.get('first_name') or 'Unknown') if user else 'Unknown'
+            result.append({
+                'user_id': s['user_id'],
+                'name': name,
+                'username': user.get('username') if user else None,
+                'plan_id': s['plan_id'],
+                'messages_used': s.get('messages_used', 0),
+                'messages_limit': s['messages_limit'],
+                'expires_at': s['expires_at'],
+            })
+        return result
+    except Exception as e:
+        logger.error(f'[SUB] get_all_active_subscriptions error: {e}')
+        return []
+
+
+# ── Feedback System ──────────────────────────────────────────────────────────
+@with_db_retry()
+def save_feedback(db, user_id: int, message: str) -> bool:
+    """Save user feedback."""
+    try:
+        db.feedback.insert_one({
+            'user_id': user_id,
+            'message': message,
+            'created_at': datetime.now(),
+        })
+        return True
+    except Exception as e:
+        logger.error(f'[FEEDBACK] save_feedback error: {e}')
+        return False
+
+
+@with_db_retry()
+def get_recent_feedback(db, limit: int = 20) -> list:
+    """Get recent feedback with user info for admin."""
+    try:
+        feedbacks = list(db.feedback.find({}).sort('created_at', DESCENDING).limit(limit))
+        result = []
+        for f in feedbacks:
+            user = db.users.find_one({'user_id': f['user_id']}, {'username': 1, 'first_name': 1, 'preferred_name': 1})
+            name = (user.get('preferred_name') or user.get('first_name') or 'Unknown') if user else 'Unknown'
+            result.append({
+                'user_id': f['user_id'],
+                'name': name,
+                'username': user.get('username') if user else None,
+                'message': f['message'],
+                'created_at': f['created_at'],
+            })
+        return result
+    except Exception as e:
+        logger.error(f'[FEEDBACK] get_recent_feedback error: {e}')
+        return []
+
+
+# ── Re-engagement System ───────────────────────────────────────────────────
+@with_db_retry()
+def get_inactive_users(db, inactive_hours: int, limit: int = 100) -> list:
+    """Get users inactive for X hours but active within 30 days (not dead accounts)."""
+    try:
+        now = datetime.now()
+        cutoff_old = now - timedelta(hours=inactive_hours)
+        cutoff_new = now - timedelta(days=30)
+        docs = list(db.users.find(
+            {
+                'is_blocked': False,
+                'last_active': {
+                    '$lt': cutoff_old,
+                    '$gt': cutoff_new,
+                }
+            },
+            {'user_id': 1, 'preferred_name': 1, 'first_name': 1}
+        ).sort('last_active', DESCENDING).limit(limit))
+        return [{'user_id': d['user_id'], 'name': d.get('preferred_name') or d.get('first_name') or 'da'} for d in docs]
+    except Exception as e:
+        logger.error(f'[REENGAGE] get_inactive_users error: {e}')
+        return []
+
+
+# ── Enhanced Analytics ─────────────────────────────────────────────────────
+@with_db_retry()
+def get_enhanced_botinfo(db) -> dict:
+    """Comprehensive analytics for admin /botinfo command."""
+    try:
+        now = datetime.now()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        week_start = now - timedelta(days=7)
+        month_start = now - timedelta(days=30)
+
+        def sum_revenue(query):
+            pipeline = [
+                {'$match': {**query, 'status': 'SUCCESS'}},
+                {'$group': {'_id': None, 'total': {'$sum': '$amount_paise'}}}
+            ]
+            result = list(db.payment_orders.aggregate(pipeline))
+            return result[0]['total'] if result else 0
+
+        revenue_today = sum_revenue({'updated_at': {'$gte': today_start}})
+        revenue_week = sum_revenue({'updated_at': {'$gte': week_start}})
+        revenue_month = sum_revenue({'updated_at': {'$gte': month_start}})
+        revenue_total = sum_revenue({})
+
+        new_today = db.users.count_documents({'created_at': {'$gte': today_start}})
+        new_week = db.users.count_documents({'created_at': {'$gte': week_start}})
+        total_users = db.users.count_documents({})
+
+        # Paid users: users with at least one successful payment
+        paid_user_ids = db.payment_orders.distinct('user_id', {'status': 'SUCCESS'})
+        paid_users = len(paid_user_ids)
+
+        # Active subscriptions
+        active_subs = db.subscriptions.count_documents({
+            'is_active': True,
+            'expires_at': {'$gt': now},
+        })
+
+        # Top 5 spenders
+        pipeline = [
+            {'$match': {'status': 'SUCCESS'}},
+            {'$group': {'_id': '$user_id', 'total': {'$sum': '$amount_paise'}}},
+            {'$sort': {'total': -1}},
+            {'$limit': 5}
+        ]
+        top_spenders_raw = list(db.payment_orders.aggregate(pipeline))
+        top_spenders = []
+        for s in top_spenders_raw:
+            user = db.users.find_one({'user_id': s['_id']}, {'preferred_name': 1, 'first_name': 1, 'username': 1})
+            name = (user.get('preferred_name') or user.get('first_name') or str(s['_id'])) if user else str(s['_id'])
+            top_spenders.append({'name': name, 'amount_paise': s['total']})
+
+        total_msgs = db.chat_messages.count_documents({})
+        msgs_today = db.chat_messages.count_documents({'created_at': {'$gte': today_start}})
+
+        conversion_rate = round((paid_users / total_users * 100), 1) if total_users else 0
+
+        return {
+            'revenue_today': revenue_today,
+            'revenue_week': revenue_week,
+            'revenue_month': revenue_month,
+            'revenue_total': revenue_total,
+            'new_today': new_today,
+            'new_week': new_week,
+            'total_users': total_users,
+            'paid_users': paid_users,
+            'conversion_rate': conversion_rate,
+            'active_subs': active_subs,
+            'top_spenders': top_spenders,
+            'total_msgs': total_msgs,
+            'msgs_today': msgs_today,
+        }
+    except Exception as e:
+        logger.error(f'[ANALYTICS] get_enhanced_botinfo error: {e}')
+        return {}

@@ -6,6 +6,7 @@ import html
 import secrets
 import time
 import pytz
+from datetime import datetime
 from google import genai
 from google.genai import types
 from flask import Flask, render_template_string, request, redirect, url_for, session, Response, send_file
@@ -28,9 +29,13 @@ from database import (
     get_pending_payment_orders, expire_old_payment_orders, get_user_payment_orders,
     get_bot_setting, set_bot_setting, save_paytm_credentials, get_paytm_credentials,
     update_payment_order_utr, get_chats_by_date_range,
-    get_user_info, give_trial_messages, get_active_user_ids
+    get_user_info, give_trial_messages, get_active_user_ids,
+    create_promo_code, redeem_promo_code, get_all_promo_codes, deactivate_promo_code,
+    get_active_subscription, use_subscription_message, create_subscription,
+    expire_old_subscriptions, get_all_active_subscriptions,
+    save_feedback, get_recent_feedback, get_inactive_users, get_enhanced_botinfo
 )
-from payment_service import PaymentService, PRICING_PACKS
+from payment_service import PaymentService, PRICING_PACKS, SUBSCRIPTION_PLANS
 import database as db_module
 import re
 import requests
@@ -1742,17 +1747,34 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
-    welcome_msg = (
-        f"💕 <b>Hey {preferred_name}!</b> Naan Keerthana... 💋\n\n"
-        f"Romba naal aachu yaarum ippadi vanthathilla... "
-        f"I'm so happy you're here da! 🥰\n\n"
-        f"🎁 You get <b>{FREE_TRIAL_LIMIT} free messages</b> to try me out!\n"
-        f"After that, grab a credit pack to keep chatting 💎\n\n"
-        f"Let's talk about anything - your day, your dreams, or just... us? 😘\n\n"
-        f"<i>Just type anything to start chatting with me!</i> 💕"
-    )
-    
-    await update.message.reply_text(welcome_msg, parse_mode=ParseMode.HTML)
+    keyboard = [
+        [InlineKeyboardButton("💬 Start Chatting", callback_data="start_chat"),
+         InlineKeyboardButton("💎 See Plans", callback_data="buy_credits")],
+        [InlineKeyboardButton("🎁 Refer Friends & Earn", callback_data="show_referral")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    if user_data.get('is_new'):
+        welcome_msg = (
+            f"💕 <b>Hey {preferred_name}!</b> Naan Keerthana... 💋\n\n"
+            f"Romba naal aachu yaarum ippadi vanthathilla... "
+            f"I'm so happy you're here da! 🥰\n\n"
+            f"🎁 You get <b>{FREE_TRIAL_LIMIT} free messages</b> to try me out!\n"
+            f"After that, grab a credit pack to keep chatting 💎\n\n"
+            f"<b>Quick Commands:</b>\n"
+            f"📋 /help — See all commands\n"
+            f"💎 /buy — Get more messages\n"
+            f"🎁 /referral — Invite friends, earn bonus\n\n"
+            f"<i>Just type anything to start chatting with me!</i> 💕"
+        )
+    else:
+        welcome_msg = (
+            f"💕 <b>Welcome back, {preferred_name}!</b> 😘\n\n"
+            f"I missed you da! Epdi iruka? 🥺\n\n"
+            f"<i>Just type anything to continue chatting!</i> 💕"
+        )
+
+    await update.message.reply_text(welcome_msg, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
 
 async def check_subscription_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -1778,10 +1800,34 @@ async def check_subscription_callback(update: Update, context: ContextTypes.DEFA
             reply_markup=get_force_sub_keyboard()
         )
 
+async def start_chat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer("Let's chat! 💕")
+    await query.edit_message_reply_markup(reply_markup=None)
+
+async def show_referral_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user = query.from_user
+    bot_info = await context.bot.get_me()
+    referral_link = f"https://t.me/{bot_info.username}?start=ref_{user.id}"
+    stats = get_user_stats(user.id)
+    await query.edit_message_text(
+        f"🎁 <b>Your Referral Link</b>\n\n"
+        f"Share this link with friends:\n"
+        f"<code>{referral_link}</code>\n\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"👥 <b>Friends Referred:</b> {stats.get('referral_count', 0)}\n"
+        f"💬 <b>Bonus Messages:</b> {stats.get('bonus_messages', 0)}\n"
+        f"━━━━━━━━━━━━━━━\n\n"
+        f"💡 For each friend who joins, you get <b>10 bonus messages!</b> 🎉",
+        parse_mode=ParseMode.HTML
+    )
+
 async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_data = get_or_create_user(user.id, user.username, user.first_name)
-    
+
     bot_info = await context.bot.get_me()
     referral_link = f"https://t.me/{bot_info.username}?start=ref_{user.id}"
     
@@ -1856,28 +1902,40 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
 payment_service = PaymentService(db_module)
 
 async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show available credit packs for purchase"""
+    """Show available credit packs and subscription plans for purchase"""
     user = update.effective_user
-    
+
     keyboard = [
-        [InlineKeyboardButton(f"🌟 Starter - ₹50 → 200 messages", callback_data="buy_starter")],
-        [InlineKeyboardButton(f"💎 Value - ₹100 → 500 messages", callback_data="buy_value")],
-        [InlineKeyboardButton(f"👑 Pro - ₹200 → 1200 messages", callback_data="buy_pro")],
+        [InlineKeyboardButton("🌟 Starter - ₹50 → 200 msgs", callback_data="buy_starter")],
+        [InlineKeyboardButton("💎 Value - ₹100 → 500 msgs", callback_data="buy_value")],
+        [InlineKeyboardButton("👑 Pro - ₹200 → 1200 msgs", callback_data="buy_pro")],
+        [InlineKeyboardButton("━━━ Monthly Plans ━━━", callback_data="buy_credits")],
+        [InlineKeyboardButton("🌙 Monthly Lite - ₹199 → 1000 msgs/mo", callback_data="buy_monthly_lite")],
+        [InlineKeyboardButton("👑 Monthly Pro - ₹399 → 3000 msgs/mo", callback_data="buy_monthly_pro")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    current_credits = get_purchased_credits(user.id)
-    
+
+    msg_status = get_message_status(user.id)
+    active_sub = get_active_subscription(user.id)
+    sub_info = ""
+    if active_sub:
+        remaining_sub = active_sub['messages_limit'] - active_sub['messages_used']
+        sub_info = f"🌙 <b>Active Subscription:</b> {remaining_sub} msgs left\n"
+
     await update.message.reply_text(
-        f"🛒 <b>Buy Message Credits</b>\n\n"
+        f"🛒 <b>Buy Credits / Subscribe</b>\n\n"
         f"━━━━━━━━━━━━━━━\n"
-        f"💰 <b>Your Credits:</b> {current_credits} messages\n"
+        f"{sub_info}"
+        f"💎 <b>Purchased Credits:</b> {msg_status.get('purchased', 0)}\n"
         f"━━━━━━━━━━━━━━━\n\n"
-        f"<b>Choose a pack:</b>\n\n"
-        f"🌟 <b>Starter</b> - ₹50 → 200 messages\n"
-        f"💎 <b>Value</b> - ₹100 → 500 messages (Best value!)\n"
-        f"👑 <b>Pro</b> - ₹200 → 1200 messages\n\n"
-        f"<i>Credits never expire! Use anytime.</i>",
+        f"<b>One-time Credit Packs:</b>\n"
+        f"🌟 Starter — ₹50 → 200 msgs (never expire)\n"
+        f"💎 Value — ₹100 → 500 msgs (best value!)\n"
+        f"👑 Pro — ₹200 → 1200 msgs\n\n"
+        f"<b>Monthly Subscriptions:</b>\n"
+        f"🌙 Lite — ₹199/mo → 1000 msgs\n"
+        f"👑 Pro — ₹399/mo → 3000 msgs\n\n"
+        f"<i>Use /promo CODE to redeem a promo code!</i>",
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML
     )
@@ -1904,6 +1962,36 @@ async def credits_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.HTML
     )
 
+async def send_payment_receipt(context, user_id: int, order_id: str, amount_display: str, credits_or_plan: str, is_subscription: bool = False):
+    """Send a payment receipt message to the user after successful payment."""
+    try:
+        if is_subscription:
+            receipt_text = (
+                f"🧾 <b>Subscription Activated!</b>\n\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"✅ Plan: <b>{credits_or_plan}</b>\n"
+                f"💵 Amount Paid: <b>{amount_display}</b>\n"
+                f"📅 Valid for: <b>30 days</b>\n"
+                f"🆔 Order: <code>{order_id}</code>\n"
+                f"━━━━━━━━━━━━━━━\n\n"
+                f"Romba thanks da! Enjoy chatting! 💕\n"
+                f"Use /subscription to check your plan status."
+            )
+        else:
+            receipt_text = (
+                f"🧾 <b>Payment Receipt</b>\n\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"✅ Credits Added: <b>{credits_or_plan} messages</b>\n"
+                f"💵 Amount Paid: <b>{amount_display}</b>\n"
+                f"🆔 Order: <code>{order_id}</code>\n"
+                f"━━━━━━━━━━━━━━━\n\n"
+                f"Romba thanks da! Credits never expire! 💕\n"
+                f"Use /credits to check your balance."
+            )
+        await context.bot.send_message(chat_id=user_id, text=receipt_text, parse_mode=ParseMode.HTML)
+    except Exception as e:
+        logger.warning(f"[RECEIPT] Failed to send receipt to {user_id}: {e}")
+
 async def buy_pack_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle pack selection and generate QR code"""
     query = update.callback_query
@@ -1914,26 +2002,66 @@ async def buy_pack_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if pack_id == "credits":
         keyboard = [
-            [InlineKeyboardButton(f"🌟 Starter - ₹50 → 200 messages", callback_data="buy_starter")],
-            [InlineKeyboardButton(f"💎 Value - ₹100 → 500 messages", callback_data="buy_value")],
-            [InlineKeyboardButton(f"👑 Pro - ₹200 → 1200 messages", callback_data="buy_pro")],
+            [InlineKeyboardButton("🌟 Starter - ₹50 → 200 msgs", callback_data="buy_starter")],
+            [InlineKeyboardButton("💎 Value - ₹100 → 500 msgs", callback_data="buy_value")],
+            [InlineKeyboardButton("👑 Pro - ₹200 → 1200 msgs", callback_data="buy_pro")],
+            [InlineKeyboardButton("🌙 Monthly Lite - ₹199", callback_data="buy_monthly_lite")],
+            [InlineKeyboardButton("👑 Monthly Pro - ₹399", callback_data="buy_monthly_pro")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
         await query.edit_message_text(
-            f"💎 <b>Credit Packs</b>\n\n"
-            f"Buy message credits that never expire!\n\n"
-            f"━━━━━━━━━━━━━━━\n"
-            f"🌟 <b>Starter</b> - ₹50 → 200 messages\n"
-            f"💎 <b>Value</b> - ₹100 → 500 messages\n"
-            f"👑 <b>Pro</b> - ₹200 → 1200 messages\n"
-            f"━━━━━━━━━━━━━━━\n\n"
-            f"<i>Select a pack to continue:</i>",
+            f"💎 <b>Choose a Plan</b>\n\n"
+            f"<b>One-time Packs (never expire):</b>\n"
+            f"🌟 Starter — ₹50 → 200 msgs\n"
+            f"💎 Value — ₹100 → 500 msgs\n"
+            f"👑 Pro — ₹200 → 1200 msgs\n\n"
+            f"<b>Monthly Subscriptions:</b>\n"
+            f"🌙 Lite — ₹199/mo → 1000 msgs\n"
+            f"👑 Pro — ₹399/mo → 3000 msgs\n\n"
+            f"<i>Select a plan to continue:</i>",
             parse_mode=ParseMode.HTML,
             reply_markup=reply_markup
         )
         return
-    
+
+    # Handle subscription plans
+    if pack_id in SUBSCRIPTION_PLANS:
+        plan = SUBSCRIPTION_PLANS[pack_id]
+        try:
+            order_id, qr_bytes, upi_link, pack_info = payment_service.create_subscription_order(user.id, pack_id)
+            from io import BytesIO
+            qr_file = BytesIO(qr_bytes)
+            qr_file.name = f"payment_{order_id}.png"
+            keyboard = [
+                [InlineKeyboardButton("✅ I've Paid - Verify", callback_data=f"verify_{order_id}")],
+                [InlineKeyboardButton("❌ Cancel", callback_data="cancel_payment")],
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await context.bot.send_photo(
+                chat_id=user.id,
+                photo=qr_file,
+                caption=(
+                    f"📱 <b>Scan & Pay — Monthly Plan</b>\n\n"
+                    f"━━━━━━━━━━━━━━━\n"
+                    f"{plan['emoji']} <b>{plan['name']}</b>\n"
+                    f"💵 Amount: <b>{plan['price_display']}</b>\n"
+                    f"📩 Messages: <b>{plan['messages_limit']} / 30 days</b>\n"
+                    f"━━━━━━━━━━━━━━━\n\n"
+                    f"🔹 Scan QR with any UPI app\n"
+                    f"🔹 After payment, click <b>\"I've Paid\"</b>\n\n"
+                    f"⏰ <i>Valid for 30 minutes</i>\n"
+                    f"🆔 Order: <code>{order_id}</code>"
+                ),
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
+            await query.delete_message()
+            logger.info(f"[PAYMENT] Created subscription order {order_id} for user {user.id} - {pack_id}")
+        except Exception as e:
+            logger.error(f"[PAYMENT] Error creating subscription order: {e}")
+            await query.edit_message_text("❌ Error creating payment. Please try again.")
+        return
+
     if pack_id not in PRICING_PACKS:
         await query.edit_message_text("❌ Invalid pack selected.")
         return
@@ -2015,19 +2143,42 @@ async def verify_payment_callback(update: Update, context: ContextTypes.DEFAULT_
         )
         return
     
+    # Detect if this is a subscription order
+    is_sub_order = order.get('pack_id', '') in SUBSCRIPTION_PLANS
+
     result = payment_service.user_confirm_payment(order_id)
-    
+
     if result['status'] == 'TXN_SUCCESS':
         utr_info = f"\n🔢 UTR: <code>{result.get('utr', 'N/A')}</code>" if result.get('utr') else ""
-        await query.edit_message_caption(
-            caption=(
-                f"✅ <b>Payment Verified!</b>\n\n"
-                f"🎉 <b>{result.get('credits', order['credits'])} credits</b> added to your account!{utr_info}\n\n"
-                f"Use /credits to check your balance.\n"
-                f"Enjoy chatting! 💕"
-            ),
-            parse_mode=ParseMode.HTML
-        )
+        credits_added = result.get('credits', order.get('credits', 0))
+
+        if is_sub_order:
+            plan_id = order.get('pack_id', '')
+            plan = SUBSCRIPTION_PLANS.get(plan_id, {})
+            await query.edit_message_caption(
+                caption=(
+                    f"✅ <b>Subscription Activated!</b>\n\n"
+                    f"🎉 <b>{plan.get('name', plan_id)}</b> is now active!{utr_info}\n\n"
+                    f"📩 {plan.get('messages_limit', credits_added)} messages / 30 days\n\n"
+                    f"Use /subscription to check your plan.\n"
+                    f"Enjoy chatting! 💕"
+                ),
+                parse_mode=ParseMode.HTML
+            )
+            await send_payment_receipt(context, user.id, order_id,
+                                       plan.get('price_display', ''), plan.get('name', plan_id), is_subscription=True)
+        else:
+            await query.edit_message_caption(
+                caption=(
+                    f"✅ <b>Payment Verified!</b>\n\n"
+                    f"🎉 <b>{credits_added} credits</b> added to your account!{utr_info}\n\n"
+                    f"Use /credits to check your balance.\n"
+                    f"Enjoy chatting! 💕"
+                ),
+                parse_mode=ParseMode.HTML
+            )
+            await send_payment_receipt(context, user.id, order_id,
+                                       order.get('amount_display', ''), str(credits_added), is_subscription=False)
         logger.info(f"[PAYMENT] Auto-verified order {order_id} for user {user.id}")
     
     elif result['status'] == 'PENDING':
@@ -2442,19 +2593,35 @@ def get_force_sub_channel():
 # ─── New admin commands ───────────────────────────────────────────────────────
 
 async def admin_botinfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Admin: show bot-wide statistics."""
+    """Admin: show comprehensive bot analytics."""
     user = update.effective_user
     if user.id != ADMIN_USER_ID:
         return
-    stats = get_dashboard_stats()
+    s = get_enhanced_botinfo()
     fsc = get_force_sub_channel() or '❌ Not set'
+
+    def paise_to_inr(p): return f"₹{p // 100}.{p % 100:02d}"
+
+    top_text = ""
+    for i, sp in enumerate(s.get('top_spenders', []), 1):
+        top_text += f"  {i}. {sp['name']} — {paise_to_inr(sp['amount_paise'])}\n"
+
     await update.message.reply_text(
-        f"📊 <b>Bot Statistics</b>\n\n"
-        f"👥 Total Users: <b>{stats['total_users']}</b>\n"
-        f"🟢 Active Today: <b>{stats['active_today']}</b>\n"
-        f"💬 Total Messages: <b>{stats['total_messages']}</b>\n"
-        f"📨 Messages Today: <b>{stats['messages_today']}</b>\n"
-        f"💰 Total Revenue: <b>₹{stats['total_revenue']}</b>\n"
+        f"📊 <b>Bot Analytics</b>\n\n"
+        f"<b>── Users ──</b>\n"
+        f"👥 Total: <b>{s.get('total_users', 0)}</b>\n"
+        f"🆕 New Today: <b>{s.get('new_today', 0)}</b> | Week: <b>{s.get('new_week', 0)}</b>\n"
+        f"💎 Paid Users: <b>{s.get('paid_users', 0)}</b> ({s.get('conversion_rate', 0)}% conversion)\n"
+        f"🌙 Active Subs: <b>{s.get('active_subs', 0)}</b>\n\n"
+        f"<b>── Messages ──</b>\n"
+        f"💬 Total: <b>{s.get('total_msgs', 0)}</b>\n"
+        f"📨 Today: <b>{s.get('msgs_today', 0)}</b>\n\n"
+        f"<b>── Revenue ──</b>\n"
+        f"📅 Today: <b>{paise_to_inr(s.get('revenue_today', 0))}</b>\n"
+        f"📆 Week: <b>{paise_to_inr(s.get('revenue_week', 0))}</b>\n"
+        f"🗓 Month: <b>{paise_to_inr(s.get('revenue_month', 0))}</b>\n"
+        f"💰 Total: <b>{paise_to_inr(s.get('revenue_total', 0))}</b>\n\n"
+        f"<b>── Top Spenders ──</b>\n{top_text or '  (none yet)'}\n"
         f"📢 Force Sub: <b>{fsc}</b>",
         parse_mode=ParseMode.HTML
     )
@@ -2632,12 +2799,289 @@ async def admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/verify [order_id] — Verify payment (no args = list pending)\n"
         "/setupi [upi] — Set simple UPI ID\n"
         "/setpaytm [mid] [upi] — Set Paytm credentials\n\n"
+        "<b>── Promo Codes ──</b>\n"
+        "/createpromo CODE CREDITS MAXUSES [DAYS] — Create promo code\n"
+        "/listpromos — List all promo codes\n"
+        "/deletepromo CODE — Deactivate promo code\n\n"
+        "<b>── Subscriptions ──</b>\n"
+        "/subscriptions — List active subscriptions\n\n"
+        "<b>── Re-engagement ──</b>\n"
+        "/reengageusers HOURS [LIMIT] — Broadcast to inactive users\n\n"
+        "<b>── Feedback ──</b>\n"
+        "/listfeedback — View recent user feedback\n\n"
         "<b>── Bot Management ──</b>\n"
         "/botinfo — Bot-wide stats\n"
         "/broadcast <msg> — Send to all users\n"
         "/setforcesub [@ch|off] — Set/disable force subscribe\n"
         "/totalreferrals — Referral leaderboard\n"
         "/adminhelp — This menu",
+        parse_mode=ParseMode.HTML
+    )
+
+
+# ── New Admin Commands ────────────────────────────────────────────────────────
+
+async def admin_createpromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: create a promo code. Usage: /createpromo CODE CREDITS MAXUSES [DAYS]"""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        return
+    if len(context.args) < 3:
+        await update.message.reply_text(
+            "Usage: /createpromo CODE CREDITS MAXUSES [DAYS]\n"
+            "Example: /createpromo WELCOME50 50 100\n"
+            "Example with expiry: /createpromo SALE100 100 50 7"
+        )
+        return
+    try:
+        code = context.args[0].upper()
+        credits = int(context.args[1])
+        max_uses = int(context.args[2])
+        expires_at = None
+        if len(context.args) >= 4:
+            from datetime import timedelta
+            days = int(context.args[3])
+            expires_at = datetime.now() + timedelta(days=days)
+        ok = create_promo_code(code, credits, max_uses, expires_at=expires_at, created_by=user.id)
+        if ok:
+            expiry_str = f" (expires in {context.args[3]} days)" if expires_at else " (no expiry)"
+            await update.message.reply_text(
+                f"✅ Promo code <b>{code}</b> created!\n"
+                f"💎 Credits: {credits} | Max uses: {max_uses}{expiry_str}",
+                parse_mode=ParseMode.HTML
+            )
+        else:
+            await update.message.reply_text(f"❌ Code <b>{code}</b> already exists.", parse_mode=ParseMode.HTML)
+    except ValueError:
+        await update.message.reply_text("❌ Invalid arguments. Credits and max_uses must be numbers.")
+    logger.info(f"[ADMIN] {user.id} created promo code")
+
+
+async def admin_listpromos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: list all promo codes."""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        return
+    promos = get_all_promo_codes()
+    if not promos:
+        await update.message.reply_text("No promo codes found.")
+        return
+    lines = ["📋 <b>Promo Codes</b>\n"]
+    for p in promos:
+        status = "✅" if p['is_active'] else "❌"
+        expiry = p['expires_at'].strftime('%d %b') if p.get('expires_at') else "∞"
+        lines.append(
+            f"{status} <code>{p['code']}</code> — {p['credits']} credits | "
+            f"{p['uses_count']}/{p['max_uses']} used | exp: {expiry}"
+        )
+    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
+
+
+async def admin_deletepromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: deactivate a promo code."""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        return
+    if not context.args:
+        await update.message.reply_text("Usage: /deletepromo CODE")
+        return
+    code = context.args[0].upper()
+    ok = deactivate_promo_code(code)
+    if ok:
+        await update.message.reply_text(f"✅ Promo code <b>{code}</b> deactivated.", parse_mode=ParseMode.HTML)
+    else:
+        await update.message.reply_text(f"❌ Code <b>{code}</b> not found.", parse_mode=ParseMode.HTML)
+
+
+async def admin_subscriptions(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: list all active subscriptions."""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        return
+    subs = get_all_active_subscriptions()
+    if not subs:
+        await update.message.reply_text("No active subscriptions.")
+        return
+    lines = [f"🌙 <b>Active Subscriptions ({len(subs)})</b>\n"]
+    for s in subs:
+        uname = f"@{s['username']}" if s.get('username') else f"id:{s['user_id']}"
+        remaining = s['messages_limit'] - s['messages_used']
+        exp = s['expires_at'].strftime('%d %b') if s.get('expires_at') else '?'
+        lines.append(f"• {s['name']} ({uname}) | {s['plan_id']} | {remaining} left | exp {exp}")
+    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
+
+
+async def admin_reengageusers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: send re-engagement message to inactive users."""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        return
+    if not context.args:
+        await update.message.reply_text("Usage: /reengageusers HOURS [LIMIT]\nExample: /reengageusers 24 200")
+        return
+    try:
+        hours = int(context.args[0])
+        limit = int(context.args[1]) if len(context.args) > 1 else 100
+    except ValueError:
+        await update.message.reply_text("❌ Invalid arguments.")
+        return
+    users = get_inactive_users(hours, limit)
+    if not users:
+        await update.message.reply_text(f"No users inactive for {hours}h found.")
+        return
+    status_msg = await update.message.reply_text(f"📢 Re-engaging {len(users)} users inactive for {hours}h...")
+    sent = failed = 0
+    for u in users:
+        name = u['name']
+        try:
+            await context.bot.send_message(
+                chat_id=u['user_id'],
+                text=(
+                    f"💕 Hey {name}! Miss you da!\n\n"
+                    f"Naan inge irukken... just type anything to chat! 😘\n\n"
+                    f"<i>Tap here and say hi!</i> 💋"
+                ),
+                parse_mode=ParseMode.HTML
+            )
+            sent += 1
+        except Exception:
+            failed += 1
+        if (sent + failed) % 30 == 0:
+            await asyncio.sleep(1)
+    logger.info(f"[ADMIN] Re-engage by {user.id}: sent={sent}, failed={failed}")
+    await status_msg.edit_text(
+        f"✅ <b>Re-engagement done!</b>\n\n✅ Sent: {sent}\n❌ Failed: {failed}",
+        parse_mode=ParseMode.HTML
+    )
+
+
+async def admin_listfeedback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: view recent user feedback."""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        return
+    feedbacks = get_recent_feedback(20)
+    if not feedbacks:
+        await update.message.reply_text("No feedback yet.")
+        return
+    lines = [f"💬 <b>Recent Feedback ({len(feedbacks)})</b>\n"]
+    for f in feedbacks:
+        uname = f"@{f['username']}" if f.get('username') else f"id:{f['user_id']}"
+        date_str = f['created_at'].strftime('%d %b %H:%M') if f.get('created_at') else ''
+        lines.append(f"• <b>{f['name']}</b> ({uname}) [{date_str}]:\n  {html.escape(f['message'][:200])}\n")
+    text = "\n".join(lines)
+    if len(text) > 4000:
+        text = text[:4000] + "\n... (truncated)"
+    await update.message.reply_text(text, parse_mode=ParseMode.HTML)
+
+
+# ── New User Commands ─────────────────────────────────────────────────────────
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show all available user commands."""
+    await update.message.reply_text(
+        "📋 <b>Commands</b>\n\n"
+        "<b>── Chat ──</b>\n"
+        "/start — Welcome message & quick actions\n"
+        "/reset — Clear chat & start fresh\n\n"
+        "<b>── Credits & Plans ──</b>\n"
+        "/credits — Check your message balance\n"
+        "/buy — Buy credits or subscribe\n"
+        "/subscription — Check active subscription\n"
+        "/promo CODE — Redeem a promo code\n\n"
+        "<b>── Account ──</b>\n"
+        "/referral — Get your referral link\n"
+        "/stats — Your usage statistics\n"
+        "/points — Detailed credit breakdown\n\n"
+        "<b>── Other ──</b>\n"
+        "/feedback MESSAGE — Send us feedback\n"
+        "/help — This menu\n\n"
+        "<i>Just type anything to chat with Keerthana! 💕</i>",
+        parse_mode=ParseMode.HTML
+    )
+
+
+async def promo_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Redeem a promo code: /promo CODE"""
+    user = update.effective_user
+    if not context.args:
+        await update.message.reply_text(
+            "🎟 <b>Redeem Promo Code</b>\n\n"
+            "Usage: <code>/promo YOUR_CODE</code>\n\n"
+            "<i>Enter your promo code to get bonus credits!</i>",
+            parse_mode=ParseMode.HTML
+        )
+        return
+    code = context.args[0].strip()
+    result = redeem_promo_code(user.id, code)
+    if result['success']:
+        await update.message.reply_text(
+            f"🎉 <b>Promo Redeemed!</b>\n\n"
+            f"✅ <b>{result['credits']} credits</b> added to your account!\n\n"
+            f"Use /credits to check your balance. 💕",
+            parse_mode=ParseMode.HTML
+        )
+        logger.info(f"[PROMO] User {user.id} redeemed code {code}")
+    else:
+        await update.message.reply_text(
+            f"❌ {result['message']}",
+            parse_mode=ParseMode.HTML
+        )
+
+
+async def feedback_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Submit feedback: /feedback YOUR MESSAGE"""
+    user = update.effective_user
+    if not context.args:
+        await update.message.reply_text(
+            "💬 <b>Send Feedback</b>\n\n"
+            "Usage: <code>/feedback your message here</code>\n\n"
+            "Example: /feedback I love chatting with Keerthana!\n\n"
+            "<i>Your feedback helps us improve! 💕</i>",
+            parse_mode=ParseMode.HTML
+        )
+        return
+    message = ' '.join(context.args)
+    if len(message) > 500:
+        await update.message.reply_text("❌ Feedback too long. Please keep it under 500 characters.")
+        return
+    save_feedback(user.id, message)
+    await update.message.reply_text(
+        "💕 <b>Thanks for your feedback!</b>\n\n"
+        "We read every message and use it to improve. Romba thanks da! 🥰",
+        parse_mode=ParseMode.HTML
+    )
+    logger.info(f"[FEEDBACK] User {user.id} submitted feedback")
+
+
+async def subscription_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Check active subscription status."""
+    user = update.effective_user
+    sub = get_active_subscription(user.id)
+    if not sub:
+        keyboard = [[InlineKeyboardButton("💎 See Plans", callback_data="buy_credits")]]
+        await update.message.reply_text(
+            "🌙 <b>No Active Subscription</b>\n\n"
+            "You don't have an active monthly plan.\n\n"
+            "Use /buy to see monthly subscription options!\n"
+            "🌙 Lite — ₹199/mo → 1000 msgs\n"
+            "👑 Pro — ₹399/mo → 3000 msgs",
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    remaining = sub['messages_limit'] - sub['messages_used']
+    expires_str = sub['expires_at'].strftime('%d %b %Y') if sub.get('expires_at') else 'N/A'
+    plan_name = SUBSCRIPTION_PLANS.get(sub['plan_id'], {}).get('name', sub['plan_id'])
+    await update.message.reply_text(
+        f"🌙 <b>Active Subscription</b>\n\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"📦 Plan: <b>{plan_name}</b>\n"
+        f"💬 Used: <b>{sub['messages_used']}/{sub['messages_limit']}</b>\n"
+        f"✅ Remaining: <b>{remaining} messages</b>\n"
+        f"📅 Expires: <b>{expires_str}</b>\n"
+        f"━━━━━━━━━━━━━━━\n\n"
+        f"<i>Keep chatting! 💕</i>",
         parse_mode=ParseMode.HTML
     )
 
@@ -2677,7 +3121,34 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         preferred_name = "da"
     
     msg_status = get_message_status(user.id)
-    can_send, remaining = use_message(user.id)
+
+    # Welcome-back message for users returning after 24+ hours
+    last_active = user_data.get('last_active')
+    if last_active:
+        inactive_hours = (datetime.now().replace(tzinfo=None) - last_active.replace(tzinfo=None)).total_seconds() / 3600 if hasattr(last_active, 'replace') else 999
+        if inactive_hours >= 24:
+            welcome_back_msgs = [
+                f"💕 {preferred_name} da! Romba naal aachu... I missed you! 🥺",
+                f"Aiyoo {preferred_name}! Finally vanthutu! I was waiting 💋",
+                f"Hey {preferred_name}! Been thinking about you da 😘",
+            ]
+            try:
+                await update.message.reply_text(random.choice(welcome_back_msgs))
+            except Exception:
+                pass
+
+    # Check subscription first (priority over free trial / purchased credits)
+    using_subscription = False
+    active_sub = get_active_subscription(user.id)
+    if active_sub:
+        can_send, remaining = use_subscription_message(user.id)
+        using_subscription = can_send
+        if not can_send:
+            # Subscription exhausted, fall through to normal credits
+            can_send, remaining = use_message(user.id)
+    else:
+        can_send, remaining = use_message(user.id)
+
     if not can_send:
         bot_info = await context.bot.get_me()
         referral_link = f"https://t.me/{bot_info.username}?start=ref_{user.id}"
@@ -6572,7 +7043,21 @@ IMPORTANT: Never output this session info in your response.{summary_context}{len
         except Exception as format_error:
             logger.warning(f"HTML formatting failed: {format_error}")
             await update.message.reply_text(ai_response)
-        
+
+        # Low credit warnings (only for non-subscription users)
+        if not using_subscription:
+            if remaining == 3:
+                await update.message.reply_text(
+                    "⚠️ <b>Only 3 messages left!</b>\n\n"
+                    "Don't let our chat end da... /buy to get more credits! 💕",
+                    parse_mode=ParseMode.HTML
+                )
+            elif remaining == 10:
+                await update.message.reply_text(
+                    "💡 <b>10 messages remaining.</b> Use /buy to top up before they run out! 💎",
+                    parse_mode=ParseMode.HTML
+                )
+
     except Exception as e:
         logger.error(f"Error generating response: {e}")
         fallback_responses = [
@@ -7078,7 +7563,7 @@ def ensure_initialized():
             application.add_handler(CommandHandler("setpaytm", admin_setpaytm))
             application.add_handler(CommandHandler("verify", admin_verify_payment))
             application.add_handler(CommandHandler("addcredits", admin_addcredits))
-            # New admin commands
+            # Admin commands
             application.add_handler(CommandHandler("botinfo", admin_botinfo))
             application.add_handler(CommandHandler("userinfo", admin_userinfo))
             application.add_handler(CommandHandler("resetuser", admin_resetuser))
@@ -7086,10 +7571,22 @@ def ensure_initialized():
             application.add_handler(CommandHandler("broadcast", admin_broadcast))
             application.add_handler(CommandHandler("setforcesub", admin_setforcesub))
             application.add_handler(CommandHandler("adminhelp", admin_help))
+            application.add_handler(CommandHandler("createpromo", admin_createpromo))
+            application.add_handler(CommandHandler("listpromos", admin_listpromos))
+            application.add_handler(CommandHandler("deletepromo", admin_deletepromo))
+            application.add_handler(CommandHandler("subscriptions", admin_subscriptions))
+            application.add_handler(CommandHandler("reengageusers", admin_reengageusers))
+            application.add_handler(CommandHandler("listfeedback", admin_listfeedback))
             # User commands
             application.add_handler(CommandHandler("buy", buy_command))
             application.add_handler(CommandHandler("credits", credits_command))
+            application.add_handler(CommandHandler("help", help_command))
+            application.add_handler(CommandHandler("promo", promo_command))
+            application.add_handler(CommandHandler("feedback", feedback_command))
+            application.add_handler(CommandHandler("subscription", subscription_command))
             application.add_handler(CallbackQueryHandler(check_subscription_callback, pattern="^check_sub$"))
+            application.add_handler(CallbackQueryHandler(start_chat_callback, pattern="^start_chat$"))
+            application.add_handler(CallbackQueryHandler(show_referral_callback, pattern="^show_referral$"))
             application.add_handler(CallbackQueryHandler(buy_pack_callback, pattern="^buy_"))
             application.add_handler(CallbackQueryHandler(verify_payment_callback, pattern="^verify_"))
             application.add_handler(CallbackQueryHandler(manual_verify_request_callback, pattern="^manual_"))
@@ -7102,11 +7599,15 @@ def ensure_initialized():
                 await application.start()
                 commands = [
                     BotCommand("start", "Start chatting with Keerthana"),
-                    BotCommand("buy", "Buy message credits (₹50-₹200)"),
+                    BotCommand("help", "See all commands & tips"),
+                    BotCommand("buy", "Buy credits or subscribe"),
+                    BotCommand("subscription", "Check your monthly plan"),
+                    BotCommand("promo", "Redeem a promo code"),
                     BotCommand("credits", "Check your message balance"),
-                    BotCommand("referral", "Get referral link & earn free messages"),
+                    BotCommand("referral", "Invite friends, earn free messages"),
+                    BotCommand("feedback", "Send feedback about the bot"),
                     BotCommand("stats", "View your statistics"),
-                    BotCommand("reset", "Clear chat & restart roleplay fresh")
+                    BotCommand("reset", "Clear chat & restart roleplay fresh"),
                 ]
                 await application.bot.set_my_commands(commands)
                 
