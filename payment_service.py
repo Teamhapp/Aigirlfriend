@@ -41,31 +41,6 @@ PRICING_PACKS = {
     }
 }
 
-SUBSCRIPTION_PLANS = {
-    'monthly_lite': {
-        'name': 'Monthly Lite',
-        'price_paise': 19900,
-        'price_display': '₹199',
-        'messages_limit': 1000,
-        'duration_days': 30,
-        'emoji': '🌙',
-        'plan_type': 'subscription',
-        'description': '1000 messages / 30 days',
-    },
-    'monthly_pro': {
-        'name': 'Monthly Pro',
-        'price_paise': 39900,
-        'price_display': '₹399',
-        'messages_limit': 3000,
-        'duration_days': 30,
-        'emoji': '👑',
-        'plan_type': 'subscription',
-        'description': '3000 messages / 30 days',
-    },
-}
-
-# Combined lookup for any plan type
-ALL_PLANS = {**PRICING_PACKS, **SUBSCRIPTION_PLANS}
 
 PAYTM_STATUS_API_V3 = "https://securegw.paytm.in/v3/order/status"
 PAYTM_STATUS_API_LEGACY = "https://securegw.paytm.in/order/status"
@@ -543,73 +518,4 @@ class PaymentService:
     def get_user_orders(self, user_id: int) -> list:
         return self.db.get_user_payment_orders(user_id)
 
-    def create_subscription_order(self, user_id: int, plan_id: str, plan_override: dict = None) -> tuple:
-        """Create a payment order for a subscription plan."""
-        import database as db_module
-        plan = plan_override or SUBSCRIPTION_PLANS.get(plan_id)
-        if not plan:
-            raise ValueError(f"Unknown subscription plan: {plan_id}")
-
-        order_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
-        txn_ref = f"SUB{user_id}{order_id}"
-
-        creds = self._get_cached_credentials()
-        upi_id = creds['upi_id'] if creds else os.environ.get('PAYTM_UPI_ID', '')
-
-        if not upi_id:
-            raise ValueError("No UPI ID configured")
-
-        upi_link = self.generate_upi_link(upi_id, plan['price_paise'], txn_ref, plan['name'])
-        qr_bytes = self.generate_qr_code_bytes(upi_link)
-
-        self.db.create_payment_order(
-            user_id=user_id,
-            order_id=order_id,
-            txn_ref=txn_ref,
-            pack_id=plan_id,
-            amount_paise=plan['price_paise'],
-            credits=plan['messages_limit'],
-        )
-
-        logger.info(f"[SUB_ORDER] Created subscription order {order_id} for user {user_id} plan {plan_id}")
-        return (order_id, qr_bytes, upi_link, plan)
-
-    def complete_subscription_payment(self, order_id: str, paytm_txn_id: str = '', utr: str = '', admin_user_id: int = None) -> dict:
-        """Called after payment verified for a subscription. Creates the subscription record."""
-        try:
-            order = self.db.get_payment_order(order_id)
-            if not order:
-                return {'success': False, 'message': 'Order not found'}
-
-            plan_id = order.get('pack_id', '')
-            plan = SUBSCRIPTION_PLANS.get(plan_id)
-            if not plan:
-                return {'success': False, 'message': f'Not a subscription plan: {plan_id}'}
-
-            user_id = order['user_id']
-            messages_limit = plan['messages_limit']
-
-            # Atomic mark order as SUCCESS
-            credited = self.db.atomic_credit_payment(
-                order_id, paytm_txn_id, utr, messages_limit, user_id
-            )
-            if not credited:
-                return {'success': False, 'message': 'Already processed'}
-
-            # Create subscription record
-            self.db.create_subscription(user_id, plan_id, messages_limit, order_id)
-
-            verified_by = f"admin:{admin_user_id}" if admin_user_id else "auto"
-            self.db.log_payment_report(order_id, str(user_id), 'SUCCESS', paytm_txn_id, utr, plan['price_paise'], verified_by=verified_by)
-
-            logger.info(f"[SUB_COMPLETE] Subscription {plan_id} created for user {user_id}")
-            return {
-                'success': True,
-                'plan': plan,
-                'messages_limit': messages_limit,
-                'user_id': user_id,
-            }
-        except Exception as e:
-            logger.error(f"[SUB_COMPLETE] Error: {e}")
-            return {'success': False, 'message': str(e)}
 
