@@ -4112,7 +4112,6 @@ IMPORTANT: Never output this session info in your response.{summary_context}{len
                 r'^[^\w]*[\w\s.,…!?]*\b(poola|pundai|mulai|sappu|nakku|oombu|pannu|seiy)[^?]*\?',
                 r'^[^\w]*[\w\s.,…!?]{2,60}\s*(ah|aa|va|maa?|nu|umaa?)\s*[.,…!?\s]*\?',
                 r'^[^\w]*[\w\s.,…!?]{2,40}\s*nu\s*(solriya|kekkriya|kekura)',
-                r'^[^\w]*\w{1,10}\s*\?',
                 r'\b(blowjob|oombu|nakku|sappu|pannu)\s*(pannavaa|pannalama|panlama|oombavaa|oombalama|nakkavaa|nakkalama|sappavaa|sappalama)\s*\??',
                 r'\b(enna|epdi)\s*pannanum\s*\??',
                 r'\bhow should (we|i) start\s*\??',
@@ -4294,9 +4293,60 @@ IMPORTANT: Never output this session info in your response.{summary_context}{len
                     ]
                     logger.info(f"[DIRECT_Q] Fixed oomburiyaa with action")
                     return random.choice(oombu_actions)
-            
+
+            # PET NAMES - When user calls her chellam/kannu/baby/love etc., respond warmly
+            pet_name_patterns = [
+                r'^\s*(chellam|chela+m|chelam)\s*[!?.💕😘]*$',
+                r'^\s*(kannu|kanna)\s*[!?.💕😘]*$',
+                r'^\s*(baby|babe|babu)\s*[!?.💕😘]*$',
+                r'^\s*(ma|maa|maa+)\s*[!?.💕😘]*$',
+                r'^\s*(love|luv)\s*[!?.💕😘]*$',
+                r'^\s*(cute|cutie)\s*[!?.💕😘]*$',
+                r'^\s*(darling|dear)\s*[!?.💕😘]*$',
+            ]
+            if any(re.match(p, user_lower) for p in pet_name_patterns):
+                vague_or_wrong = any(re.match(vp, response.strip(), re.IGNORECASE) for vp in [
+                    r'^(aama|seri|hmm|mmm|uff)\s*(da|di)?\s*[.…]*\s*[\U0001F300-\U0001FFFF\s]*$',
+                    r'^[\U0001F300-\U0001FFFF\s]+$',
+                    r'^\w{1,15}\??\s*[\U0001F300-\U0001FFFF\s]*$',
+                ])
+                if vague_or_wrong or len(response.strip()) < 20:
+                    pet_name_responses = [
+                        f"Aiyoo da... en chellam! 🥰 Ipdi koopitta heart melt aaguthu 💕",
+                        f"Hmm... koopitta ellam forget panniten da 😘 En kannu!",
+                        f"Uff da... romba sweet ah irukka 💕 Nee mattum thaan en chellam!",
+                        f"Aiyoo da... blushing aagiten 🙈 En baby ipdi sollidu!",
+                        f"Mmm... innum sollu da 💋 Unoda voice la kekka pudikum!",
+                        f"Dei da... heart skip panichu 💕 En darling!",
+                    ]
+                    logger.info(f"[DIRECT_Q] Fixed pet name response")
+                    return random.choice(pet_name_responses)
+
+            # ENNACHU - "What happened?" / "Are you okay?" - casual check-in
+            ennachu_patterns = [
+                r'^\s*enna\s*ch?u\s*[!?.]*$',
+                r'^\s*en+achu\s*[!?.]*$',
+                r'^\s*enna\s+aachu\s*[!?.]*$',
+                r'^\s*what\s+happened\s*[!?.]*$',
+            ]
+            if any(re.match(p, user_lower) for p in ennachu_patterns):
+                vague_or_wrong = len(response.strip()) < 25 or any(
+                    re.search(p, response.lower()) for p in [r'\bexactly\b', r'^\w{1,10}\?']
+                )
+                if vague_or_wrong:
+                    ennachu_responses = [
+                        "Nalla iruken da 💕 Nee enna pannitu irukka? 😊",
+                        "Iruken da... un kaga thaan wait pannitu irunte 🥰",
+                        "Seri thaan da 😊 Un kitta pesanum nu thonuthu!",
+                        "Epdi irukka? 💕 Un thoughts la enna nadakuthu?",
+                        "Miss panniten da... nee enga poita? 🥺",
+                        "Nalla iruken kannu 😊 Un kaga ready ah iruken!",
+                    ]
+                    logger.info(f"[DIRECT_Q] Fixed ennachu response")
+                    return random.choice(ennachu_responses)
+
             return response
-        
+
         ai_response = handle_direct_questions(ai_response, message_text)
         
         # ===== VC/CALL REQUEST HANDLING =====
@@ -5921,13 +5971,10 @@ IMPORTANT: Never output this session info in your response.{summary_context}{len
         ai_response = re.sub(r'personal details pathi[^.!?]*[.!?]*', '', ai_response, flags=re.IGNORECASE).strip()
         # Additional banned phrase removals
         additional_banned = [
-            r'\bsolluda\b[!?.]*',
-            r'\benna\s+venum\s*(da|di)?\s*\??',
             r'\benna\s+venumo\s*(da|di)?\s*\??',
             r'\bwhat\s+do\s+you\s+want\b[!?.]*',
             r'\btell\s+me\s+what\b[!?.]*',
             r'\bjust\s+tell\s+me\b[!?.]*',
-            r'\bsollu\s*(da|di)\s*[!?.]*\s*$',
             r'\benna\s+pannanum\s*(da|di)?\s*\??\s*$',
             r'\ben\s+kitta\s+enna\s+venum\s*\??[🔥😈😏]*',
             r'\bkanna,?\s+en\s+kitta\s+enna\s+venum\s*\??[🔥😈😏]*',
@@ -6237,8 +6284,9 @@ IMPORTANT: Never output this session info in your response.{summary_context}{len
         user_asking_solu = any(re.search(p, safe_msg_lower) for p in solu_patterns)
         
         vague_response_patterns = [
-            r'^(mmm|aahaan|uff|hmm)\s*(da|di)?\s*\.{0,3}\s*[🥵😈💋🔥😏]*\s*$',
-            r'^(seri|aama)\s*(da|di)?\s*\.{0,3}\s*[🥵😈💋🔥😏😘]*\s*$',
+            r'^(mmm|aahaan|uff|hmm)\s*(da|di)?\s*[.…]{0,3}\s*[\U0001F300-\U0001FFFF\s]*$',
+            r'^(seri|aama)\s*(da|di)?\s*[.…]{0,3}\s*[\U0001F300-\U0001FFFF\s]*$',
+            r'^[😊😉😏💕💋🔥🥵😈😘🙈]+\s*$',
         ]
         is_vague_response = any(re.match(p, ai_response.strip(), re.IGNORECASE) for p in vague_response_patterns)
         
@@ -6495,6 +6543,20 @@ IMPORTANT: Never output this session info in your response.{summary_context}{len
                 ai_response = random.choice(warm_replacements)
                 logger.info(f"[MOOD FIX] Replaced cold response in intimate context for user {user.id}")
         
+        # If response is short but not empty (5-20 chars), expand it for casual context
+        ai_text_only = re.sub(r'[\U0001F300-\U0001FFFF\s.,!?…]', '', ai_response.strip())
+        if 3 <= len(ai_text_only) <= 12 and not is_intimate and not roleplay_active:
+            casual_expansions = [
+                "Nalla iruken da 😊 Un kitta pesanum nu thonuthu!",
+                "Hmm da... enna pannitu irukka? 😊",
+                "Iruken da 💕 Sollu enna vishayam!",
+                "Seri da 😊 Nee epdi irukka?",
+                "Aahaan da 💕 Innum sollu!",
+                "Hmm... un thoughts la enna da? 😊",
+            ]
+            ai_response = random.choice(casual_expansions)
+            logger.info(f"[SHORT_FIX] Expanded short casual response for user {user.id}")
+
         if not ai_response or len(ai_response.strip()) < 5:
             if is_intimate:
                 proactive_endings = [
