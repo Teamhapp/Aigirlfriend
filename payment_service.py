@@ -144,12 +144,11 @@ class PaymentService:
         buffer.seek(0)
         return buffer.getvalue()
 
-    def create_payment_order(self, user_id: int, pack_id: str) -> Tuple[str, bytes, str, dict]:
+    def create_payment_order(self, user_id: int, pack_id: str, plan_override: dict = None) -> Tuple[str, bytes, str, dict]:
         """Create a new payment order with QR code"""
-        if pack_id not in PRICING_PACKS:
+        pack = plan_override or PRICING_PACKS.get(pack_id)
+        if not pack:
             raise ValueError(f"Invalid pack_id: {pack_id}")
-        
-        pack = PRICING_PACKS[pack_id]
         
         creds = self._get_cached_credentials()
         if creds and creds.get('upi_id'):
@@ -544,10 +543,10 @@ class PaymentService:
     def get_user_orders(self, user_id: int) -> list:
         return self.db.get_user_payment_orders(user_id)
 
-    def create_subscription_order(self, user_id: int, plan_id: str) -> tuple:
+    def create_subscription_order(self, user_id: int, plan_id: str, plan_override: dict = None) -> tuple:
         """Create a payment order for a subscription plan."""
         import database as db_module
-        plan = SUBSCRIPTION_PLANS.get(plan_id)
+        plan = plan_override or SUBSCRIPTION_PLANS.get(plan_id)
         if not plan:
             raise ValueError(f"Unknown subscription plan: {plan_id}")
 

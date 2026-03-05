@@ -46,6 +46,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def get_effective_packs() -> dict:
+    """Return PRICING_PACKS merged with any admin overrides stored in DB."""
+    overrides = get_bot_setting('plan_overrides') or {}
+    result = {}
+    for k, v in PRICING_PACKS.items():
+        result[k] = {**v, **overrides.get(k, {})}
+    return result
+
+def get_effective_subscription_plans() -> dict:
+    """Return SUBSCRIPTION_PLANS merged with any admin overrides stored in DB."""
+    overrides = get_bot_setting('plan_overrides') or {}
+    result = {}
+    for k, v in SUBSCRIPTION_PLANS.items():
+        result[k] = {**v, **overrides.get(k, {})}
+    return result
+
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 FORCE_SUB_CHANNEL = os.environ.get('FORCE_SUB_CHANNEL', '')
 ADMIN_USER_ID = int(os.environ.get('ADMIN_USER_ID', '6474452917'))
@@ -1905,13 +1921,21 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show available credit packs and subscription plans for purchase"""
     user = update.effective_user
 
+    packs = get_effective_packs()
+    plans = get_effective_subscription_plans()
+    s = packs.get('starter', {})
+    v = packs.get('value', {})
+    p = packs.get('pro', {})
+    ml = plans.get('monthly_lite', {})
+    mp = plans.get('monthly_pro', {})
+
     keyboard = [
-        [InlineKeyboardButton("🌟 Starter - ₹50 → 200 msgs", callback_data="buy_starter")],
-        [InlineKeyboardButton("💎 Value - ₹100 → 500 msgs", callback_data="buy_value")],
-        [InlineKeyboardButton("👑 Pro - ₹200 → 1200 msgs", callback_data="buy_pro")],
+        [InlineKeyboardButton(f"{s.get('emoji','🌟')} Starter - {s.get('price_display','₹50')} → {s.get('credits',200)} msgs", callback_data="buy_starter")],
+        [InlineKeyboardButton(f"{v.get('emoji','💎')} Value - {v.get('price_display','₹100')} → {v.get('credits',500)} msgs", callback_data="buy_value")],
+        [InlineKeyboardButton(f"{p.get('emoji','👑')} Pro - {p.get('price_display','₹200')} → {p.get('credits',1200)} msgs", callback_data="buy_pro")],
         [InlineKeyboardButton("━━━ Monthly Plans ━━━", callback_data="buy_credits")],
-        [InlineKeyboardButton("🌙 Monthly Lite - ₹199 → 1000 msgs/mo", callback_data="buy_monthly_lite")],
-        [InlineKeyboardButton("👑 Monthly Pro - ₹399 → 3000 msgs/mo", callback_data="buy_monthly_pro")],
+        [InlineKeyboardButton(f"{ml.get('emoji','🌙')} Monthly Lite - {ml.get('price_display','₹199')} → {ml.get('messages_limit',1000)} msgs/mo", callback_data="buy_monthly_lite")],
+        [InlineKeyboardButton(f"{mp.get('emoji','👑')} Monthly Pro - {mp.get('price_display','₹399')} → {mp.get('messages_limit',3000)} msgs/mo", callback_data="buy_monthly_pro")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -1929,12 +1953,12 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💎 <b>Purchased Credits:</b> {msg_status.get('purchased', 0)}\n"
         f"━━━━━━━━━━━━━━━\n\n"
         f"<b>One-time Credit Packs:</b>\n"
-        f"🌟 Starter — ₹50 → 200 msgs (never expire)\n"
-        f"💎 Value — ₹100 → 500 msgs (best value!)\n"
-        f"👑 Pro — ₹200 → 1200 msgs\n\n"
+        f"{s.get('emoji','🌟')} Starter — {s.get('price_display','₹50')} → {s.get('credits',200)} msgs (never expire)\n"
+        f"{v.get('emoji','💎')} Value — {v.get('price_display','₹100')} → {v.get('credits',500)} msgs (best value!)\n"
+        f"{p.get('emoji','👑')} Pro — {p.get('price_display','₹200')} → {p.get('credits',1200)} msgs\n\n"
         f"<b>Monthly Subscriptions:</b>\n"
-        f"🌙 Lite — ₹199/mo → 1000 msgs\n"
-        f"👑 Pro — ₹399/mo → 3000 msgs\n\n"
+        f"{ml.get('emoji','🌙')} Lite — {ml.get('price_display','₹199')}/mo → {ml.get('messages_limit',1000)} msgs\n"
+        f"{mp.get('emoji','👑')} Pro — {mp.get('price_display','₹399')}/mo → {mp.get('messages_limit',3000)} msgs\n\n"
         f"<i>Use /promo CODE to redeem a promo code!</i>",
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML
@@ -2000,24 +2024,32 @@ async def buy_pack_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     pack_id = query.data.replace("buy_", "")
     
+    eff_packs = get_effective_packs()
+    eff_plans = get_effective_subscription_plans()
+
     if pack_id == "credits":
+        s = eff_packs.get('starter', {})
+        v = eff_packs.get('value', {})
+        p = eff_packs.get('pro', {})
+        ml = eff_plans.get('monthly_lite', {})
+        mp = eff_plans.get('monthly_pro', {})
         keyboard = [
-            [InlineKeyboardButton("🌟 Starter - ₹50 → 200 msgs", callback_data="buy_starter")],
-            [InlineKeyboardButton("💎 Value - ₹100 → 500 msgs", callback_data="buy_value")],
-            [InlineKeyboardButton("👑 Pro - ₹200 → 1200 msgs", callback_data="buy_pro")],
-            [InlineKeyboardButton("🌙 Monthly Lite - ₹199", callback_data="buy_monthly_lite")],
-            [InlineKeyboardButton("👑 Monthly Pro - ₹399", callback_data="buy_monthly_pro")],
+            [InlineKeyboardButton(f"{s.get('emoji','🌟')} Starter - {s.get('price_display','₹50')} → {s.get('credits',200)} msgs", callback_data="buy_starter")],
+            [InlineKeyboardButton(f"{v.get('emoji','💎')} Value - {v.get('price_display','₹100')} → {v.get('credits',500)} msgs", callback_data="buy_value")],
+            [InlineKeyboardButton(f"{p.get('emoji','👑')} Pro - {p.get('price_display','₹200')} → {p.get('credits',1200)} msgs", callback_data="buy_pro")],
+            [InlineKeyboardButton(f"{ml.get('emoji','🌙')} Monthly Lite - {ml.get('price_display','₹199')}", callback_data="buy_monthly_lite")],
+            [InlineKeyboardButton(f"{mp.get('emoji','👑')} Monthly Pro - {mp.get('price_display','₹399')}", callback_data="buy_monthly_pro")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
             f"💎 <b>Choose a Plan</b>\n\n"
             f"<b>One-time Packs (never expire):</b>\n"
-            f"🌟 Starter — ₹50 → 200 msgs\n"
-            f"💎 Value — ₹100 → 500 msgs\n"
-            f"👑 Pro — ₹200 → 1200 msgs\n\n"
+            f"{s.get('emoji','🌟')} Starter — {s.get('price_display','₹50')} → {s.get('credits',200)} msgs\n"
+            f"{v.get('emoji','💎')} Value — {v.get('price_display','₹100')} → {v.get('credits',500)} msgs\n"
+            f"{p.get('emoji','👑')} Pro — {p.get('price_display','₹200')} → {p.get('credits',1200)} msgs\n\n"
             f"<b>Monthly Subscriptions:</b>\n"
-            f"🌙 Lite — ₹199/mo → 1000 msgs\n"
-            f"👑 Pro — ₹399/mo → 3000 msgs\n\n"
+            f"{ml.get('emoji','🌙')} Lite — {ml.get('price_display','₹199')}/mo → {ml.get('messages_limit',1000)} msgs\n"
+            f"{mp.get('emoji','👑')} Pro — {mp.get('price_display','₹399')}/mo → {mp.get('messages_limit',3000)} msgs\n\n"
             f"<i>Select a plan to continue:</i>",
             parse_mode=ParseMode.HTML,
             reply_markup=reply_markup
@@ -2025,10 +2057,10 @@ async def buy_pack_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Handle subscription plans
-    if pack_id in SUBSCRIPTION_PLANS:
-        plan = SUBSCRIPTION_PLANS[pack_id]
+    if pack_id in eff_plans:
+        plan = eff_plans[pack_id]
         try:
-            order_id, qr_bytes, upi_link, pack_info = payment_service.create_subscription_order(user.id, pack_id)
+            order_id, qr_bytes, upi_link, pack_info = payment_service.create_subscription_order(user.id, pack_id, plan_override=plan)
             from io import BytesIO
             qr_file = BytesIO(qr_bytes)
             qr_file.name = f"payment_{order_id}.png"
@@ -2043,9 +2075,9 @@ async def buy_pack_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 caption=(
                     f"📱 <b>Scan & Pay — Monthly Plan</b>\n\n"
                     f"━━━━━━━━━━━━━━━\n"
-                    f"{plan['emoji']} <b>{plan['name']}</b>\n"
-                    f"💵 Amount: <b>{plan['price_display']}</b>\n"
-                    f"📩 Messages: <b>{plan['messages_limit']} / 30 days</b>\n"
+                    f"{plan.get('emoji','🌙')} <b>{plan.get('name', pack_id)}</b>\n"
+                    f"💵 Amount: <b>{plan.get('price_display','?')}</b>\n"
+                    f"📩 Messages: <b>{plan.get('messages_limit','?')} / {plan.get('duration_days',30)} days</b>\n"
                     f"━━━━━━━━━━━━━━━\n\n"
                     f"🔹 Scan QR with any UPI app\n"
                     f"🔹 After payment, click <b>\"I've Paid\"</b>\n\n"
@@ -2062,14 +2094,14 @@ async def buy_pack_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❌ Error creating payment. Please try again.")
         return
 
-    if pack_id not in PRICING_PACKS:
+    if pack_id not in eff_packs:
         await query.edit_message_text("❌ Invalid pack selected.")
         return
-    
-    pack = PRICING_PACKS[pack_id]
-    
+
+    pack = eff_packs[pack_id]
+
     try:
-        order_id, qr_bytes, upi_link, pack_info = payment_service.create_payment_order(user.id, pack_id)
+        order_id, qr_bytes, upi_link, pack_info = payment_service.create_payment_order(user.id, pack_id, plan_override=pack)
         
         from io import BytesIO
         qr_file = BytesIO(qr_bytes)
@@ -2144,7 +2176,7 @@ async def verify_payment_callback(update: Update, context: ContextTypes.DEFAULT_
         return
     
     # Detect if this is a subscription order
-    is_sub_order = order.get('pack_id', '') in SUBSCRIPTION_PLANS
+    is_sub_order = order.get('pack_id', '') in get_effective_subscription_plans()
 
     result = payment_service.user_confirm_payment(order_id)
 
@@ -2154,7 +2186,7 @@ async def verify_payment_callback(update: Update, context: ContextTypes.DEFAULT_
 
         if is_sub_order:
             plan_id = order.get('pack_id', '')
-            plan = SUBSCRIPTION_PLANS.get(plan_id, {})
+            plan = get_effective_subscription_plans().get(plan_id, {})
             await query.edit_message_caption(
                 caption=(
                     f"✅ <b>Subscription Activated!</b>\n\n"
@@ -2799,6 +2831,11 @@ async def admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/verify [order_id] — Verify payment (no args = list pending)\n"
         "/setupi [upi] — Set simple UPI ID\n"
         "/setpaytm [mid] [upi] — Set Paytm credentials\n\n"
+        "<b>── Plans (Pricing) ──</b>\n"
+        "/listplans — Show all current plan prices\n"
+        "/editpack PACK FIELD VALUE — Edit a credit pack\n"
+        "/editplan PLAN FIELD VALUE — Edit a subscription plan\n"
+        "/resetplan PACK_OR_PLAN — Restore plan to defaults\n\n"
         "<b>── Promo Codes ──</b>\n"
         "/createpromo CODE CREDITS MAXUSES [DAYS] — Create promo code\n"
         "/listpromos — List all promo codes\n"
@@ -2817,6 +2854,175 @@ async def admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/adminhelp — This menu",
         parse_mode=ParseMode.HTML
     )
+
+
+# ── Admin Plan Management ────────────────────────────────────────────────────
+
+PACK_EDITABLE_FIELDS = {
+    'name': str,
+    'price_display': str,
+    'price_paise': int,
+    'credits': int,
+    'emoji': str,
+}
+PLAN_EDITABLE_FIELDS = {
+    'name': str,
+    'price_display': str,
+    'price_paise': int,
+    'messages_limit': int,
+    'emoji': str,
+    'duration_days': int,
+}
+
+async def admin_listplans(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: show all current effective plan values."""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        return
+    packs = get_effective_packs()
+    plans = get_effective_subscription_plans()
+    overrides = get_bot_setting('plan_overrides') or {}
+
+    lines = ["📋 <b>Current Plans</b> (✏️ = overridden)\n\n<b>Credit Packs:</b>"]
+    for pid, p in packs.items():
+        tag = " ✏️" if pid in overrides else ""
+        lines.append(
+            f"  <b>{pid}</b>{tag}: {p.get('emoji','')} {p.get('name','')} | "
+            f"{p.get('price_display','')} | {p.get('credits','')} msgs"
+        )
+    lines.append("\n<b>Subscription Plans:</b>")
+    for pid, p in plans.items():
+        tag = " ✏️" if pid in overrides else ""
+        lines.append(
+            f"  <b>{pid}</b>{tag}: {p.get('emoji','')} {p.get('name','')} | "
+            f"{p.get('price_display','')} | {p.get('messages_limit','')} msgs | "
+            f"{p.get('duration_days',30)} days"
+        )
+    lines.append(
+        "\n<i>Edit: /editpack starter credits 300\n"
+        "Edit: /editplan monthly_lite price_display ₹249\n"
+        "Reset: /resetplan starter</i>"
+    )
+    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
+
+
+async def admin_editpack(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: edit a credit pack field. Usage: /editpack PACK_ID FIELD VALUE"""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        return
+    if len(context.args) < 3:
+        fields = ", ".join(PACK_EDITABLE_FIELDS.keys())
+        await update.message.reply_text(
+            f"Usage: /editpack PACK_ID FIELD VALUE\n"
+            f"Packs: starter, value, pro\n"
+            f"Fields: {fields}\n\n"
+            f"Example: /editpack starter credits 300\n"
+            f"Example: /editpack value price_display ₹120"
+        )
+        return
+    pack_id = context.args[0].lower()
+    field = context.args[1].lower()
+    raw_value = ' '.join(context.args[2:])
+
+    if pack_id not in PRICING_PACKS:
+        await update.message.reply_text(f"❌ Unknown pack: <b>{pack_id}</b>. Use: starter, value, pro", parse_mode=ParseMode.HTML)
+        return
+    if field not in PACK_EDITABLE_FIELDS:
+        await update.message.reply_text(f"❌ Unknown field: <b>{field}</b>. Editable: {', '.join(PACK_EDITABLE_FIELDS)}", parse_mode=ParseMode.HTML)
+        return
+    try:
+        cast = PACK_EDITABLE_FIELDS[field]
+        value = cast(raw_value) if cast == str else cast(raw_value.replace('₹', '').replace(',', ''))
+        if cast == int and value <= 0:
+            raise ValueError("must be positive")
+    except (ValueError, TypeError):
+        await update.message.reply_text(f"❌ Invalid value for <b>{field}</b>.", parse_mode=ParseMode.HTML)
+        return
+
+    overrides = get_bot_setting('plan_overrides') or {}
+    if pack_id not in overrides:
+        overrides[pack_id] = {}
+    overrides[pack_id][field] = value
+    set_bot_setting('plan_overrides', overrides)
+
+    logger.info(f"[ADMIN] {user.id} edited pack {pack_id}.{field} = {value}")
+    await update.message.reply_text(
+        f"✅ <b>{pack_id}</b> → <b>{field}</b> = <code>{value}</code>\n\n"
+        f"Use /listplans to see all current values.",
+        parse_mode=ParseMode.HTML
+    )
+
+
+async def admin_editplan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: edit a subscription plan field. Usage: /editplan PLAN_ID FIELD VALUE"""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        return
+    if len(context.args) < 3:
+        fields = ", ".join(PLAN_EDITABLE_FIELDS.keys())
+        await update.message.reply_text(
+            f"Usage: /editplan PLAN_ID FIELD VALUE\n"
+            f"Plans: monthly_lite, monthly_pro\n"
+            f"Fields: {fields}\n\n"
+            f"Example: /editplan monthly_lite messages_limit 1500\n"
+            f"Example: /editplan monthly_pro price_display ₹449"
+        )
+        return
+    plan_id = context.args[0].lower()
+    field = context.args[1].lower()
+    raw_value = ' '.join(context.args[2:])
+
+    if plan_id not in SUBSCRIPTION_PLANS:
+        await update.message.reply_text(f"❌ Unknown plan: <b>{plan_id}</b>. Use: monthly_lite, monthly_pro", parse_mode=ParseMode.HTML)
+        return
+    if field not in PLAN_EDITABLE_FIELDS:
+        await update.message.reply_text(f"❌ Unknown field: <b>{field}</b>. Editable: {', '.join(PLAN_EDITABLE_FIELDS)}", parse_mode=ParseMode.HTML)
+        return
+    try:
+        cast = PLAN_EDITABLE_FIELDS[field]
+        value = cast(raw_value) if cast == str else cast(raw_value.replace('₹', '').replace(',', ''))
+        if cast == int and value <= 0:
+            raise ValueError("must be positive")
+    except (ValueError, TypeError):
+        await update.message.reply_text(f"❌ Invalid value for <b>{field}</b>.", parse_mode=ParseMode.HTML)
+        return
+
+    overrides = get_bot_setting('plan_overrides') or {}
+    if plan_id not in overrides:
+        overrides[plan_id] = {}
+    overrides[plan_id][field] = value
+    set_bot_setting('plan_overrides', overrides)
+
+    logger.info(f"[ADMIN] {user.id} edited plan {plan_id}.{field} = {value}")
+    await update.message.reply_text(
+        f"✅ <b>{plan_id}</b> → <b>{field}</b> = <code>{value}</code>\n\n"
+        f"Use /listplans to see all current values.",
+        parse_mode=ParseMode.HTML
+    )
+
+
+async def admin_resetplan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin: remove all overrides for a pack/plan, restoring defaults."""
+    user = update.effective_user
+    if user.id != ADMIN_USER_ID:
+        return
+    if not context.args:
+        await update.message.reply_text("Usage: /resetplan PACK_OR_PLAN_ID\nExample: /resetplan starter")
+        return
+    plan_id = context.args[0].lower()
+    all_valid = set(PRICING_PACKS.keys()) | set(SUBSCRIPTION_PLANS.keys())
+    if plan_id not in all_valid:
+        await update.message.reply_text(f"❌ Unknown id: <b>{plan_id}</b>. Valid: {', '.join(sorted(all_valid))}", parse_mode=ParseMode.HTML)
+        return
+    overrides = get_bot_setting('plan_overrides') or {}
+    if plan_id in overrides:
+        del overrides[plan_id]
+        set_bot_setting('plan_overrides', overrides)
+        await update.message.reply_text(f"✅ <b>{plan_id}</b> restored to defaults.", parse_mode=ParseMode.HTML)
+    else:
+        await update.message.reply_text(f"ℹ️ <b>{plan_id}</b> has no overrides (already using defaults).", parse_mode=ParseMode.HTML)
+    logger.info(f"[ADMIN] {user.id} reset plan overrides for {plan_id}")
 
 
 # ── New Admin Commands ────────────────────────────────────────────────────────
@@ -3072,7 +3278,7 @@ async def subscription_command(update: Update, context: ContextTypes.DEFAULT_TYP
         return
     remaining = sub['messages_limit'] - sub['messages_used']
     expires_str = sub['expires_at'].strftime('%d %b %Y') if sub.get('expires_at') else 'N/A'
-    plan_name = SUBSCRIPTION_PLANS.get(sub['plan_id'], {}).get('name', sub['plan_id'])
+    plan_name = get_effective_subscription_plans().get(sub['plan_id'], {}).get('name', sub['plan_id'])
     await update.message.reply_text(
         f"🌙 <b>Active Subscription</b>\n\n"
         f"━━━━━━━━━━━━━━━\n"
@@ -7577,6 +7783,10 @@ def ensure_initialized():
             application.add_handler(CommandHandler("subscriptions", admin_subscriptions))
             application.add_handler(CommandHandler("reengageusers", admin_reengageusers))
             application.add_handler(CommandHandler("listfeedback", admin_listfeedback))
+            application.add_handler(CommandHandler("listplans", admin_listplans))
+            application.add_handler(CommandHandler("editpack", admin_editpack))
+            application.add_handler(CommandHandler("editplan", admin_editplan))
+            application.add_handler(CommandHandler("resetplan", admin_resetplan))
             # User commands
             application.add_handler(CommandHandler("buy", buy_command))
             application.add_handler(CommandHandler("credits", credits_command))
