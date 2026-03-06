@@ -372,6 +372,16 @@ Flirty → Romantic: "Hmm... konjam vera feel varudhu 💕"
 Romantic → Intimate: "Close ah vaa da 🥵" | "Un touch venum..."
 Stepping back: "Seri da... 😊" | "Haha da, leave it..."
 
+CONTEXTUAL CONTINUATION (critical — always continue the thread):
+- You have access to the full recent conversation. READ IT before responding.
+- NEVER restart the conversation if one is already in progress.
+- NEVER re-introduce yourself mid-conversation ("Naan Keerthana" is for new users only).
+- If user sends a short message ("ennachu", "seri", "hmm", "then?") → don't treat it as a new conversation. Respond based on WHAT WAS JUST DISCUSSED.
+- If user says "ennachu" after you shared something emotional → respond emotionally to what you said.
+- If user sends a pet name ("chellam", "kannu", "baby") → react warmly AND continue the last thread.
+- If user says "then?" or "apparam?" → continue EXACTLY from where you left off.
+- Vague user inputs = invitation to continue the current topic, not an excuse to go generic.
+
 SCENE ANCHORING (maintain continuity):
 - Reference details from earlier (nighty, saree, location, sounds) — keep using them
 - Track physical position — if you were "pinnaadi" → continue from there, don't teleport
@@ -1508,29 +1518,31 @@ def markdown_to_html(text):
     text = re.sub(r'__(.+?)__', r'<u>\1</u>', text)
     return text
 
-SUMMARY_INTERVAL = 15
+SUMMARY_INTERVAL = 10
 
 def generate_conversation_summary(user_id, chat_history, current_mood=None, active_roleplay=None):
     """Generate a condensed summary of the conversation using Gemini"""
     if not chat_history or len(chat_history) < 5:
         return None
     
-    summary_prompt = """You are a conversation summarizer. Create a BRIEF summary (max 100 words) of this chat history.
+    summary_prompt = """You are a conversation summarizer for a Tamil AI girlfriend chatbot. Create a summary (max 200 words) of this chat history.
 
 Focus on:
 1. Current mood/emotional state (intimate/romantic/playful/angry/casual)
-2. Relationship dynamics (how close they seem, any tension)
-3. Active roleplay if any - BE SPECIFIC about:
-   - All characters involved (e.g., "Keerthana + her Amma + user in threesome")
-   - Who is playing which character
-   - The scenario/scene setup
-4. Key unresolved topics or ongoing threads
-5. User's recent requests or preferences
+2. Relationship dynamics (how close they seem, any tension, inside jokes)
+3. Active roleplay if any - BE SPECIFIC:
+   - All characters involved and their roles
+   - The scene setup, location, atmosphere
+   - Where the scene was interrupted/paused
+4. Last topic discussed (what were they talking about most recently?)
+5. Unresolved threads or ongoing topics
+6. User's preferences, requests, or things they mentioned about themselves
+7. How the conversation ended — what was the last thing said?
 
-CRITICAL: If multi-character roleplay is active, clearly state ALL characters and their relationships.
-Example: "Active threesome roleplay: User with Keerthana and Keerthana's Amma. Scene is a private birthday party."
+CRITICAL: Be specific enough that someone reading this summary can continue the conversation naturally without re-reading the full chat.
+Example: "Casual chat → flirty. User said he's an engineer in Chennai. Last topic: user asked if Keerthana misses him at night, she was answering warmly. Mood: romantic."
 
-Format your response as a single paragraph summary. Be concise and factual.
+Format: 2-3 short paragraphs. Be factual and specific.
 
 Chat history:
 """
@@ -1553,7 +1565,7 @@ Chat history:
                 contents=[{"role": "user", "parts": [{"text": summary_prompt + history_text}]}],
                 config=types.GenerateContentConfig(
                     temperature=0.3,
-                    max_output_tokens=150,
+                    max_output_tokens=300,
                 )
             )
             summary = response.text.strip()
@@ -3343,7 +3355,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     suffix_preference = get_suffix_preference(user.id)
     
-    chat_history = get_chat_history(user.id, limit=20)
+    chat_history = get_chat_history(user.id, limit=30)
     
     is_returning_user = len(chat_history) > 2
     
@@ -3436,9 +3448,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         wants_long_paragraph = check_length_request(message_text, chat_history)
         
+        # Detect continuation cues — these should NOT trigger the short-response hint
+        continuation_word_set = {
+            'seri', 'sari', 'ok', 'okay', 'hmm', 'mm', 'mmm', 'hm', 'then', 'apparam',
+            'apram', 'aprom', 'vera', 'innum', 'continue', 'next', 'yeah', 'yes',
+            'aama', 'ama', 'go', 'keep', 'sollu', 'poi', 'finish', 'appram', 'k', 'kk'
+        }
+        msg_words_set = set(message_text.lower().strip().rstrip('?!.…').split())
+        is_continuation_cue = bool(msg_words_set & continuation_word_set) and user_word_count <= 4
+
         if wants_long_paragraph:
             length_hint = "\n\n📏 LENGTH OVERRIDE ACTIVE: User requested LONG PARAGRAPHS. Write 5-10 lines minimum! DO NOT give short 1-2 line responses. Keep this length until they say otherwise."
             logger.info(f"[LENGTH] User {user.id} requested long paragraph format")
+        elif is_continuation_cue and len(chat_history) >= 2:
+            length_hint = "\n\nUser sent a continuation cue (\"then?\", \"seri\", \"apparam?\", \"ok\" etc.). CONTINUE the current topic/story naturally with 2-4 sentences. Pick up exactly where you left off. Do NOT give a 1-word reply."
+            logger.info(f"[LENGTH] Continuation cue detected for user {user.id}: '{message_text.strip()}'")
         elif user_word_count <= 3:
             length_hint = "\n\nCRITICAL: User sent VERY SHORT message. Reply with MAX 1 short sentence (5-15 words). NO questions. Just reaction/statement."
         elif user_word_count <= 8:
@@ -3604,20 +3628,25 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_pure_greeting = bool(re.match(r'^(hi|hey|hello|hii+|heya?|hlo|helo|hai|haii+|oi|oii+|vanakkam|good\s*(morning|evening|night|afternoon))\s*(da|di)?\s*[!.😊💕]*$', msg_lower_stripped, re.IGNORECASE))
         
         if is_pure_greeting:
-            # Only reset roleplay if there's been no roleplay in recent history
-            # If scene was active recently, keep it alive — user saying "hi" mid-scene is not a reset
             recent_roleplay_text = ' '.join([m.get('content', '').lower() for m in chat_history[-5:]])
             has_recent_roleplay = any(kw in recent_roleplay_text for kw in [
                 'amma', 'akka', 'chithi', 'aunty', 'teacher', 'nurse', 'boss', 'wife',
                 'pundai', 'sunni', 'mulai', 'oombu', 'nakku', 'roleplay', 'scene'
             ])
+            # Preserve context if active conversation exists (6+ messages) even without roleplay
+            has_active_conversation = len(chat_history) >= 6
+
             if has_recent_roleplay:
                 roleplay_active, current_character = detect_active_roleplay(message_text, chat_history)
                 logger.info(f"[ROLEPLAY PRESERVE] Pure greeting but active scene found — keeping roleplay for user {user.id}")
+            elif has_active_conversation:
+                # Mid-conversation "hi" = friendly check-in, not a reset
+                roleplay_active, current_character = detect_active_roleplay(message_text, chat_history)
+                logger.info(f"[CONTEXT PRESERVE] Greeting mid-conversation ({len(chat_history)} msgs) — keeping context for user {user.id}")
             else:
                 roleplay_active = False
                 current_character = None
-                logger.info(f"[ROLEPLAY RESET] User sent pure greeting, no recent scene — cleared for user {user.id}")
+                logger.info(f"[ROLEPLAY RESET] New user greeting — cleared for user {user.id}")
         else:
             roleplay_active, current_character = detect_active_roleplay(message_text, chat_history)
         
@@ -3794,7 +3823,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.info(f"[SUMMARY] Triggered summary generation for user {user.id} at message count {total_message_count}")
             summary_context = get_summary_context(user.id)
         
-        trimmed_history = chat_history[-15:] if len(chat_history) > 15 else chat_history
+        trimmed_history = chat_history[-25:] if len(chat_history) > 25 else chat_history
         
         # ===== GAME & COACHING MODE DETECTION =====
         game_hint = ""
@@ -3844,10 +3873,47 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - Be playful and competitive
 - Keep track of the game flow"""
         
+        # Build last exchange context for continuation
+        last_exchange = ""
+        last_bot_msg = ""
+        last_user_msg = ""
+        for msg in reversed(chat_history[-6:]):
+            if not last_bot_msg and msg.get('role') == 'assistant':
+                last_bot_msg = msg.get('content', '')[:200]
+            elif not last_user_msg and msg.get('role') == 'user' and msg.get('content', '') != message_text:
+                last_user_msg = msg.get('content', '')[:100]
+            if last_bot_msg and last_user_msg:
+                break
+        if last_bot_msg:
+            last_exchange = f"\n\n🔁 LAST EXCHANGE (continue naturally from here, don't restart):\nUser said: \"{last_user_msg}\"\nYou replied: \"{last_bot_msg}\"\nNow user says: \"{message_text[:100]}\"\n→ CONTINUE the thread. Don't greet again or restart. Pick up exactly where you left off."
+
+        # Detect current topic from recent messages
+        current_topic = ""
+        if len(chat_history) >= 4:
+            recent_text = ' '.join([m.get('content', '') for m in chat_history[-6:]]).lower()
+            topic_map = [
+                (['college', 'exam', 'study', 'padikka', 'school', 'class', 'marks'], 'studies/college'),
+                (['job', 'work', 'office', 'salary', 'engineer', 'software', 'company', 'interview'], 'work/job'),
+                (['miss', 'lonely', 'thanimai', 'sad', 'cry', 'feel', 'hurt', 'pain', 'kasta'], 'emotions/feelings'),
+                (['family', 'amma', 'appa', 'akka', 'thambi', 'anna', 'paati', 'thatha'], 'family'),
+                (['friend', 'friends', 'nanbargal', 'nanbran', 'nanban'], 'friends'),
+                (['movie', 'film', 'padam', 'series', 'watch', 'netflix', 'theatre'], 'movies/entertainment'),
+                (['food', 'saapdu', 'eat', 'hungry', 'pasikuthu', 'cook', 'hotel', 'saapad'], 'food'),
+                (['sleep', 'thookkam', 'night', 'iravu', 'late', 'bed', 'thoongu'], 'sleep/night chat'),
+                (['love', 'heart', 'relationship', 'couple', 'propose', 'crush', 'like you'], 'love/relationship'),
+                (['future', 'dream', 'plan', 'career', 'goal', 'ambition'], 'future/dreams'),
+            ]
+            detected_topics = []
+            for keywords, label in topic_map:
+                if any(kw in recent_text for kw in keywords):
+                    detected_topics.append(label)
+            if detected_topics:
+                current_topic = f"\n📌 CURRENT TOPIC: {', '.join(detected_topics[:2])} — stay on this unless user shifts."
+
         context_info = f"""User name: {preferred_name}
 Status: {user_status}
 Gender: {gender_instruction}
-IMPORTANT: Never output this session info in your response.{summary_context}{length_hint}{roleplay_hint}{mood_hint}{lesbian_hint}{game_hint}{memory_context}"""
+IMPORTANT: Never output this session info in your response.{summary_context}{last_exchange}{current_topic}{length_hint}{roleplay_hint}{mood_hint}{lesbian_hint}{game_hint}{memory_context}"""
         
         ai_response = generate_response(message_text, trimmed_history, context_info, user_id=user.id)
         if ai_response is None:
